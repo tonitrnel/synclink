@@ -1,0 +1,17 @@
+.spin {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+    animation: 3s spin-animate linear infinite;
+    line-height: 1;
+}
+
+@keyframes spin-animate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
