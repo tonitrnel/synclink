@@ -1,0 +1,79 @@
+/* Item */
+.synclink-item {
+    margin: 20px 0;
+    background-color: #fefefe;
+    padding: 0 0 20px 0;
+    border-radius: 2px;
+    border-bottom: 1px dashed #cccccc;
+}
+
+.synclink-item:last-of-type {
+    border-bottom: none;
+}
+
+.synclink-item-title {
+    margin-top: 0;
+}
+
+.synclink-item-metadata {
+    display: flex;
+    gap: 5px;
+    font-size: 12px;
+    margin: 10px 0;
+}
+
+.synclink-item-metadata span {
+    border: 1px solid #cccccc;
+    padding: 0 2px;
+}
+
+.synclink-item-menus {
+    display: flex;
+    gap: 5px;
+}
+
+.synclink-item-link {
+    -webkit-appearance: none;
+    border: none;
+    background-color: transparent;
+    text-decoration: underline;
+    color: #333;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0;
+}
+
+/* Preview Item */
+
+p.synclink-item-preview {
+    width: 100%;
+    color: #171717;
+    font-weight: bold;
+    font-size: 12px;
+    white-space: break-spaces;
+}
+
+video.synclink-item-preview {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+}
+
+figure.synclink-item-preview {
+    text-align: left;
+    margin: 0;
+    width: max-content;
+}
+
+figure.synclink-item-preview img {
+    max-height: 300px;
+    max-width: 100%;
+    object-fit: cover;
+    object-position: left;
+}
+
+figure.synclink-item-preview figcaption {
+    text-align: right;
+}

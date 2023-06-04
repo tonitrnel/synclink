@@ -1,9 +1,9 @@
 import { FC, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Spin } from '../spin';
-import { OneShot } from '../../utils/one-shot.ts';
-import { formatBytes } from '../../utils/format-bytes.ts';
-import { calculateDuration } from '../../utils/calculate-duration.ts';
-import { ReactComponent as AlertReiangleIcon } from '../../assets/alert-triangle.svg';
+import { OneShot } from '~/utils/one-shot.ts';
+import { formatBytes } from '~/utils/format-bytes.ts';
+import { calculateDuration } from '~/utils/calculate-duration.ts';
+import { ReactComponent as AlertTriangleIcon } from '~/assets/alert-triangle.svg';
 import './upload-manager.css';
 
 type OneShotData = {
@@ -142,7 +142,7 @@ export const UploadManager: FCWithOneShot = memo(() => {
           case 'failure':
             return (
               <p className="upload-failure-reason">
-                <AlertReiangleIcon />
+                <AlertTriangleIcon />
                 <span>{uploadState.reason}</span>
               </p>
             );

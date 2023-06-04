@@ -1,0 +1,48 @@
+.synclink-list-container .synclink-loading {
+    width: 32px;
+    height: 32px;
+    color: #aaa;
+    display: block;
+    margin: 20% auto 0;
+}
+
+.synclink-list-container .synclink-loading circle {
+    stroke-dasharray: 12.5;
+}
+
+.synclink-list-container .synclink-error {
+    display: block;
+    margin: 20% auto 0;
+    text-align: center;
+    color: #aaa;
+}
+
+.synclink-list {
+    margin-top: 10px;
+    padding: 0;
+    list-style: none;
+}
+
+.synclink-list:not(:empty)::after {
+    content: "-- END --";
+    display: block;
+    text-align: center;
+    padding: 10px;
+    color: #e0e2e6;
+}
+
+.synclink-list:empty::after {
+    content: "No items found.";
+    display: block;
+    text-align: center;
+    margin-top: 60px;
+    color: #e0e2e6;
+}
+
+.synclink-list:not(:empty)::after {
+    content: "-- END --";
+    display: block;
+    text-align: center;
+    padding: 10px;
+    color: #e0e2e6;
+}

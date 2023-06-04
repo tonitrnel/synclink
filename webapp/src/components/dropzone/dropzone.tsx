@@ -7,8 +7,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { ReactComponent as SendIcon } from '../../assets/send.svg';
-import { IGNORE_FILE_TYPE } from '../../constants';
+import { ReactComponent as SendIcon } from '~/assets/send.svg';
+import { IGNORE_FILE_TYPE } from '~/constants';
 import './dropzone.css';
 
 export const DropZone: FC<{

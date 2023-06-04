@@ -1,0 +1,74 @@
+.section-input__textarea {
+    border: 1px solid #e0e2e6;
+    resize: none;
+    min-height: 100px;
+    font-family: inherit;
+    padding: 10px;
+    line-height: 1.5;
+    color: #333;
+    width: calc(100% - 20px);
+    border-radius: 5px;
+}
+
+.section-input__textarea:focus {
+    outline: none;
+    border-color: #333;
+}
+
+.section-input__menu {
+    display: flex;
+    margin-top: 10px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-input__menu-left {
+    display: flex;
+    gap: 5px;
+}
+
+.section-input__menu button {
+    background-color: #e5e5e5;
+    height: auto;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+    font-size: 0;
+    cursor: pointer;
+    color: #666;
+    border-radius: 4px;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    font-family: inherit;
+    user-select: none;
+}
+
+.section-input__menu button[disabled] {
+    cursor: not-allowed;
+    color: #000;
+}
+
+.section-input__menu button:active {
+    outline: 2px solid #9f9f9f;
+}
+
+.section-input__menu button > span {
+    font-size: 12px;
+    padding: 8px 16px;
+}
+
+.section-input__menu button > svg {
+    padding: 8px;
+}
+
+.section-input__menu button > span + svg {
+    background-color: #dadada;
+}
+
+.section-input__menu button svg {
+    width: 16px;
+    height: 16px;
+}

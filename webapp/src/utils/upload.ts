@@ -1,5 +1,5 @@
 import { calculateHash, calculateHashFromStream } from './calculate-hash.ts';
-import { UploadManager } from '../components/upload-manager';
+import { UploadManager } from '~/components/upload-manager';
 
 const fastPerform = async (file: File) => {
   const hash = await calculateHash(file.arrayBuffer(), 'SHA-256');

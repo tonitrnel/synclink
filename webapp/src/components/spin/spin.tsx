@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { clsx } from '../../utils/clsx.ts';
+import { clsx } from '~/utils/clsx.ts';
 import './spin.css';
 
 export const Spin: FC<{ className?: string }> = ({ className }) => {
