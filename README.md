@@ -4,18 +4,18 @@ SyncLink 是一个简洁的用于快速存储文本、图像和文件以方便�
 
 ## 功能
 
-- 文件共享：支持文本图像快速粘贴复制以及，方便用户在不同设备上共享
-- 实时通知：通过 SSE 技术，用户能够接收到文件状态更新、新文件的通知等
-- 搜索功能：提供便捷的搜索功能，帮助用户快速找到所需的文件和文本内容。
+- 文件共享：支持文本图像快速粘贴复制以及拖拽，方便用户在不同设备上共享。
+- 实时更新：用户能够接收到列表的实时变化。
+- 搜索功能：提供便捷的搜索功能，帮助用户快速找到所需的文件和文本内容【Todo】。
 
 ## 技术栈
 
-- 前端：使用 Vite、TypeScript 和 React 构建的前端应用程序
+- 前端：使用 TypeScript 和 React 构建的前端应用程序
 - 后端：使用 Rust 和 Axum 构建后端服务
 
 ## 前提条件
 
-开发需要安装 `NodeJS` 和 `Rust`、`WASM-Pack`
+开发需要安装 [`NodeJS`](https://nodejs.org/en/download) 和 [`Rust`](https://www.rust-lang.org/tools/install)、[`WASM-Pack`](https://rustwasm.github.io/wasm-pack)
 
 ## 快速开始
 
@@ -34,10 +34,10 @@ git clone https://github.com/tonitrnel/synclink
 cd server
 cargo build
 # 进入 WASM 目录
-cd ../wasm
+cd ../wasm/sha256
 wasm-pack build
 # 进入 webapp 目录
-cd ../webapp
+cd ../../webapp
 npm install
 ```
 
