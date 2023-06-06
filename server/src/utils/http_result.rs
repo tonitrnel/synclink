@@ -1,3 +1,4 @@
+use crate::errors::ApiError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -119,6 +120,16 @@ impl From<(HttpException, String)> for HttpError {
 
 impl From<(HttpException, &str)> for HttpError {
     fn from(value: (HttpException, &str)) -> Self {
+        Self {
+            error: None,
+            exception: value.0,
+            custom_message: Some(value.1.to_string()),
+        }
+    }
+}
+
+impl From<(HttpException, ApiError<'_>)> for HttpError {
+    fn from(value: (HttpException, ApiError)) -> Self {
         Self {
             error: None,
             exception: value.0,
