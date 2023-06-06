@@ -3,11 +3,6 @@ extern crate wasm_bindgen;
 use sha2::{Digest, Sha256};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
 type Hasher = sha2::digest::core_api::CoreWrapper<
     sha2::digest::core_api::CtVariableCoreWrapper<
         sha2::Sha256VarCore,
@@ -33,17 +28,14 @@ impl Sha256Binding {
     pub fn finalize(self) -> Vec<u8> {
         self.hasher.finalize().to_vec()
     }
+    pub fn digest(bytes: Vec<u8>) -> Vec<u8> {
+        Sha256::digest(bytes).to_vec()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
 
     fn to_hex(bytes: Vec<u8>) -> String {
         bytes
@@ -53,7 +45,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sha256() {
+    fn test_partial_bytes_update_digest() {
         let str = "That perches in the soul";
         let bytes = str.as_bytes();
         let mut hasher = Sha256Binding::create();
@@ -61,6 +53,16 @@ mod tests {
         hasher.update(bytes[8..].to_vec());
         assert_eq!(
             to_hex(hasher.finalize()),
+            "a3ad9aac74e36b60c75c02151ca1de92f217b0d9a14c7130a40d396731bee2d7"
+        )
+    }
+
+    #[test]
+    fn test_direct_digest() {
+        let str = "That perches in the soul";
+        let bytes = str.as_bytes();
+        assert_eq!(
+            to_hex(Sha256Binding::digest(bytes.to_vec())),
             "a3ad9aac74e36b60c75c02151ca1de92f217b0d9a14c7130a40d396731bee2d7"
         )
     }
