@@ -2,10 +2,12 @@ use crate::utils;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::io::{Seek, SeekFrom, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::{fs, io::AsyncWriteExt, sync::Mutex};
+use tokio::io::AsyncReadExt;
+use tokio::{fs, sync::Mutex};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,6 +51,12 @@ impl BucketEntity {
             None => self.name.to_string(),
         }
     }
+    pub fn get_resource(&self) -> String {
+        match &self.ext {
+            Some(ext) => format!("{}.{}", self.uid, ext),
+            None => self.uid.to_string(),
+        }
+    }
     pub fn get_hash(&self) -> &str {
         &self.hash
     }
@@ -87,7 +95,7 @@ impl PartialEq for BucketEntity {
 pub struct PreallocationFile {
     pub uid: Uuid,
     pub file: fs::File,
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 impl PreallocationFile {
@@ -96,7 +104,7 @@ impl PreallocationFile {
         drop(self.file);
         fs::remove_file(&self.path)
             .await
-            .with_context(|| format!("Error: cleanup file failed from {:?}", self.path))?;
+            .with_context(|| format!("Error: Cleanup file failed from {:?}", self.path))?;
         Ok(())
     }
 }
@@ -118,6 +126,7 @@ struct Index {
 
 pub(crate) struct Bucket {
     index: Arc<Mutex<Index>>,
+    index_file: std::fs::File,
     path: PathBuf,
 }
 
@@ -125,18 +134,22 @@ impl Bucket {
     pub(crate) async fn connect(path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_owned();
         if !&path.is_dir() {
-            panic!("Error: path '{:?}' is not a directory", path.as_os_str())
+            panic!("Error: Path '{:?}' is not a directory", path.as_os_str())
         }
         let index_path = path.join("index.toml");
-        if !index_path.exists() {
-            fs::write(&index_path, "")
-                .await
-                .expect("Error: Generate index.toml failed");
+        if index_path.exists() && !index_path.is_file() {
+            panic!("Error: Path '{:?}' is not a file", index_path.as_os_str())
         }
-        if !index_path.is_file() {
-            panic!("Error: path '{:?}' is not a file", index_path.as_os_str())
-        }
-        let index_content = fs::read_to_string(&index_path)
+        let mut index_file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(!index_path.exists())
+            .open(&index_path)
+            .await
+            .unwrap_or_else(|_| panic!("Error: Index file open '{:?}' failed", &index_path));
+        let mut index_content = String::new();
+        index_file
+            .read_to_string(&mut index_content)
             .await
             .unwrap_or_else(|_| panic!("Error: Index read '{:?}' failed", index_path.as_os_str()));
         let index: Index = toml::from_str(&index_content).unwrap_or_else(|err| {
@@ -146,6 +159,7 @@ impl Bucket {
         let path = index_path.parent().unwrap().to_path_buf();
         Self {
             index: Arc::new(Mutex::new(index)),
+            index_file: index_file.into_std().await,
             path,
         }
     }
@@ -180,14 +194,6 @@ impl Bucket {
         }
         None
     }
-    pub(crate) fn get_entity_path(&self, entity: &BucketEntity) -> PathBuf {
-        self.path.join({
-            match &entity.ext {
-                Some(ext) => format!("{}.{}", entity.uid, ext),
-                None => entity.uid.to_string(),
-            }
-        })
-    }
     pub(crate) async fn delete(&self, id: &Uuid) -> anyhow::Result<()> {
         let mut index = self.index.try_lock().unwrap();
         let entity_with_idx = index.items.iter().enumerate().find_map(|(idx, it)| {
@@ -199,13 +205,10 @@ impl Bucket {
         });
         match entity_with_idx {
             Some((idx, entity)) => {
-                let asset_path = self.get_entity_path(entity);
-                if asset_path.exists() {
-                    fs::remove_file(&asset_path).await.with_context(|| {
-                        format!(
-                            "Error: remove asset file '{:?}' failed",
-                            asset_path.as_os_str()
-                        )
+                let resource_path = self.get_storage_path().join(entity.get_resource());
+                if resource_path.exists() {
+                    fs::remove_file(&resource_path).await.with_context(|| {
+                        format!("Error: Remove resource file '{:?}' failed", &resource_path)
                     })?;
                 };
                 // Regenerate index file content
@@ -220,11 +223,19 @@ impl Bucket {
                         },
                     )
                 };
-                match fs::write(&self.path.join("index.toml"), content)
-                    .await
-                    .with_context(|| "Fatal error: update index failed")
+                let mut file = self.index_file.try_clone()?;
+                let bytes = content.as_bytes();
+                file.seek(SeekFrom::Start(0))?;
+                // `write_all` is used to overwrite not truncate, so set the length here to ensure that all content is overwritten
+                file.set_len(bytes.len() as u64)?;
+                match file
+                    .write_all(bytes)
+                    .with_context(|| "Fatal error: Update index file failed")
                 {
-                    Ok(_) => Ok(()),
+                    Ok(_) => {
+                        self.sync_all()?;
+                        Ok(())
+                    }
                     Err(err) => {
                         // rollback
                         index.items.insert(idx, deleted);
@@ -235,26 +246,32 @@ impl Bucket {
             _ => Ok(()),
         }
     }
-    /// 写入索引
+    pub(crate) fn get_storage_path(&self) -> &PathBuf {
+        &self.path
+    }
+    /// Writing entity to index file
     async fn write_index(&self, entity: &BucketEntity) -> anyhow::Result<()> {
         let part = format!(
             "{newline}[[item]]\n{body}",
-            newline = if self.index.try_lock().unwrap().items.is_empty() {
+            newline = if self.index.try_lock()?.items.is_empty() {
                 ""
             } else {
                 "\n"
             },
-            body = toml::to_string(entity).unwrap()
+            body = toml::to_string(entity)?
         );
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .open(&self.path.join("index.toml"))
-            .await
-            .with_context(|| "Fatal Error: open index file failed")?;
+        let mut file = self.index_file.try_clone()?;
+        file.seek(SeekFrom::End(0))?;
         file.write_all(part.as_bytes())
-            .await
-            .with_context(|| "Fatal Error: write index file failed")?;
+            .with_context(|| "Fatal Error: Write new index to index file failed")?;
+        self.sync_all()?;
         Ok(())
+    }
+    /// Sync indexes to index file
+    fn sync_all(&self) -> anyhow::Result<()> {
+        self.index_file
+            .sync_all()
+            .with_context(|| "Fatal Error: Sync indexes to file failed")
     }
     /// 预分配一个 UUID 和文件，并可选择进行预分配大小。
     ///
