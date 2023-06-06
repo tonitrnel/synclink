@@ -1,6 +1,17 @@
-import { FC, memo, useCallback, useMemo, useRef } from 'react';
+import {
+  ChangeEventHandler,
+  FC,
+  KeyboardEventHandler,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ReactComponent as UploadCloudIcon } from '~/assets/upload-cloud.svg';
 import { ReactComponent as SendIcon } from '~/assets/send.svg';
+import { ReactComponent as CloseIcon } from '~/assets/x.svg';
 import { ReactComponent as ClipboardPasteIcon } from '~/assets/clipboard-paste.svg';
 import { DropZone } from '../dropzone';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
@@ -10,17 +21,17 @@ import { upload } from '~/utils/upload.ts';
 import './input.css';
 
 export const Input: FC = memo(() => {
+  const [text, setText] = useState('');
+  const textRef = useRef(text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const handleSend = useMemo(
     () =>
       executeAsyncTask(async () => {
-        const textarea = textareaRef.current;
-        if (!textarea || textarea.value.trim().length === 0) {
-          return void 0;
-        }
+        const value = textRef.current.trim();
+        if (value.length === 0) return void 0;
         try {
-          await upload(new File([textarea.value], '', { type: 'text/plain' }));
-          textarea.value = '';
+          await upload(new File([value], '', { type: 'text/plain' }));
+          setText('');
         } catch (e) {
           console.error('Seed failed', e);
         }
@@ -44,8 +55,6 @@ export const Input: FC = memo(() => {
   const handlePaste = useMemo(
     () =>
       executeAsyncTask(async () => {
-        const textarea = textareaRef.current;
-        if (!textarea) return void 0;
         try {
           const data = await navigator.clipboard.read();
           if (data.length === 0) return void 0;
@@ -59,14 +68,38 @@ export const Input: FC = memo(() => {
                 return it.getType(type);
               })
               .filter((it): it is NonNullable<typeof it> => Boolean(it))
+              .reverse()
           );
-          for (const item of items) {
+          const item = items[0];
+          if (item.type.startsWith('text/')) {
+            setText(await item.text().then((text) => text.trim()));
+            textareaRef.current?.focus();
+          } else {
             await upload(new File([item], '', { type: item.type }));
           }
         } catch (e) {
           console.error(e);
         }
       }),
+    []
+  );
+  const handleKeyUp = useMemo<KeyboardEventHandler>(
+    () =>
+      executeAsyncTask(async (evt) => {
+        if (evt.ctrlKey && evt.key === 'Enter') {
+          evt.preventDefault();
+          await handleSend();
+        }
+      }),
+    [handleSend]
+  );
+  const handleClear = useCallback(() => {
+    setText('');
+  }, []);
+  const handleChange = useCallback<ChangeEventHandler<HTMLTextAreaElement>>(
+    (evt) => {
+      setText(evt.target.value);
+    },
     []
   );
   const handleReceivedTransferData = useCallback(async (files: File[]) => {
@@ -78,24 +111,81 @@ export const Input: FC = memo(() => {
       console.error(e);
     }
   }, []);
+  // Register "measure-size" event
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const container = textarea?.parentElement;
+    if (!textarea || !container) return void 0;
+    const measure = document.createElement('span');
+    measure.className = 'input-measure';
+    const computedStyle = window.getComputedStyle(textarea);
+    measure.style.setProperty('font-family', computedStyle.fontFamily);
+    measure.style.setProperty('width', computedStyle.width);
+    let measureTimer: number | void = void 0;
+    const lineHeight = 12 * 1.5;
+    container.appendChild(measure);
+    const measureSize = () => {
+      if (measureTimer) window.cancelAnimationFrame(measureTimer);
+      measureTimer = window.requestAnimationFrame(() => {
+        const value = textarea.value;
+        measure.innerText = textarea.value || ' ';
+        const height = Math.max(
+          measure.offsetHeight + (value.endsWith('\n') ? lineHeight : 0),
+          lineHeight
+        );
+        textarea.style.setProperty('height', `${height}px`);
+        if (
+          textarea.selectionStart === value.length &&
+          textarea.scrollHeight > textarea.clientHeight
+        ) {
+          textarea.scrollTo({ top: textarea.scrollHeight });
+        }
+      });
+    };
+    textarea.addEventListener('measure-size', measureSize);
+    return () => {
+      container.removeChild(measure);
+      textarea.removeEventListener('measure-size', measureSize);
+    };
+  }, []);
+  // Dispatch the "measure-size" event and update text ref when the text change
+  useEffect(() => {
+    textRef.current = text;
+    textareaRef.current?.dispatchEvent(new CustomEvent('measure-size'));
+  }, [text]);
   return (
     <section className="section-input">
       <textarea
         ref={textareaRef}
+        value={text}
+        onKeyUp={handleKeyUp}
+        onChange={handleChange}
         className="section-input__textarea"
         placeholder="Just write something..."
       ></textarea>
       <div className="section-input__menu">
         <div className="section-input__menu-left">
-          <button title="Upload" onClick={handleUpload}>
+          <button title="Upload" data-btn-typ="default" onClick={handleUpload}>
             <UploadCloudIcon />
           </button>
-          <button title="Paste" onClick={handlePaste}>
+          <button title="Paste" data-btn-typ="default" onClick={handlePaste}>
             <ClipboardPasteIcon />
           </button>
         </div>
         <div className="section-input__menu-right">
-          <button title="Send" onClick={handleSend}>
+          <button
+            data-btn-typ="text"
+            title="Clear"
+            disabled={text.length === 0}
+            onClick={handleClear}
+          >
+            <CloseIcon />
+          </button>
+          <button
+            data-btn-typ="default"
+            title="Send (Ctrl + C)"
+            onClick={handleSend}
+          >
             <span>Send</span>
             <SendIcon />
           </button>
