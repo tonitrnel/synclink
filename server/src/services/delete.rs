@@ -9,7 +9,7 @@ use axum::{
 use uuid::Uuid;
 
 #[debug_handler]
-pub async fn delete_bucket(
+pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> HttpResult<Json<String>> {

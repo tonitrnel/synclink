@@ -1,12 +1,13 @@
-pub mod add_bucket;
-pub mod delete_bucket;
-pub mod get_bucket;
-pub mod list_bucket;
+pub mod add;
+pub mod delete;
+pub mod get;
+pub mod list;
 pub mod update_notify;
-mod upload_part;
+pub mod upload_part;
 
-pub use add_bucket::*;
-pub use delete_bucket::*;
-pub use get_bucket::*;
-pub use list_bucket::*;
-pub use update_notify::*;
+pub use add::add;
+pub use delete::delete;
+pub use get::{get, get_metadata};
+pub use list::list;
+pub use update_notify::update_notify;
+pub use upload_part::upload_part;

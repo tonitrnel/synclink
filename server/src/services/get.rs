@@ -1,4 +1,5 @@
 use crate::config::state::AppState;
+use crate::errors::{ApiError, InternalError};
 use crate::utils::{HttpException, HttpResult};
 use crate::{throw_error, try_break_ok, utils};
 use anyhow::Context;
@@ -22,7 +23,7 @@ pub struct GetBucketQueryParams {
 }
 
 #[debug_handler]
-pub async fn get_bucket(
+pub async fn get(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     headers: HeaderMap,
@@ -37,27 +38,25 @@ pub async fn get_bucket(
     let (path, item) = {
         let bucket = state.bucket;
         if !bucket.has(&id) {
-            throw_error!(
-                HttpException::NotFound,
-                format!("Bucket id {} not found", id)
-            )
+            throw_error!(HttpException::NotFound)
         }
         bucket
             .get(&id)
-            .map(|it| (bucket.get_entity_path(&it), it))
+            .map(|it| (bucket.get_storage_path().join(it.get_resource()), it))
             .unwrap()
     };
     let ranges = headers
         .get("range")
         .map(|it| String::from_utf8(it.as_bytes().to_vec()).unwrap())
         .map(|it| utils::parse_ranges(&it));
+
     let file = try_break_ok!(tokio::fs::File::open(&path)
         .await
-        .with_context(|| format!("file open failed from {:?}", &path)));
+        .with_context(|| InternalError::OpenFile(&path).to_string()));
     let metadata = try_break_ok!(file
         .metadata()
         .await
-        .with_context(|| "file metadata read failed"));
+        .with_context(|| InternalError::ReadFileMetadata(&path).to_string()));
     let mut response_headers = vec![
         (
             header::CONTENT_TYPE,
@@ -86,11 +85,8 @@ pub async fn get_bucket(
             Pin<Box<dyn Stream<Item = Result<axum::body::Bytes, std::io::Error>> + Send>>;
         let mut streams: Vec<PinedStreamPart> = Vec::new();
         let mut transmitted_length = 0;
-        if ranges.len() > 10 {
-            throw_error!(
-                HttpException::RangeNotSatisfiable,
-                "To many ranges".to_string()
-            );
+        if ranges.len() > 8 {
+            throw_error!(HttpException::RangeNotSatisfiable, ApiError::RangeTooLarge);
         }
         for range in ranges.iter() {
             let (start, end, is_negative) = match range {
@@ -100,7 +96,7 @@ pub async fn get_bucket(
                     let last = (*last).min(total);
                     (total - last, total, true)
                 }
-                _ => throw_error!(HttpException::RangeNotSatisfiable),
+                _ => throw_error!(HttpException::RangeNotSatisfiable, ApiError::InvalidRange),
             };
             // 如果指定了 range-end 则取部分值
             let end = end.min(total);
@@ -117,29 +113,27 @@ pub async fn get_bucket(
             if len > 4096 {
                 let mut file = try_break_ok!(tokio::fs::File::open(&path)
                     .await
-                    .with_context(|| format!("file open failed from {:?}", &path)));
+                    .with_context(|| InternalError::OpenFile(&path).to_string()));
                 try_break_ok!(file
                     .seek(SeekFrom::Start(start))
                     .await
-                    .with_context(|| "file stream seek failed"));
+                    .with_context(|| InternalError::SeekFile));
                 let stream = ReaderStream::new(file.take(len));
                 streams.push(Box::pin(stream));
             } else {
                 let mut file = try_break_ok!(file
                     .try_clone()
                     .await
-                    .with_context(|| "clone file handler failed"));
+                    .with_context(|| InternalError::CloneFileHandle));
                 try_break_ok!(file
                     .seek(SeekFrom::Start(start))
                     .await
-                    .with_context(|| "file stream seek failed"));
+                    .with_context(|| InternalError::SeekFile));
                 let mut buffer = vec![0; len as usize];
-                println!("will write {} bytes", buffer.len());
                 try_break_ok!(file
                     .read_exact(&mut buffer)
                     .await
-                    .with_context(|| "file stream exact failed"));
-                println!("buffer = {:?}", buffer);
+                    .with_context(|| InternalError::ExactFile));
                 let buffer =
                     Box::new(std::io::Cursor::new(buffer)) as Box<dyn AsyncRead + Unpin + Send>;
                 let stream = ReaderStream::new(buffer);
@@ -153,7 +147,7 @@ pub async fn get_bucket(
         });
         let combine_stream = match combine_stream
             .map(StreamBody::new)
-            .with_context(|| "missing stream output")
+            .with_context(|| ApiError::RangeNotFound)
         {
             Ok(stream) => stream,
             Err(err) => throw_error!(HttpException::RangeNotSatisfiable, err),
@@ -179,24 +173,15 @@ pub async fn get_bucket(
     }
 }
 
-pub async fn get_bucket_metadata(
+#[debug_handler]
+pub async fn get_metadata(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> HttpResult<impl IntoResponse> {
     let bucket = state.bucket;
-    if bucket.has(&id) {
-        let item = bucket
-            .get(&id)
-            .with_context(|| format!("Bucket id {} query failed", id));
-        if let Err(err) = item {
-            return Err(err).into();
-        }
-        let item = item.unwrap().clone();
+    if let Some(item) = bucket.get(&id) {
         Ok::<_, ()>(Json(item)).into()
     } else {
-        throw_error!(
-            HttpException::NotFound,
-            format!("Bucket id {} not found", id)
-        )
+        throw_error!(HttpException::NotFound, ApiError::ResourceNotFound)
     }
 }

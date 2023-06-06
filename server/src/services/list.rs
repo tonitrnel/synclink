@@ -25,7 +25,7 @@ pub struct BucketEntityDto {
 }
 
 #[debug_handler]
-pub async fn list_bucket(
+pub async fn list(
     State(state): State<AppState>,
     query: Query<QueryParams>,
 ) -> HttpResult<Json<Vec<BucketEntityDto>>> {
