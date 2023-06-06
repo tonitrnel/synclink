@@ -1,4 +1,12 @@
-import { FC, memo, MouseEvent, ReactNode, useMemo } from 'react';
+import {
+  FC,
+  memo,
+  MouseEvent,
+  MouseEventHandler,
+  ReactNode,
+  useCallback,
+  useMemo,
+} from 'react';
 import { EntityProvider, useEntityConsumer } from './entity-provider.ts';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -65,16 +73,25 @@ const SynclinkItemMenu: FC<{
     );
   }
 );
-const SynclinkItemMetadata: FC<{ entity: IEntity }> = memo(({ entity }) => {
+const SynclinkItemMetadata: FC<{
+  entity: IEntity;
+  features?: Array<'date' | 'type' | 'size'>;
+}> = memo(({ entity, features = ['date', 'type', 'size'] }) => {
   return (
     <div className="synclink-item-metadata">
-      <span className="synclink-item-date">
-        {dayjs(entity.created).fromNow()}
-      </span>
-      <span className="synclink-item-type">Type: {entity.type}</span>
-      <span className="synclink-item-size">
-        Size: {formatBytes(entity.size)}
-      </span>
+      {features.includes('date') && (
+        <span className="synclink-item-date">
+          {dayjs(entity.created).fromNow()}
+        </span>
+      )}
+      {features.includes('type') && (
+        <span className="synclink-item-type">type: {entity.type}</span>
+      )}
+      {features.includes('size') && (
+        <span className="synclink-item-size">
+          size: {formatBytes(entity.size)}
+        </span>
+      )}
     </div>
   );
 });
@@ -87,6 +104,20 @@ const TextItem: FC = () => {
     `${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}`,
     (res) => res.text()
   );
+  const handleDoubleClick = useCallback<
+    MouseEventHandler<HTMLParagraphElement>
+  >((evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const selection = window.getSelection();
+
+    if (selection) {
+      selection.removeAllRanges();
+      const range = document.createRange();
+      range.selectNodeContents(evt.currentTarget);
+      selection.addRange(range);
+    }
+  }, []);
   const copyButton = useMemo<CustomMenu>(
     () => ({
       key: 'copy',
@@ -100,8 +131,10 @@ const TextItem: FC = () => {
   );
   return (
     <>
-      <p className="synclink-item-preview">{content}</p>
-      <SynclinkItemMetadata entity={entity} />
+      <p className="synclink-item-preview" onDoubleClick={handleDoubleClick}>
+        {content}
+      </p>
+      <SynclinkItemMetadata entity={entity} features={['date']} />
       <SynclinkItemMenu
         entity={entity}
         features={['deletable']}
@@ -116,7 +149,9 @@ const FigureItem: FC = () => {
     <>
       <figure className="synclink-item-preview">
         <img
-          src={`${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}`}
+          src={`${import.meta.env.VITE_APP_ENDPOINT}/${
+            entity.uid
+          }?thumbnail-prefer`}
           alt={entity.name}
           loading="lazy"
         />
@@ -131,7 +166,12 @@ const VideoItem: FC = () => {
   const entity = useEntityConsumer();
   return (
     <>
-      <video preload="metadata" controls className="synclink-item-preview">
+      <video
+        preload="metadata"
+        controls
+        className="synclink-item-preview"
+        controlsList="nodownload"
+      >
         <source
           src={`${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}`}
           type={entity.type}

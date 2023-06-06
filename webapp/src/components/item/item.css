@@ -7,6 +7,13 @@
     border-bottom: 1px dashed #cccccc;
 }
 
+@media screen and (max-width: 780px) {
+    .synclink-item {
+        margin-bottom: 0;
+    }
+}
+
+
 .synclink-item:last-of-type {
     border-bottom: none;
 }
@@ -18,13 +25,12 @@
 .synclink-item-metadata {
     display: flex;
     gap: 5px;
-    font-size: 12px;
     margin: 10px 0;
 }
 
 .synclink-item-metadata span {
-    border: 1px solid #cccccc;
-    padding: 0 2px;
+    color: #666;
+    font-size: 12px;
 }
 
 .synclink-item-menus {
@@ -39,18 +45,19 @@
     text-decoration: underline;
     color: #333;
     font-size: 12px;
-    font-weight: bold;
     font-family: inherit;
     cursor: pointer;
     padding: 0;
 }
-
 /* Preview Item */
+
+.synclink-item-preview {
+    max-width: 100%;
+}
 
 p.synclink-item-preview {
     width: 100%;
     color: #171717;
-    font-weight: bold;
     font-size: 12px;
     white-space: break-spaces;
 }
@@ -68,7 +75,6 @@ figure.synclink-item-preview {
 }
 
 figure.synclink-item-preview img {
-    max-height: 300px;
     max-width: 100%;
     object-fit: cover;
     object-position: left;
