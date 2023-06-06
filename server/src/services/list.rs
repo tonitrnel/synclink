@@ -22,6 +22,7 @@ pub struct BucketEntityDto {
     size: u64,
     r#type: String,
     ext: Option<String>,
+    user_agent: Option<String>
 }
 
 #[debug_handler]
@@ -51,6 +52,7 @@ pub async fn list(
             size: *it.get_size(),
             r#type: it.get_type().to_string(),
             ext: it.get_extension().to_owned(),
+            user_agent: it.get_user_agent().to_owned(),
         })
         .collect::<Vec<_>>();
     Ok::<_, ()>(Json(result)).into()

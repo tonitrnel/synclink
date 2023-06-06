@@ -38,6 +38,8 @@ pub struct BucketEntity {
     r#type: String,
     /// original file extension of the content
     ext: Option<String>,
+    /// user-agent
+    user_agent: Option<String>,
 }
 
 #[allow(unused)]
@@ -83,6 +85,9 @@ impl BucketEntity {
     }
     pub fn get_extension(&self) -> &Option<String> {
         &self.ext
+    }
+    pub fn get_user_agent(&self) -> &Option<String> {
+        &self.user_agent
     }
 }
 
@@ -312,6 +317,7 @@ impl Bucket {
     pub(crate) async fn write(
         &self,
         uid: Uuid,
+        user_agent: Option<String>,
         filename: Option<String>,
         r#type: String,
         hash: String,
@@ -338,6 +344,7 @@ impl Bucket {
             size: size as u64,
             r#type,
             ext,
+            user_agent,
         };
         self.write_index(&item).await?;
         self.index.try_lock().unwrap().items.push(item);

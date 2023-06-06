@@ -7,7 +7,7 @@ use axum::{
     debug_handler,
     extract::{BodyStream, State},
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    response::{AppendHeaders, IntoResponse},
     Json,
 };
 
@@ -16,7 +16,7 @@ use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
 #[debug_handler]
-pub async fn add(
+pub async fn upload(
     State(state): State<AppState>,
     headers: HeaderMap,
     mut stream: BodyStream,
@@ -52,9 +52,21 @@ pub async fn add(
         .and_then(|it| it.to_str().ok())
         .and_then(|it| utils::decode_uri(it).ok());
 
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|it| it.to_str().ok())
+        .map(|it| it.to_string());
+
     // Check hash exists, if it exists, then cancel upload and return uuid
     if let Some(uuid) = state.bucket.has_hash(&content_hash) {
-        return Ok::<_, ()>(Json(uuid).into_response()).into();
+        return Ok::<_, ()>(
+            (
+                StatusCode::CONFLICT,
+                AppendHeaders([("location", uuid.to_string())]),
+            )
+                .into_response(),
+        )
+        .into();
     }
     let (uid, size, hash) = {
         // Preallocate disk space, uuid
@@ -101,7 +113,7 @@ pub async fn add(
     try_break_ok!(
         state
             .bucket
-            .write(uid, filename, content_type, hash, size)
+            .write(uid, user_agent, filename, content_type, hash, size)
             .await
     );
     if let Err(err) = state.broadcast.send(BucketAction::Add(uid)) {

@@ -4,12 +4,11 @@ use crate::models::bucket::BucketAction;
 use crate::utils::{HttpException, HttpResult};
 use crate::{throw_error, try_break_ok, utils};
 use anyhow::Context;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use axum::{
     debug_handler,
     extract::{BodyStream, Path, Query, State},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
+    response::{AppendHeaders, IntoResponse},
     Json,
 };
 use serde::{Deserialize, Deserializer};
@@ -203,7 +202,14 @@ pub async fn upload_part(
                     ApiError::HeaderFieldMissing("X-Content-Sha256")
                 )));
             if let Some(uuid) = state.bucket.has_hash(&content_hash) {
-                return Ok::<_, ()>(Json(uuid).into_response()).into();
+                return Ok::<_, ()>(
+                    (
+                        StatusCode::CONFLICT,
+                        AppendHeaders([("location", uuid.to_string())]),
+                    )
+                        .into_response(),
+                )
+                .into();
             }
             let uid = Uuid::new_v4();
             if query.parts.is_none() {
@@ -253,6 +259,11 @@ pub async fn upload_part(
                 .get("x-raw-filename")
                 .and_then(|it| it.to_str().ok())
                 .and_then(|it| utils::decode_uri(it).ok());
+            let user_agent = headers
+                .get("user-agent")
+                .and_then(|it| it.to_str().ok())
+                .map(|it| it.to_string());
+
             let (path, size, hash) =
                 try_break_ok!(concatenate(state.bucket.get_storage_path(), &uid, &filename).await);
             if content_hash != hash {
@@ -264,7 +275,7 @@ pub async fn upload_part(
             try_break_ok!(
                 state
                     .bucket
-                    .write(uid, filename, content_type, hash, size)
+                    .write(uid, user_agent, filename, content_type, hash, size)
                     .await
             );
             if let Err(err) = state.broadcast.send(BucketAction::Add(uid)) {

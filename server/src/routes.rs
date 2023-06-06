@@ -1,7 +1,7 @@
 use crate::config::state::AppState;
 use crate::services;
 use axum::{
-    routing::{delete, get, post},
+    routing::{delete, get, head, post},
     Router,
 };
 
@@ -11,11 +11,12 @@ pub fn routes() -> Router<AppState> {
             .append_index_html_on_directories(true);
     Router::new()
         .route("/api", get(services::list))
-        .route("/api/upload", post(services::add))
+        .route("/api/upload", post(services::upload))
         .layer(axum::extract::DefaultBodyLimit::max(4 * 1024 * 1024))
-        .route("/api/notify", get(services::update_notify))
         .route("/api/upload-part/", post(services::upload_part))
         .route("/api/upload-part/:uuid", post(services::upload_part))
+        .route("/api/upload-preflight", head(services::upload_preflight))
+        .route("/api/notify", get(services::update_notify))
         .layer(axum::extract::DefaultBodyLimit::max(1024 * 1024))
         .route("/api/:uuid", delete(services::delete))
         .route("/api/:uuid/metadata", get(services::get_metadata))
