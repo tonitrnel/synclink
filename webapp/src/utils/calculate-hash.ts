@@ -1,9 +1,8 @@
 import CalculateHashWorker from '../workers/calculate-hash.worker.ts?worker';
-import { formatBytes } from './format-bytes.ts';
 import { toHex } from './to-hex.ts';
 import { wait } from './wait.ts';
 
-type TransferData = ['result', string] | ['ready'];
+type TransferData = ['result', string] | ['ready' | 'done'];
 export const calculateHash = async (
   buffer: Promise<ArrayBuffer>,
   algorithm: 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512'
@@ -13,10 +12,10 @@ export const calculateHash = async (
     .then((buffer) => toHex(buffer));
 };
 export const calculateHashFromStream = async (
-  stream: ReadableStream
+  stream: ReadableStream<Uint8Array>,
+  options: { onSpeedChange?: (speed: number) => void } = {}
 ): Promise<string> => {
   const worker = new CalculateHashWorker();
-  const start = performance.now();
   // wait worker ready, worker registering message listener is not immediate and may lose message
   await (async () => {
     let ready = false;
@@ -44,27 +43,42 @@ export const calculateHashFromStream = async (
     if (error) throw error;
   })();
   const reader = stream.getReader();
-  let speed = 0;
+  const waitWorkerTask = (task: () => void) => {
+    return new Promise<void>(async (resolve) => {
+      worker.addEventListener(
+        'message',
+        (evt: MessageEvent<TransferData>) => {
+          if (evt.data[0] === 'done') resolve();
+        },
+        { once: true }
+      );
+      await task();
+    });
+  };
+  let previous = Date.now();
+  let interval = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const { done, value } = await reader.read();
+    const { done, value: view } = await reader.read();
     if (done) break;
-    if (!value) throw new Error('Stream read error');
-    speed = Math.max(value.length, speed);
-    worker.postMessage(['update', value.buffer], [value.buffer]);
+    if (!view) throw new Error('Unexpected loss of stream value');
+    const now = Date.now();
+    interval += now - previous;
+    if (interval > 1000) {
+      options.onSpeedChange?.((view.length / (now - previous)) * 1000);
+      interval = 0;
+    }
+    previous = now;
+    await waitWorkerTask(() => {
+      worker.postMessage(['update', view.buffer], [view.buffer]);
+    });
   }
+  console.log('Wait HASH result');
   return new Promise((resolve) => {
     worker.addEventListener('message', (evt: MessageEvent<TransferData>) => {
       if (evt.data[0] === 'result') {
         resolve(evt.data[1]);
-        console.log(
-          `calculate hash, speed ${formatBytes(speed)} in ${(
-            performance.now() - start
-          ).toFixed(2)}ms`
-        );
         worker.terminate();
-      } else {
-        console.warn(`unknown worker message type: ${evt.data[0]}`);
       }
     });
     worker.postMessage(['finalize']);
