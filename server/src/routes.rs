@@ -11,6 +11,7 @@ pub fn routes() -> Router<AppState> {
             .append_index_html_on_directories(true);
     Router::new()
         .route("/api", get(services::list))
+        .route("/api/beacon", post(services::beacon))
         .route("/api/upload", post(services::upload))
         .layer(axum::extract::DefaultBodyLimit::max(4 * 1024 * 1024))
         .route("/api/upload-part/", post(services::upload_part))

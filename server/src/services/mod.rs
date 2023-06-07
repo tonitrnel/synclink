@@ -1,3 +1,4 @@
+mod beacon;
 mod delete;
 mod get;
 mod list;
@@ -6,6 +7,7 @@ mod upload;
 mod upload_part;
 mod upload_preflight;
 
+pub use beacon::beacon;
 pub use delete::delete;
 pub use get::{get, get_metadata};
 pub use list::list;
