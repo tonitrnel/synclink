@@ -1,0 +1,47 @@
+{
+  "short_name": "SyncLink",
+  "name": "SyncLink",
+  "description": "Quickly sync text, images and files across devices",
+  "icons": [
+    {
+      "src": "/maskable_icon.png",
+      "type": "image/png",
+      "sizes": "1024x1024"
+    },
+    {
+      "src": "/maskable_icon_x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "/maskable_icon_x384.png",
+      "type": "image/png",
+      "sizes": "384x384"
+    },
+    {
+      "src": "/maskable_icon_x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "id": "/?utm_source=installed",
+  "start_url": "/?utm_source=installed",
+  "background_color": "#ffffff",
+  "theme_color": "#e0e1e5",
+  "display": "standalone",
+  "share_target": {
+    "action": "/receive-files",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "media",
+          "accept": [
+            "*/*"
+          ]
+        }
+      ]
+    }
+  }
+}

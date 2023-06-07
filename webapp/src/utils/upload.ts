@@ -1,5 +1,8 @@
 import { calculateHash, calculateHashFromStream } from './calculate-hash.ts';
 import { UploadManager } from '~/components/upload-manager';
+import { Logger } from '~/utils/logger.ts';
+
+const logger = new Logger('upload');
 
 const preflight = async (hash: string): Promise<boolean> => {
   return fetch(`${__ENDPOINT}/upload-preflight`, {
@@ -18,7 +21,7 @@ const fastPerform = async (file: File) => {
     'x-content-sha256': hash,
   };
   if (file.name.length > 0) {
-    headers['x-raw-filename'] = file.name;
+    headers['x-raw-filename'] = encodeURI(file.name);
   }
   await fetch(`${__ENDPOINT}/upload`, {
     method: 'POST',
@@ -35,7 +38,7 @@ const fastPerform = async (file: File) => {
 };
 const slowPerform = async (file: File) => {
   const xhr = new XMLHttpRequest();
-  const manager = UploadManager.oneshot.fire({
+  const manager = await UploadManager.oneshot.fire({
     abort: () => xhr.abort(),
     timestamp: Date.now(),
     total: file.size,
@@ -73,8 +76,7 @@ const slowPerform = async (file: File) => {
           reject(new Error(xhr.responseText));
         }
       });
-      xhr.addEventListener('error', (evt) => {
-        console.log(evt, xhr, xhr.status, xhr.readyState);
+      xhr.addEventListener('error', () => {
         reject(
           new Error(
             `code: ${xhr.status}, ${xhr.statusText}, ${xhr.responseText}`
@@ -87,11 +89,11 @@ const slowPerform = async (file: File) => {
       xhr.send(file);
       manager.ready();
     });
-    console.log(`upload success, ${uid}`);
+    logger.debug(`upload success, ${uid}`);
     manager.setLoaded(file.size, (file.size / (Date.now() - setupTime)) * 1000);
     manager.complete();
   } catch (e) {
-    console.error(e);
+    logger.error(e);
     manager.failed(String(e));
   }
 };

@@ -7,3 +7,5 @@ declare module '*.svg' {
 }
 
 declare const __ENDPOINT: string;
+declare const __VERSION: string;
+declare const __BUILD_TIMESTAMP: number;

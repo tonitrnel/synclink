@@ -16,9 +16,17 @@ import { ReactComponent as ClipboardPasteIcon } from '~/assets/clipboard-paste.s
 import { DropZone } from '../dropzone';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { openFilePicker } from '~/utils/open-file-picker.ts';
-import { IGNORE_FILE_TYPE } from '~/constants';
+import {
+  __CACHE_NAME,
+  __CHANNEL,
+  __PREFIX,
+  IGNORE_FILE_TYPE,
+} from '~/constants';
+import { Logger } from '~/utils/logger.ts';
 import { upload } from '~/utils/upload.ts';
 import './input.css';
+
+const logger = new Logger('Input');
 
 export const Input: FC = memo(() => {
   const [text, setText] = useState('');
@@ -33,7 +41,7 @@ export const Input: FC = memo(() => {
           await upload(new File([value], '', { type: 'text/plain' }));
           setText('');
         } catch (e) {
-          console.error('Seed failed', e);
+          logger.error('Seed Failed', e);
         }
       }),
     []
@@ -47,7 +55,7 @@ export const Input: FC = memo(() => {
         try {
           await upload(file);
         } catch (e) {
-          console.error('Upload failed', e);
+          logger.error('Upload Failed', e);
         }
       }),
     []
@@ -78,7 +86,7 @@ export const Input: FC = memo(() => {
             await upload(new File([item], '', { type: item.type }));
           }
         } catch (e) {
-          console.error(e);
+          logger.error('Pasted Failed', e);
         }
       }),
     []
@@ -108,7 +116,7 @@ export const Input: FC = memo(() => {
         await upload(file);
       }
     } catch (e) {
-      console.error(e);
+      logger.error('Upload Failed', e);
     }
   }, []);
   // Register "measure-size" event
@@ -154,22 +162,61 @@ export const Input: FC = memo(() => {
     textareaRef.current?.dispatchEvent(new CustomEvent('measure-size'));
   }, [text]);
   useEffect(() => {
-    const read = async () => {
-      const keys = await caches.keys();
-      const mediaCache = await caches.open(
-        keys.filter((key) => key.startsWith('media'))[0]
-      );
-      const content = await mediaCache.match('shared-content');
-      if (content) {
-        const formData = await content.formData();
-        console.log(formData);
-      } else {
-        console.log('shared content is empty');
-      }
+    const subscribeBroadcast = () => {
+      const broadcastChannel =
+        'BroadcastChannel' in self ? new BroadcastChannel(__CHANNEL) : null;
+      if (!broadcastChannel) return void 0;
+      broadcastChannel.addEventListener('message', (evt) => {
+        logger.debug(`[Broadcast]: ${evt.data}`);
+      });
+      return () => {
+        broadcastChannel.close();
+      };
     };
-    if (location.search.includes('share-target')) {
-      read().catch(console.error);
+    const read = async () => {
+      logger.debug(`检测到已接收到的文件 ${location.search}`);
+      const cache = await caches.open(__CACHE_NAME);
+      logger.debug(`已打开缓存`);
+      const requests = await cache.keys();
+      logger.debug(`共计 ${requests.length} 项`);
+      for (const request of requests) {
+        const response = await cache.match(request);
+        if (!response) {
+          logger.warn(`Invalid cache item = "${request.url}"`);
+          continue;
+        }
+        logger.debug(`处理数据中... url = ${request.url}`);
+        const blob = await response.blob();
+        const filename =
+          response.headers.get('x-raw-filename') ||
+          new URL(request.url).pathname.slice(__PREFIX.length + 21); // two `-`, 13-digits timestamp, 6-digits hex index
+        const file = new File([blob], decodeURIComponent(filename), {
+          type:
+            blob.type ||
+            response.headers.get('content-type') ||
+            'application/octet-stream',
+          lastModified: new Date(
+            response.headers.get('last-modified') || Date.now()
+          ).getTime(),
+        });
+        await upload(file);
+        await cache.delete(request);
+        logger.debug(`已删除缓存`);
+      }
+      const search = new URLSearchParams(location.search);
+      search.delete('received');
+      search.delete('t');
+      search.delete('l');
+      search.delete('keys');
+      logger.debug(`所有项处理完毕`);
+      const url = new URL(location.href);
+      url.search = search.size === 0 ? '' : search.toString();
+      window.history.replaceState(null, document.title, url);
+    };
+    if (location.search.includes('received')) {
+      read().catch(logger.error);
     }
+    return subscribeBroadcast();
   }, []);
   return (
     <section className="section-input">
