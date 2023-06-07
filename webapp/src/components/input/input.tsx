@@ -153,6 +153,24 @@ export const Input: FC = memo(() => {
     textRef.current = text;
     textareaRef.current?.dispatchEvent(new CustomEvent('measure-size'));
   }, [text]);
+  useEffect(() => {
+    const read = async () => {
+      const keys = await caches.keys();
+      const mediaCache = await caches.open(
+        keys.filter((key) => key.startsWith('media'))[0]
+      );
+      const content = await mediaCache.match('shared-content');
+      if (content) {
+        const formData = await content.formData();
+        console.log(formData);
+      } else {
+        console.log('shared content is empty');
+      }
+    };
+    if (location.search.includes('share-target')) {
+      read().catch(console.error);
+    }
+  }, []);
   return (
     <section className="section-input">
       <textarea

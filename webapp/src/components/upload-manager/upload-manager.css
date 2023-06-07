@@ -13,7 +13,7 @@
 
 .upload-manager .upload-label span {
     font-weight: bold;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .upload-manager .upload-label svg {
@@ -46,7 +46,7 @@
 }
 
 .upload-manager .upload-progress[data-colortype="success"] {
-    color: #4caf50;
+    color: #3a3a3a;
 }
 
 .upload-manager .upload-progress[data-colortype="failure"] {
@@ -58,9 +58,14 @@
     gap: 5px;
     font-size: 12px;
     margin-bottom: 5px;
-    width: max-content;
+    width: fit-content;
     color: #ef3d5a;
     display: flex;
+    flex-wrap: wrap;
+}
+
+.upload-manager .upload-failure-reason span {
+    white-space: break-spaces;
 }
 
 .upload-manager .upload-failure-reason svg {
@@ -73,6 +78,7 @@
     display: inline-flex;
     gap: 5px;
     margin: 10px 0;
+    font-family: "Roboto Mono", monospace;
 }
 
 .upload-manager .upload-details span {
@@ -106,4 +112,8 @@
     font-weight: bold;
     cursor: pointer;
     padding: 0;
+}
+
+.upload-manager .upload-actions button[disabled] {
+    display: none;
 }

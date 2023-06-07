@@ -1,7 +1,7 @@
 import { ReactComponent as LogoIcon } from './assets/logo.svg';
 import { Input } from './components/input';
 import { List } from '~/components/list';
-import './App.css';
+import './app.css';
 
 function App() {
   return (

@@ -32,7 +32,7 @@ const parseTSAlias = async () => {
     return {};
   }
 };
-const injectEnvironmentVariables = async (): Promise<void> => {
+const parseEndpoint = async (): Promise<string> => {
   const config = toml.parse(
     await fs
       .readFile(path.join(__ROOT, '../synclink-config.toml'))
@@ -47,16 +47,19 @@ const injectEnvironmentVariables = async (): Promise<void> => {
     };
   };
 
-  process.env['VITE_APP_ENDPOINT'] = config.https
-    ? `https://${config.server.host}:${config.https.port}/api`
-    : `http://${config.server.host}:${config.server.port}/api`;
+  return JSON.stringify(
+    config.https
+      ? `https://${config.server.host}:${config.https.port}/api`
+      : `http://${config.server.host}:${config.server.port}/api`
+  );
 };
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => {
-  await injectEnvironmentVariables();
-  console.log(await parseTSAlias());
   return {
+    define: {
+      __ENDPOINT: await parseEndpoint(),
+    },
     plugins: [react(), svgr(), wasm()],
     resolve: {
       alias: await parseTSAlias(),

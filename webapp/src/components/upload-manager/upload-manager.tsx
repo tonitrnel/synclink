@@ -15,7 +15,8 @@ type OneShotData = {
 type UploadManager = {
   complete(): void;
   failed(reason: string): void;
-  setLoaded(loaded: number): void;
+  ready(): void;
+  setLoaded(loaded: number, speed: number): void;
 };
 type OneShotHandlerReturnValue = UploadManager;
 
@@ -25,7 +26,7 @@ type FCWithOneShot<P = NonNullable<unknown>> = FC<P> & {
 
 type FileUploadStatus =
   | {
-      status: 'pending' | 'success';
+      status: 'pending' | 'uploading' | 'success';
     }
   | {
       status: 'failure';
@@ -40,12 +41,16 @@ export const UploadManager: FCWithOneShot = memo(() => {
   }));
   const [data, setData] = useState<OneShotData | null>(null);
   const [loaded, setLoaded] = useState(0);
+  const [speed, setSpeed] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const progress = useMemo(() => {
     if (!data) return 0;
     if (uploadState.status === 'success') return 100;
     if (uploadState.status === 'failure') return 0;
-    return Math.min(Math.round((loaded / data.total) * 100) / 100, 100);
+    return Math.min(
+      Math.round(100 - ((data.total - loaded) / data.total) * 100),
+      100
+    );
   }, [data, loaded, uploadState.status]);
   const manager = useMemo<UploadManager>(
     () => ({
@@ -53,7 +58,13 @@ export const UploadManager: FCWithOneShot = memo(() => {
         setUploadState({ status: 'success' });
         setTimeout(() => {
           setData(null);
-        }, 3000);
+        }, 1000);
+      },
+      ready() {
+        setUploadState({ status: 'uploading' });
+        // setTimeout(() => {
+        //   setData(null);
+        // }, 3000);
       },
       failed(reason) {
         reason = reason.trim();
@@ -63,8 +74,9 @@ export const UploadManager: FCWithOneShot = memo(() => {
         }
         setUploadState({ status: 'failure', reason });
       },
-      setLoaded(loaded: number) {
+      setLoaded(loaded, speed) {
         setLoaded(loaded);
+        setSpeed(speed);
       },
     }),
     []
@@ -72,6 +84,7 @@ export const UploadManager: FCWithOneShot = memo(() => {
   const cancelHandler = useCallback(() => {
     if (!data) return void 0;
     data.abort('Actively cancel');
+    setData(null);
   }, [data]);
   const closeHandler = useCallback(() => {
     setData(null);
@@ -85,6 +98,7 @@ export const UploadManager: FCWithOneShot = memo(() => {
       setUploadState({ status: 'pending' });
       setData(ref);
       setLoaded(0);
+      setSpeed(0);
       return manager;
     });
     return () => {
@@ -95,7 +109,11 @@ export const UploadManager: FCWithOneShot = memo(() => {
     let timer: number | null = null;
     const handler = () => {
       setNow(Date.now());
-      if (timer === null || uploadState.status !== 'pending') return void 0;
+      if (
+        timer === null ||
+        (uploadState.status !== 'pending' && uploadState.status !== 'uploading')
+      )
+        return void 0;
       timer = window.setTimeout(handler);
     };
     timer = window.setTimeout(handler);
@@ -116,6 +134,13 @@ export const UploadManager: FCWithOneShot = memo(() => {
         {(() => {
           switch (uploadState.status) {
             case 'pending':
+              return (
+                <>
+                  <span>PENDING</span>
+                  <Spin />
+                </>
+              );
+            case 'uploading':
               return (
                 <>
                   <span>UPLOADING</span>
@@ -148,6 +173,7 @@ export const UploadManager: FCWithOneShot = memo(() => {
             );
           case 'success':
           case 'pending':
+          case 'uploading':
             return (
               <div
                 id="file"
@@ -163,17 +189,27 @@ export const UploadManager: FCWithOneShot = memo(() => {
         }
       })()}
       <div className="upload-details">
-        <span>Total: {formatBytes(data.total)}</span>
-        <span>Transferred: {formatBytes(loaded)}</span>
-        <span>Duration: {calculateDuration(data.timestamp, now)}</span>
+        <span title="Length of data to be send">
+          Total: {formatBytes(data.total)}
+        </span>
+        <span title="Length of data seet to server">
+          Transferred: {formatBytes(loaded)}
+        </span>
+        <span title="Hash calcation speed or upload speed">
+          Speed: {formatBytes(speed)}/s
+        </span>
+        <span title="Duration time">
+          Duration: {calculateDuration(data.timestamp, now)}
+        </span>
       </div>
       <div className="upload-actions">
         {(() => {
           switch (uploadState.status) {
             case 'pending':
+            case 'uploading':
               return (
                 <>
-                  <button title="cancel upload" onClick={cancelHandler}>
+                  <button title="Cancel upload" onClick={cancelHandler}>
                     Cancel
                   </button>
                 </>
@@ -181,10 +217,10 @@ export const UploadManager: FCWithOneShot = memo(() => {
             case 'failure':
               return (
                 <>
-                  <button title="cancel upload" onClick={retryHandler}>
+                  <button title="Retry upload" disabled onClick={retryHandler}>
                     Retry
                   </button>
-                  <button title="cancel upload" onClick={closeHandler}>
+                  <button title="Close upload manager" onClick={closeHandler}>
                     Close
                   </button>
                 </>
@@ -192,7 +228,7 @@ export const UploadManager: FCWithOneShot = memo(() => {
             case 'success':
               return (
                 <>
-                  <button title="cancel upload" onClick={closeHandler}>
+                  <button title="Close upload manager" onClick={closeHandler}>
                     Close
                   </button>
                 </>

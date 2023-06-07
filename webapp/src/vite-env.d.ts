@@ -6,11 +6,4 @@ declare module '*.svg' {
   export default uri;
 }
 
-interface ImportMetaEnv {
-  readonly VITE_APP_ENDPOINT: string;
-  // 更多环境变量...
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+declare const __ENDPOINT: string;

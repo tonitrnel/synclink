@@ -19,6 +19,10 @@ import './item.css';
 
 dayjs.extend(relativeTime);
 
+const SUPPORTED_SHARE =
+  typeof window.navigator.share === 'function' &&
+  typeof window.navigator.canShare === 'function';
+
 type CustomMenu = {
   key: string;
   component: ReactNode;
@@ -26,16 +30,56 @@ type CustomMenu = {
 };
 const SynclinkItemMenu: FC<{
   entity: IEntity;
-  features?: Array<'previewable' | 'downloadable' | 'deletable'>;
+  features?: Array<'previewable' | 'downloadable' | 'deletable' | 'shareable'>;
   slots?: Array<CustomMenu>;
 }> = memo(
-  ({ entity, features = ['downloadable', 'deletable'], slots = [] }) => {
+  ({
+    entity,
+    features = ['downloadable', 'deletable', 'shareable'],
+    slots = [],
+  }) => {
     const onDelete = useMemo(
       () =>
         executeAsyncTask(async (uid: string) => {
-          await fetch(`${import.meta.env.VITE_APP_ENDPOINT}/${uid}`, {
+          await fetch(`${__ENDPOINT}/${uid}`, {
             method: 'DELETE',
           });
+        }),
+      []
+    );
+    const onShare = useMemo(
+      () =>
+        executeAsyncTask(async (entity: IEntity) => {
+          if (typeof navigator.share !== 'function') return void 0;
+          const data = await (async (): Promise<ShareData | void> => {
+            // 5 MB
+            if (entity.size > 5_242_880) {
+              return {
+                title: entity.name,
+                url: `${__ENDPOINT}/${entity.uid}`,
+              };
+            }
+            if (entity.type.startsWith('text/')) {
+              return {
+                title: entity.name,
+                text: await fetch(`${__ENDPOINT}/${entity.uid}`).then((res) =>
+                  res.text()
+                ),
+              };
+            }
+            return {
+              title: entity.name,
+              files: [
+                await fetch(`${__ENDPOINT}/${entity.uid}`)
+                  .then((res) => res.blob())
+                  .then(
+                    (blob) =>
+                      new File([blob], entity.name, { type: entity.type })
+                  ),
+              ],
+            };
+          })();
+          if (data && navigator.canShare(data)) await navigator.share(data);
         }),
       []
     );
@@ -54,11 +98,19 @@ const SynclinkItemMenu: FC<{
           {features.includes('downloadable') && (
             <a
               className="synclink-item-link"
-              href={`${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}?raw`}
+              href={`${__ENDPOINT}/${entity.uid}?raw`}
               target="_blank"
             >
               Download
             </a>
+          )}
+          {features.includes('shareable') && SUPPORTED_SHARE && (
+            <button
+              className="synclink-item-link"
+              onClick={() => onShare(entity)}
+            >
+              Share
+            </button>
           )}
           {features.includes('deletable') && (
             <button
@@ -100,10 +152,7 @@ const SynclinkItemMetadata: FC<{
 
 const TextItem: FC = () => {
   const entity = useEntityConsumer();
-  const [content] = useGet(
-    `${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}`,
-    (res) => res.text()
-  );
+  const [content] = useGet(`${__ENDPOINT}/${entity.uid}`, (res) => res.text());
   const handleDoubleClick = useCallback<
     MouseEventHandler<HTMLParagraphElement>
   >((evt) => {
@@ -137,7 +186,7 @@ const TextItem: FC = () => {
       <SynclinkItemMetadata entity={entity} features={['date']} />
       <SynclinkItemMenu
         entity={entity}
-        features={['deletable']}
+        features={['shareable', 'deletable']}
         slots={[copyButton]}
       />
     </>
@@ -149,9 +198,7 @@ const FigureItem: FC = () => {
     <>
       <figure className="synclink-item-preview">
         <img
-          src={`${import.meta.env.VITE_APP_ENDPOINT}/${
-            entity.uid
-          }?thumbnail-prefer`}
+          src={`${__ENDPOINT}/${entity.uid}?thumbnail-prefer`}
           alt={entity.name}
           loading="lazy"
         />
@@ -172,12 +219,9 @@ const VideoItem: FC = () => {
         className="synclink-item-preview"
         controlsList="nodownload"
       >
-        <source
-          src={`${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}`}
-          type={entity.type}
-        />
+        <source src={`${__ENDPOINT}/${entity.uid}`} type={entity.type} />
       </video>
-      <SynclinkItemMetadata entity={entity} />
+      <SynclinkItemMetadata entity={entity} features={['date', 'size']} />
       <SynclinkItemMenu entity={entity} />
     </>
   );
@@ -187,10 +231,7 @@ const AudioItem: FC = () => {
   return (
     <>
       <audio controls className="synclink-item-preview">
-        <source
-          src={`${import.meta.env.VITE_APP_ENDPOINT}/${entity.uid}`}
-          type={entity.type}
-        />
+        <source src={`${__ENDPOINT}/${entity.uid}`} type={entity.type} />
       </audio>
       <SynclinkItemMetadata entity={entity} />
       <SynclinkItemMenu entity={entity} />
@@ -231,7 +272,7 @@ export const SynclinkItem: FC<{ it: IEntity }> = memo(({ it }) => {
   }, [file.category]);
   return (
     <EntityProvider value={it}>
-      <li className="synclink-item" key={it.uid}>
+      <li className="synclink-item" data-uid={it.uid} key={it.uid}>
         {render}
       </li>
     </EntityProvider>

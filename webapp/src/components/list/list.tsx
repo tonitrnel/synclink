@@ -8,19 +8,16 @@ import { IEntity } from '~/constants/types.ts';
 import './list.css';
 
 const getEntity = async (uid: string) => {
-  return fetch(
-    `${import.meta.env.VITE_APP_ENDPOINT}/${uid}/metadata`
-  ).then<IEntity>((res) => res.json());
+  return fetch(`${__ENDPOINT}/${uid}/metadata`).then<IEntity>((res) =>
+    res.json()
+  );
 };
 
 export const List: FC = memo(() => {
   const [list, setList] = useState<IEntity[]>([]);
-  const [, { done, error }] = useGet<void>(
-    import.meta.env.VITE_APP_ENDPOINT,
-    async (res) => {
-      setList(await res.json());
-    }
-  );
+  const [, { done, error }] = useGet<void>(__ENDPOINT, async (res) => {
+    setList(await res.json());
+  });
   useEffect(() => {
     let sse: EventSource | null = null;
     let timer: number | null = null;
@@ -52,7 +49,7 @@ export const List: FC = memo(() => {
       if (!last_active_time) return void 0;
       try {
         const records = await fetch(
-          `${import.meta.env.VITE_APP_ENDPOINT}?after=${last_active_time}`
+          `${__ENDPOINT}?after=${last_active_time}`
         ).then<IEntity[]>((res) => (res.ok ? res.json() : []));
         if (records.length > 0) {
           console.log(`updated ${records.length} records`);
@@ -64,9 +61,7 @@ export const List: FC = memo(() => {
     };
     const connectSSE = () => {
       let retry = 0;
-      const _sse = new EventSource(
-        `${import.meta.env.VITE_APP_ENDPOINT}/notify`
-      );
+      const _sse = new EventSource(`${__ENDPOINT}/notify`);
       _sse.onopen = () => {
         console.log('sse connected');
       };
@@ -91,7 +86,7 @@ export const List: FC = memo(() => {
           timer = null;
           last_active_time = Date.now();
           console.log('Inactive for more than 60s, sse closed');
-        }, 6_000);
+        }, 6_0000);
         return void 0;
       }
       if (timer) window.clearTimeout(timer);

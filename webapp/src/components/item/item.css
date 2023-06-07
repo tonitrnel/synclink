@@ -13,7 +13,6 @@
     }
 }
 
-
 .synclink-item:last-of-type {
     border-bottom: none;
 }
@@ -49,6 +48,15 @@
     cursor: pointer;
     padding: 0;
 }
+
+.synclink-item-link:hover {
+    text-decoration: underline dotted;
+}
+
+.synclink-item-link:active {
+    text-shadow: 0 1px 0 #333;
+    text-decoration: underline dotted;
+}
 /* Preview Item */
 
 .synclink-item-preview {
@@ -64,7 +72,6 @@ p.synclink-item-preview {
 
 video.synclink-item-preview {
     max-width: 100%;
-    max-height: 300px;
     object-fit: cover;
 }
 
@@ -82,4 +89,9 @@ figure.synclink-item-preview img {
 
 figure.synclink-item-preview figcaption {
     text-align: right;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: block;
+    width: 100%;
 }
