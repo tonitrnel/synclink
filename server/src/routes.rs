@@ -6,9 +6,8 @@ use axum::{
 };
 
 pub fn routes() -> Router<AppState> {
-    let static_files_service =
-        tower_http::services::ServeDir::new(std::path::Path::new("../public"))
-            .append_index_html_on_directories(true);
+    let static_files_service = tower_http::services::ServeDir::new(std::path::Path::new("public"))
+        .append_index_html_on_directories(true);
     Router::new()
         .route("/api", get(services::list))
         .route("/api/beacon", post(services::beacon))

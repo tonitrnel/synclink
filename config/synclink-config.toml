@@ -1,0 +1,12 @@
+# HTTP Server
+[server]
+host = "::"
+port = 8080
+
+# File storage
+[file_storage]
+storage_path = "storage"
+
+# logger
+[log]
+level = "debug"

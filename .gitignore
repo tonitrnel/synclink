@@ -1,2 +1,4 @@
-.storage/
+storage/
 certs/
+logs/
+synclink.img

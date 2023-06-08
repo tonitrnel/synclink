@@ -53,7 +53,6 @@ pub(crate) struct Config {
     pub server: ServerConfig,
     pub file_storage: FileStorageConfig,
     pub log: LogConfig,
-    pub https: Option<HttpsConfig>,
 }
 
 impl Config {
@@ -65,11 +64,7 @@ impl Config {
 pub mod utils {
     pub(crate) fn read_path(str: &str) -> std::path::PathBuf {
         let path = std::path::Path::new(str);
-        let current_dir = std::env::current_dir()
-            .map(|it| it.parent().map(|parent| parent.to_path_buf()))
-            .ok()
-            .flatten()
-            .unwrap();
+        let current_dir = std::env::current_dir().unwrap();
         if path.is_absolute() {
             path.to_path_buf()
         } else {
@@ -78,8 +73,23 @@ pub mod utils {
     }
 }
 
+fn parse_config_path() -> std::path::PathBuf {
+    let mut args = std::env::args();
+    args.next();
+    while let Some(arg) = args.next() {
+        if arg == "-c" || arg == "--config" {
+            if let Some(path) = args.next() {
+                return std::path::Path::new(&path).to_path_buf();
+            } else {
+                panic!("Error: Please specify path string for -c argument.")
+            }
+        }
+    }
+    panic!("Error: Please specify configuration file argument. Usage: -c <config_file>")
+}
+
 pub(crate) fn load() -> anyhow::Result<Config> {
-    let path = std::path::Path::new("../synclink-config.toml");
+    let path = parse_config_path();
     if !path.is_file() {
         return Err(anyhow!(
             "Error: Configuration file not found or invalid.\n\
