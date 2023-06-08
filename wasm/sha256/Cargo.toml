@@ -1,8 +1,9 @@
 [package]
-name = "sha256"
+name = "sha256-binding"
 version = "0.1.0"
 edition = "2021"
-
+description = "Rust sha2 SHA-256 WASM binding"
+repository = "https://github.com/tonitrnel/synclink"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
