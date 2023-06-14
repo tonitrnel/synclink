@@ -20,9 +20,8 @@ export function executeAsyncTask<T extends unknown[]>(
     // Execute the asynchronous task.
     try {
       await doAsyncTask(...args);
-    } catch (err) {
-      console.error(err);
+    } finally {
+      isAsyncInProgress = false;
     }
-    isAsyncInProgress = false;
   };
 }

@@ -1,4 +1,5 @@
 import CalculateHashWorker from '../workers/calculate-hash.worker.ts?worker';
+import { Logger } from '~/utils/logger.ts';
 import { toHex } from './to-hex.ts';
 import { wait } from './wait.ts';
 
@@ -11,6 +12,9 @@ export const calculateHash = async (
     .digest(algorithm, await buffer)
     .then((buffer) => toHex(buffer));
 };
+
+const logger = new Logger('calculateHash');
+
 export const calculateHashFromStream = async (
   stream: ReadableStream<Uint8Array>,
   options: { onSpeedChange?: (speed: number) => void } = {}
@@ -35,7 +39,7 @@ export const calculateHashFromStream = async (
       },
       { once: true }
     );
-    console.log('wait worker ready');
+    logger.debug('wait worker ready');
     while (!ready && !error) {
       worker.postMessage(['create']);
       await wait(100);
@@ -44,7 +48,7 @@ export const calculateHashFromStream = async (
   })();
   const reader = stream.getReader();
   const waitWorkerTask = (task: () => void) => {
-    return new Promise<void>(async (resolve) => {
+    return new Promise<void>((resolve) => {
       worker.addEventListener(
         'message',
         (evt: MessageEvent<TransferData>) => {
@@ -52,7 +56,7 @@ export const calculateHashFromStream = async (
         },
         { once: true }
       );
-      await task();
+      task();
     });
   };
   let previous = Date.now();
@@ -73,7 +77,7 @@ export const calculateHashFromStream = async (
       worker.postMessage(['update', view.buffer], [view.buffer]);
     });
   }
-  console.log('Wait HASH result');
+  logger.debug('Wait HASH result');
   return new Promise((resolve) => {
     worker.addEventListener('message', (evt: MessageEvent<TransferData>) => {
       if (evt.data[0] === 'result') {

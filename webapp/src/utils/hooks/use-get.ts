@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Logger } from '~/utils/logger.ts';
+
+const logger = new Logger('useGet');
 
 export const useGet = <T>(
   url: string,
   transformer: (response: Response) => Promise<T>
-): [T | undefined, { done: boolean; error?: Error }] => {
+): [
+  T | undefined,
+  {
+    done: boolean;
+    error?: Error;
+    refresh: () => Promise<void>;
+  }
+] => {
   const [done, setDone] = useState(false);
   const [result, setResult] = useState<T>();
   const [error, setError] = useState<Error>();
@@ -30,8 +40,15 @@ export const useGet = <T>(
     }
   }, [url]);
   useEffect(() => {
-    send().catch(console.error);
+    send().catch(logger.error);
   }, [send]);
   transformerRef.current = transformer;
-  return [result, { error, done }];
+  return [
+    result,
+    {
+      error,
+      done,
+      refresh: send,
+    },
+  ];
 };

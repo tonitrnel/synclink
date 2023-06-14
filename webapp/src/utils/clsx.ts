@@ -8,7 +8,7 @@ export const clsx = (
     .map((it) => {
       if (typeof it !== 'object') return it;
       return Object.entries(it)
-        .filter(([, v]) => !v)
+        .filter(([, v]) => Boolean(v))
         .map(([k]) => k);
     })
     .flat()
