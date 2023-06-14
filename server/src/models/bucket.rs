@@ -3,11 +3,9 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::io::{Seek, SeekFrom, Write};
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::io::AsyncReadExt;
-use tokio::{fs, sync::Mutex};
+use std::sync::{Arc, Mutex};
+use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -168,27 +166,17 @@ impl Bucket {
             path,
         }
     }
-    /// 获取 BucketEntity
+    /// Get BucketEntity
     pub(crate) fn get(&self, id: &Uuid) -> Option<BucketEntity> {
-        self.find(|it| &it.uid == id)
-    }
-    /// 查找 BucketEntity
-    pub(crate) fn find<F>(&self, predicate: F) -> Option<BucketEntity>
-    where
-        F: FnMut(&&BucketEntity) -> bool,
-    {
-        let guard = self.index.try_lock().unwrap();
-        guard.items.iter().find(predicate).cloned()
-    }
-    pub(crate) fn clone_inner(&self) -> Vec<BucketEntity> {
-        let guard = self.index.try_lock().unwrap();
-        guard.items.clone()
+        let guard = &self.index.lock().unwrap();
+        guard.items.iter().find(|it| it.uid == *id).cloned()
     }
     pub(crate) fn has(&self, id: &Uuid) -> bool {
-        self.find(|it| it.uid.eq(id)).is_some()
+        let guard = &self.index.lock().unwrap();
+        guard.items.iter().any(|it| &it.uid == id)
     }
     pub(crate) fn has_hash(&self, hash: &str) -> Option<Uuid> {
-        let guard = self.index.try_lock().unwrap();
+        let guard = self.index.lock().unwrap();
         if let Some(uuid) =
             guard
                 .items
@@ -199,70 +187,55 @@ impl Bucket {
         }
         None
     }
+    pub(crate) fn map_clone<T, F>(&self, f: F) -> Vec<T>
+    where
+        F: FnOnce(&Vec<BucketEntity>) -> Vec<T>,
+    {
+        let guard = self.index.lock().unwrap();
+        f(&guard.items)
+    }
     pub(crate) async fn delete(&self, id: &Uuid) -> anyhow::Result<()> {
-        let mut index = self.index.try_lock().unwrap();
-        let entity_with_idx = index.items.iter().enumerate().find_map(|(idx, it)| {
-            if &it.uid == id {
-                Some((idx, it))
-            } else {
-                None
-            }
-        });
-        match entity_with_idx {
-            Some((idx, entity)) => {
-                let resource_path = self.get_storage_path().join(entity.get_resource());
-                if resource_path.exists() {
-                    fs::remove_file(&resource_path).await.with_context(|| {
-                        format!("Error: Remove resource file '{:?}' failed", &resource_path)
-                    })?;
-                };
-                // Regenerate index file content
-                let (deleted, content) = {
-                    let deleted = index.items.remove(idx);
-                    (
-                        deleted,
-                        if index.items.is_empty() {
-                            "".to_string()
-                        } else {
-                            toml::to_string(&index.deref()).unwrap()
-                        },
-                    )
-                };
-                let mut file = self.index_file.try_clone()?;
-                let bytes = content.as_bytes();
-                file.seek(SeekFrom::Start(0))?;
-                // `write_all` is used to overwrite not truncate, so set the length here to ensure that all content is overwritten
-                file.set_len(bytes.len() as u64)?;
-                match file
-                    .write_all(bytes)
-                    .with_context(|| "Fatal error: Update index file failed")
-                {
-                    Ok(_) => {
-                        self.sync_all()?;
-                        Ok(())
-                    }
-                    Err(err) => {
-                        // rollback
-                        index.items.insert(idx, deleted);
-                        Err(err)
-                    }
+        let mut guard = self.index.lock().unwrap();
+        if let Some(idx) = guard.items.iter().position(|it| &it.uid == id) {
+            let entity = guard.items.remove(idx);
+            let is_empty = guard.items.is_empty();
+            let resource_path = self.get_storage_path().join(entity.get_resource());
+            if resource_path.exists() {
+                let result = std::fs::remove_file(&resource_path).with_context(|| {
+                    format!("Error: Remove resource file '{:?}' failed", &resource_path)
+                });
+                if let Err(err) = result {
+                    // rollback
+                    guard.items.insert(idx, entity);
+                    return Err(err);
                 }
-            }
-            _ => Ok(()),
+            };
+            let mut file = self.index_file.try_clone()?;
+            file.seek(SeekFrom::Start(0))?;
+            // Regenerate index file content
+            let content = if is_empty {
+                "".to_string()
+            } else {
+                toml::to_string(&*guard).unwrap()
+            };
+            let bytes = content.as_bytes();
+            // `write_all` is used to overwrite not truncate, so set the length here to ensure that all content is overwritten
+            file.set_len(bytes.len() as u64)?;
+            file.write_all(bytes)
+                .with_context(|| "Fatal error: Update index file failed")
+                .and_then(|_| self.sync_all())?
         }
+        Ok(())
     }
     pub(crate) fn get_storage_path(&self) -> &PathBuf {
         &self.path
     }
     /// Writing entity to index file
     async fn write_index(&self, entity: &BucketEntity) -> anyhow::Result<()> {
+        let is_empty = self.index.lock().unwrap().items.is_empty();
         let part = format!(
             "{newline}[[item]]\n{body}",
-            newline = if self.index.try_lock()?.items.is_empty() {
-                ""
-            } else {
-                "\n"
-            },
+            newline = if is_empty { "" } else { "\n" },
             body = toml::to_string(entity)?
         );
         let mut file = self.index_file.try_clone()?;
@@ -278,14 +251,14 @@ impl Bucket {
             .sync_all()
             .with_context(|| "Fatal Error: Sync indexes to file failed")
     }
-    /// 预分配一个 UUID 和文件，并可选择进行预分配大小。
+    /// Pre-allocate a UUID and file with the option to pre-size.
     ///
-    /// # 参数
-    /// - `ext`：文件的扩展名，可选。如果提供了扩展名，文件名将使用 UUID 加上扩展名的形式。
-    /// - `size`：预分配的文件大小，可选。如果提供了大小，将会设置文件的大小为指定值。
+    /// # Params
+    /// - `ext`：The extension of the file, optionally. If an extension is provided, the file name will be in the form of a `{UUID}.{extension}`.
+    /// - `size`：Pre-allocated file size, optional. If size is provided, will set the size of the file to the specified value.
     ///
-    /// # 返回值
-    /// 返回一个包含生成的 UUID 和打开的文件的元组，成功时返回 `Ok`，失败时返回 `Err`。
+    /// # Return
+    /// Returns a tuple containing the generated UUID and the opened file, returning `Ok` on success and `Err` on failure.
     pub(crate) async fn preallocation(
         &self,
         filename: &Option<String>,
@@ -313,7 +286,7 @@ impl Bucket {
         }
         Ok(PreallocationFile { uid, file, path })
     }
-    /// 写入 Bucket
+    /// Writing bucket to index file
     pub(crate) async fn write(
         &self,
         uid: Uuid,
@@ -347,7 +320,7 @@ impl Bucket {
             user_agent,
         };
         self.write_index(&item).await?;
-        self.index.try_lock().unwrap().items.push(item);
+        self.index.lock().unwrap().items.push(item);
         Ok(())
     }
 }
