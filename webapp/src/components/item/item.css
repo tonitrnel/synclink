@@ -79,12 +79,15 @@ figure.synclink-item-preview {
     text-align: left;
     margin: 0;
     width: max-content;
+    overflow: hidden;
+    cursor: zoom-in;
 }
 
 figure.synclink-item-preview img {
     max-width: 100%;
+    max-height: 300px;
     object-fit: cover;
-    object-position: left;
+    object-position: center;
 }
 
 figure.synclink-item-preview figcaption {
@@ -94,4 +97,5 @@ figure.synclink-item-preview figcaption {
     text-overflow: ellipsis;
     display: block;
     width: 100%;
+    text-decoration: none;
 }

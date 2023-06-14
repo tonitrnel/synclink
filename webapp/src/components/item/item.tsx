@@ -8,7 +8,9 @@ import {
   useMemo,
 } from 'react';
 import { EntityProvider, useEntityConsumer } from './entity-provider.ts';
+import { AudioPlayer } from '~/components/audio-player';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
+import { useLightBox } from '~/components/light-box';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { useGet } from '~/utils/hooks/use-get.ts';
@@ -194,18 +196,21 @@ const TextItem: FC = () => {
 };
 const FigureItem: FC = () => {
   const entity = useEntityConsumer();
+  const lightBox = useLightBox(`${__ENDPOINT}/${entity.uid}`);
   return (
     <>
-      <figure className="synclink-item-preview">
+      <figure className="synclink-item-preview" onClick={lightBox.install}>
         <img
           src={`${__ENDPOINT}/${entity.uid}?thumbnail-prefer`}
           alt={entity.name}
+          data-id={entity.uid}
           loading="lazy"
         />
         <figcaption>{entity.name}</figcaption>
       </figure>
       <SynclinkItemMetadata entity={entity} />
       <SynclinkItemMenu entity={entity} />
+      {lightBox.portal}
     </>
   );
 };
@@ -230,9 +235,12 @@ const AudioItem: FC = () => {
   const entity = useEntityConsumer();
   return (
     <>
-      <audio controls className="synclink-item-preview">
-        <source src={`${__ENDPOINT}/${entity.uid}`} type={entity.type} />
-      </audio>
+      <AudioPlayer
+        className="synclink-item-preview"
+        src={`${__ENDPOINT}/${entity.uid}`}
+        title={entity.name}
+        type={entity.type}
+      />
       <SynclinkItemMetadata entity={entity} />
       <SynclinkItemMenu entity={entity} />
     </>
