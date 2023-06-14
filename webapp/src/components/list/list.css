@@ -46,3 +46,20 @@
     padding: 10px;
     color: #e0e2e6;
 }
+
+.synclink-previous {
+    /*display: block;*/
+}
+
+.synclink-previous button {
+    background-color: initial;
+    border: 1px solid #aaa;
+    padding: 5px 10px;
+    border-radius: 2px;
+    color: #333;
+    cursor: pointer;
+}
+
+.synclink-previous button:hover {
+    border-color: #666;
+}

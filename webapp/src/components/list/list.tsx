@@ -1,23 +1,57 @@
-import { FC, memo, useEffect, useState } from 'react';
+import { FC, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactComponent as AlertTriangleIcon } from '~/assets/alert-triangle.svg';
 import { UploadManager } from '~/components/upload-manager';
 import { SynclinkItem } from '~/components/item';
 import { Spin } from '~/components/spin';
 import { useGet } from '~/utils/hooks/use-get.ts';
 import { IEntity } from '~/constants/types.ts';
+import { Logger } from '~/utils/logger.ts';
 import './list.css';
+
+const logger = new Logger('List');
+
+interface Pagination {
+  page: number;
+  size: number;
+}
 
 const getEntity = async (uid: string) => {
   return fetch(`${__ENDPOINT}/${uid}/metadata`).then<IEntity>((res) =>
     res.json()
   );
 };
+const __TIME = Date.now();
 
 export const List: FC = memo(() => {
+  const [pagination, setPagination] = useState<Pagination>(() => ({
+    page: 1,
+    size: 10,
+  }));
+  const [total, setTotal] = useState(0);
   const [list, setList] = useState<IEntity[]>([]);
-  const [, { done, error }] = useGet<void>(__ENDPOINT, async (res) => {
-    setList(await res.json());
-  });
+  const [, { done, error }] = useGet<void>(
+    `${__ENDPOINT}?page=${pagination.page}&per_page=${pagination.size}&before=${__TIME}`,
+    async (res) => {
+      const val = await res.json();
+      setTotal(val.total);
+      const ids = new Set(list.map((it) => it.uid));
+      setList(
+        list.concat((val.data as IEntity[]).filter((it) => !ids.has(it.uid)))
+      );
+    }
+  );
+  const previous = useMemo(
+    () =>
+      total > pagination.size * pagination.page ? pagination.page + 1 : void 0,
+    [pagination.page, pagination.size, total]
+  );
+  const loadPrevious = useCallback(() => {
+    if (!previous) return void 0;
+    setPagination((prev) => ({
+      page: previous,
+      size: prev.size,
+    }));
+  }, [previous]);
   useEffect(() => {
     let sse: EventSource | null = null;
     let timer: number | null = null;
@@ -37,22 +71,22 @@ export const List: FC = memo(() => {
             const entity = await getEntity(payload.uid);
             setList((list) => [entity, ...list]);
           } catch (e) {
-            console.error('Update list failed', e);
+            logger.error('Update list failed', e);
           }
           break;
         }
         default:
-          console.error(`Unknown notify type ${payload.type}`);
+          logger.error(`Unknown notify type ${payload.type}`);
       }
     };
     const getLatestRecords = async () => {
       if (!last_active_time) return void 0;
       try {
         const records = await fetch(
-          `${__ENDPOINT}?after=${last_active_time}`
+          `${__ENDPOINT}?page=1&per_page=${10}&after=${last_active_time}`
         ).then<IEntity[]>((res) => (res.ok ? res.json() : []));
         if (records.length > 0) {
-          console.log(`updated ${records.length} records`);
+          logger.info(`updated ${records.length} records`);
           setList((list) => [...records, ...list]);
         }
       } finally {
@@ -63,14 +97,14 @@ export const List: FC = memo(() => {
       let retry = 0;
       const _sse = new EventSource(`${__ENDPOINT}/notify`);
       _sse.onopen = () => {
-        console.log('sse connected');
+        logger.trace('sse connected');
       };
       _sse.onerror = () => {
         retry++;
         if (retry >= 3) {
           _sse.close();
           sse = null;
-          console.log('More than 3 connection failures, sse closed');
+          logger.trace('More than 3 connection failures, sse closed');
         }
       };
       _sse.onmessage = handleSSEMessage;
@@ -85,7 +119,7 @@ export const List: FC = memo(() => {
           sse = null;
           timer = null;
           last_active_time = Date.now();
-          console.log('Inactive for more than 60s, sse closed');
+          logger.trace('Inactive for more than 60s, sse closed');
         }, 6_0000);
         return void 0;
       }
@@ -93,7 +127,7 @@ export const List: FC = memo(() => {
       if (sse) return void 0;
       // reconnect sse
       sse = connectSSE();
-      getLatestRecords().catch(console.error);
+      getLatestRecords().catch(logger.error);
     };
     document.addEventListener('visibilitychange', handleVisibility);
     sse = connectSSE();
@@ -119,6 +153,11 @@ export const List: FC = memo(() => {
             {list.map((it) => (
               <SynclinkItem key={it.uid} it={it} />
             ))}
+            {previous && (
+              <li className="synclink-previous">
+                <button onClick={loadPrevious}>Previous</button>
+              </li>
+            )}
           </ul>
         );
       })()}
