@@ -41,26 +41,32 @@ pub struct ReportObject {
 #[debug_handler]
 pub async fn beacon(body: String) {
     let body = serde_json::from_str::<ReportObject>(&body).unwrap();
-    let mut logs = Vec::with_capacity(body.logs.len() + 2);
-    logs.push(format!(
-        "==== From {} @ {} Logs ====\n",
-        body.system.user_agent,
-        Utc.timestamp_millis_opt(body.build.timestamp as i64)
-            .map(|dt| dt.format("%H:%M:%S%.3f").to_string())
-            .unwrap()
-    ));
+    let span = tracing::span!(
+        tracing::Level::INFO,
+        "beacon",
+        timestamp = Utc
+            .timestamp_millis_opt(body.build.timestamp as i64)
+            .map(|dt| dt.format("%F %T%.6fZ").to_string())
+            .unwrap(),
+        user_agent = body.system.user_agent
+    );
+    let _guard = span.enter();
     for log in body.logs {
-        logs.push(format!(
-            "{} [{}] {}: {} {}",
-            Utc.timestamp_millis_opt(log.time as i64)
-                .map(|dt| dt.format("%H:%M:%S%.3f").to_string())
+        tracing::debug!(
+            timestamp = Utc
+                .timestamp_millis_opt(log.time as i64)
+                .map(|dt| dt.format("%F %T%.6fZ").to_string())
                 .unwrap(),
-            log.level,
+            level = log.level,
+            stack = log
+                .stack
+                .splitn(2, '\n')
+                .take(1)
+                .collect::<String>()
+                .trim_start_matches(' '),
+            "{}: {}",
             log.name,
             log.message,
-            log.stack.splitn(2, '\n').take(1).collect::<String>(),
-        ));
+        )
     }
-    logs.push("\n===========  END  ===========".to_string());
-    println!("{}", logs.join("\n"))
 }
