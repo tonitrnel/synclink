@@ -1,9 +1,17 @@
-import { FC, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  memo,
+  NamedExoticComponent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Spin } from '../spin';
 import { OneShot } from '~/utils/one-shot.ts';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { calculateDuration } from '~/utils/calculate-duration.ts';
 import { ReactComponent as AlertTriangleIcon } from '~/assets/alert-triangle.svg';
+import { clsx } from '~/utils/clsx.ts';
 import './upload-manager.css';
 
 type OneShotData = {
@@ -20,9 +28,9 @@ type UploadManager = {
 };
 type OneShotHandlerReturnValue = UploadManager;
 
-type FCWithOneShot<P = NonNullable<unknown>> = FC<P> & {
+interface UploadManagerFC<T> extends NamedExoticComponent<T> {
   oneshot: OneShot<OneShotData, OneShotHandlerReturnValue>;
-};
+}
 
 type FileUploadStatus =
   | {
@@ -35,7 +43,9 @@ type FileUploadStatus =
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-export const UploadManager: FCWithOneShot = memo(() => {
+export const UploadManager: UploadManagerFC<{
+  className?: string;
+}> = memo(({ className }) => {
   const [uploadState, setUploadState] = useState<FileUploadStatus>(() => ({
     status: 'pending',
   }));
@@ -125,7 +135,7 @@ export const UploadManager: FCWithOneShot = memo(() => {
   }, [uploadState.status]);
   if (!data) return null;
   return (
-    <li className="upload-manager">
+    <li className={clsx('upload-manager', className)}>
       <label
         htmlFor="file"
         className="upload-label"
