@@ -14,6 +14,7 @@ import { ReactComponent as LoopOffIcon } from '~/assets/loop-off.svg';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { Logger } from '~/utils/logger.ts';
 import { clsx } from '~/utils/clsx.ts';
+import { ImageValue, metadataParser } from './metadata-parser';
 import './audio-player.css';
 
 const logger = new Logger('AudioPlayer');
@@ -46,7 +47,7 @@ export const AudioPlayer: FC<{
   className?: string;
 }> = memo(({ src, type, title, className }) => {
   const [state, setState] = useState<State>(() => ({
-    ready: true,
+    ready: false,
     played: 0,
     loaded: 0,
     duration: 0,
@@ -59,7 +60,7 @@ export const AudioPlayer: FC<{
       show: false,
     },
   }));
-  const [metadata] = useState<Metadata>(() => ({}));
+  const [metadata, setMetadata] = useState<Metadata>(() => ({}));
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const controllers = useMemo(() => {
     return new (class {
@@ -152,43 +153,43 @@ export const AudioPlayer: FC<{
       };
     })();
   }, []);
-  // useEffect(() => {
-  // let objectURL: string | void = void 0;
-  // const readCover = (image: ImageValue, ost: string) => {
-  //   const file = new File(
-  //     [image.data as ArrayBuffer],
-  //     `${ost}-${image.description}`,
-  //     { type: image.mime || 'image/png' }
-  //   );
-  //   objectURL = URL.createObjectURL(file);
-  //   return objectURL;
-  // };
-  //   extract(src)
-  //     .then((tags) => {
-  //       if (!tags) return void 0;
-  //       // console.log(`"${tags.title}"`, isNonUTF8(tags.title || ''));
-  //       setMetadata({
-  //         title: tags.title || void 0,
-  //         artist: tags.artist || void 0,
-  //         cover: Array.isArray(tags.image)
-  //           ? readCover(
-  //               tags.image,
-  //               tags.album || 'Album cover'
-  //             )
-  //           : void 0,
-  //       });
-  //     }, logger.error)
-  //     .finally(() => {
-  //       setState((state) => ({ ...state, ready: true }));
-  //     });
-  //   return () => {
-  //     if (objectURL) URL.revokeObjectURL(objectURL);
-  //   };
-  // }, [src]);
+  useEffect(() => {
+    let objectURL: string | void = void 0;
+    const readCover = (image: ImageValue, ost: string) => {
+      const file = new File(
+        [image.data as ArrayBuffer],
+        `${ost}-${image.description}`,
+        { type: image.mime || 'image/png' }
+      );
+      objectURL = URL.createObjectURL(file);
+      return objectURL;
+    };
+    metadataParser(src)
+      .then((tags) => {
+        if (!tags) return void 0;
+        // console.log(`"${tags.title}"`, isNonUTF8(tags.title || ''));
+        setMetadata({
+          title: tags.title || void 0,
+          artist: tags.artist || void 0,
+          cover: tags.image
+            ? readCover(tags.image, tags.album || 'Album cover')
+            : void 0,
+        });
+      }, logger.error)
+      .finally(() => {
+        setState((state) => ({
+          ...state,
+          ready: true,
+        }));
+      });
+    return () => {
+      if (objectURL) URL.revokeObjectURL(objectURL);
+    };
+  }, [src]);
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return void 0;
-    let _title = document.title;
+    const raw_document_title = document.title;
     audio.ondurationchange = () =>
       setState((prev) => ({
         ...prev,
@@ -209,13 +210,14 @@ export const AudioPlayer: FC<{
         ...prev,
         loading: true,
       }));
-    audio.onended = () =>
+    audio.onended = () => {
+      document.title = raw_document_title;
       setState((prev) => ({
         ...prev,
         paused: true,
       }));
+    };
     audio.onplay = () => {
-      _title = document.title;
       if (audio.dataset['audioTitle'])
         document.title = `🎵 ${audio.dataset['audioTitle']}`;
       setState((prev) => ({
@@ -224,7 +226,7 @@ export const AudioPlayer: FC<{
       }));
     };
     audio.onpause = () => {
-      document.title = _title;
+      document.title = raw_document_title;
       setState((prev) => ({
         ...prev,
         paused: true,
