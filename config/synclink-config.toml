@@ -8,5 +8,10 @@ port = 8080
 storage_path = "storage"
 
 # logger
-[log]
+[logs]
 level = "debug"
+# path = "logs"
+
+# Authorize
+#[authorize]
+#secret = ""

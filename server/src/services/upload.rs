@@ -1,123 +1,90 @@
-use crate::config::state::AppState;
-use crate::models::bucket::BucketAction;
-use crate::utils::{HttpException, HttpResult};
-use crate::{cleanup_preallocation, throw_error, try_break_ok, utils};
-use anyhow::Context;
+use crate::models::file_indexing::IndexChangeAction;
+use crate::state::AppState;
 use axum::{
-    debug_handler,
-    extract::{BodyStream, State},
-    http::{HeaderMap, StatusCode},
+    extract::{ConnectInfo, Request, State},
+    http::StatusCode,
     response::{AppendHeaders, IntoResponse},
     Json,
 };
+use sha2::{Digest, Sha256};
+use std::net::SocketAddr;
 
-use crate::errors::{ApiError, InternalError};
+use crate::errors::{ApiResponse, ErrorKind};
+use crate::extactors::Headers;
+use crate::utils::decode_uri;
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
-#[debug_handler]
 pub async fn upload(
     State(state): State<AppState>,
-    headers: HeaderMap,
-    mut stream: BodyStream,
-) -> HttpResult<impl IntoResponse> {
-    use sha2::{Digest, Sha256};
-    use std::str::FromStr;
-
-    let content_length = try_break_ok!(headers
-        .get("content-length")
-        .and_then(|it| it.to_str().ok().and_then(|val| u64::from_str(val).ok()))
-        .ok_or((
-            HttpException::BadRequest,
-            ApiError::HeaderFieldMissing("Content-Length")
-        )));
-
-    let content_type = try_break_ok!(headers
-        .get("content-type")
-        .map(|it| String::from_utf8_lossy(it.as_bytes()).to_string())
-        .ok_or((
-            HttpException::BadRequest,
-            ApiError::HeaderFieldMissing("Content-Type")
-        )));
-    let content_hash = try_break_ok!(headers
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: Headers,
+    request: Request,
+) -> ApiResponse<impl IntoResponse> {
+    let content_length = headers.get("content-length").try_as_u64()?;
+    let content_type = headers.get("content-type").try_as_string()?;
+    let content_hash = headers
         .get("x-content-sha256")
-        .and_then(|it| it.to_str().ok())
-        .map(|it| it.to_lowercase())
-        .ok_or((
-            HttpException::BadRequest,
-            ApiError::HeaderFieldMissing("X-Content-Sha256")
-        )));
+        .try_as_string()?
+        .to_lowercase();
     let filename = headers
         .get("x-raw-filename")
-        .and_then(|it| it.to_str().ok())
-        .and_then(|it| utils::decode_uri(it).ok());
+        .try_as_string()
+        .ok()
+        .map(|it| decode_uri(&it).map_err(ErrorKind::from))
+        .transpose()?;
 
-    let user_agent = headers
-        .get("user-agent")
-        .and_then(|it| it.to_str().ok())
-        .map(|it| it.to_string());
+    let user_agent = headers.get("user-agent").try_as_string().ok();
+
+    let host = Some(addr.ip().to_string());
 
     // Check hash exists, if it exists, then cancel upload and return uuid
-    if let Some(uuid) = state.bucket.has_hash(&content_hash) {
-        return Ok::<_, ()>(
-            (
-                StatusCode::CONFLICT,
-                AppendHeaders([("location", uuid.to_string())]),
-            )
-                .into_response(),
+    if let Some(uuid) = state.indexing.has_hash(&content_hash) {
+        return Ok((
+            StatusCode::CONFLICT,
+            AppendHeaders([("location", uuid.to_string())]),
         )
-        .into();
+            .into_response());
     }
     let (uid, size, hash) = {
         // Preallocate disk space, uuid
-        let mut preallocation = match state
-            .bucket
+        let mut preallocation = state
+            .indexing
             .preallocation(&filename, &Some(content_length))
-            .await
-        {
-            Ok(tup) => tup,
-            Err(err) => return Err(err).into(),
-        };
+            .await?;
         let mut hasher = Sha256::new();
         let mut size = 0;
+        let mut stream = request.into_body().into_data_stream();
         while let Some(chunk) = stream.next().await {
-            let chunk = match chunk.with_context(|| InternalError::ReadStream) {
+            let chunk = match chunk {
                 Ok(v) => v,
                 Err(err) => {
-                    cleanup_preallocation!(preallocation);
-                    return Err(err).into();
+                    preallocation.cleanup().await?;
+                    return Err(ErrorKind::from(err));
                 }
             };
             hasher.update(chunk.as_ref());
-            match preallocation
-                .file
-                .write_all(chunk.as_ref())
-                .await
-                .with_context(|| InternalError::WriteFile(&preallocation.path).to_string())
-            {
+            match preallocation.file.write_all(chunk.as_ref()).await {
                 Ok(_) => (),
                 Err(err) => {
-                    cleanup_preallocation!(preallocation);
-                    return Err(err).into();
+                    preallocation.cleanup().await?;
+                    return Err(ErrorKind::from(err));
                 }
             }
             size += chunk.len()
         }
         let hash = format!("{:x}", hasher.finalize());
         if hash.as_str() != content_hash {
-            cleanup_preallocation!(preallocation);
-            throw_error!(HttpException::BadRequest, ApiError::HashMismatch)
+            preallocation.cleanup().await?;
+            return Err(ErrorKind::HashMismatch);
         }
         (preallocation.uid, size, hash)
     };
-    try_break_ok!(
-        state
-            .bucket
-            .write(uid, user_agent, filename, content_type, hash, size)
-            .await
-    );
-    if let Err(err) = state.broadcast.send(BucketAction::Add(uid)) {
-        tracing::warn!(%err, "{}", InternalError::Broadcast(&format!("add {} action", uid)));
-    }
-    Ok::<_, ()>((StatusCode::CREATED, Json(uid)).into_response()).into()
+
+    state
+        .indexing
+        .write(uid, user_agent, filename, content_type, hash, size, host)
+        .await?;
+    state.broadcast.send(IndexChangeAction::AddItem(uid))?;
+    Ok((StatusCode::CREATED, Json(uid)).into_response())
 }

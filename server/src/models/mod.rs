@@ -1,3 +1,3 @@
-pub(crate) mod bucket;
+pub mod file_indexing;
 
-pub(crate) use bucket::Bucket;
+pub use file_indexing::FileIndexing;

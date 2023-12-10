@@ -1,9 +1,8 @@
-use axum::debug_handler;
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 
-#[allow(unused)]
 #[derive(Deserialize, Debug)]
+#[allow(unused)]
 struct SystemPart {
     #[serde(rename = "userAgent")]
     user_agent: String,
@@ -11,15 +10,15 @@ struct SystemPart {
     width: u32,
 }
 
-#[allow(unused)]
 #[derive(Deserialize, Debug)]
+#[allow(unused)]
 struct BuildPart {
     version: String,
     timestamp: u64,
 }
 
-#[allow(unused)]
 #[derive(Deserialize, Debug)]
+#[allow(unused)]
 struct LogPart {
     level: String,
     time: u64,
@@ -29,8 +28,8 @@ struct LogPart {
     stack: String,
 }
 
-#[allow(unused)]
 #[derive(Deserialize, Debug)]
+#[allow(unused)]
 pub struct ReportObject {
     logs: Vec<LogPart>,
     time: u64,
@@ -38,7 +37,6 @@ pub struct ReportObject {
     build: BuildPart,
 }
 
-#[debug_handler]
 pub async fn beacon(body: String) {
     let body = serde_json::from_str::<ReportObject>(&body).unwrap();
     let span = tracing::span!(

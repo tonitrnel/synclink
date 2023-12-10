@@ -1,7 +1,6 @@
-use crate::config::state::AppState;
-use crate::utils::HttpResult;
+use crate::errors::ApiResponse;
+use crate::state::AppState;
 use axum::{
-    debug_handler,
     extract::{Query, State},
     Json,
 };
@@ -18,8 +17,27 @@ pub struct QueryParams {
     fields: Option<String>,
 }
 
+impl QueryParams {
+    fn per_page(&self) -> usize {
+        self.per_page.unwrap_or(10) as usize
+    }
+    fn page(&self) -> usize {
+        self.page.unwrap_or(1).max(1) as usize
+    }
+    fn fields(&self) -> HashSet<String> {
+        self.fields
+            .as_ref()
+            .map(|it| {
+                it.split(',')
+                    .map(|field| field.trim().to_string())
+                    .collect::<HashSet<_>>()
+            })
+            .unwrap_or_default()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BucketEntityDto {
+pub struct ResponseDto {
     uid: Uuid,
     created: i64,
     name: String,
@@ -27,9 +45,10 @@ pub struct BucketEntityDto {
     r#type: String,
     ext: Option<String>,
     user_agent: Option<String>,
+    host: Option<String>,
 }
 
-impl BucketEntityDto {
+impl ResponseDto {
     fn into_value(self) -> serde_json::Value {
         serde_json::json!(self)
     }
@@ -74,24 +93,15 @@ where
     data: Vec<T>,
 }
 
-#[debug_handler]
 pub async fn list(
     State(state): State<AppState>,
     query: Query<QueryParams>,
-) -> HttpResult<Json<PaginationDto<serde_json::Value>>> {
-    let query: QueryParams = query.0;
-    let per_page = query.per_page.unwrap_or(10) as usize;
-    let page = query.page.unwrap_or(1).max(1) as usize;
-    let fields = query
-        .fields
-        .map(|it| {
-            it.split(',')
-                .map(|field| field.trim().to_string())
-                .collect::<HashSet<_>>()
-        })
-        .unwrap_or_default();
+) -> ApiResponse<Json<PaginationDto<serde_json::Value>>> {
+    let per_page = query.per_page();
+    let page = query.page();
+    let fields = query.fields();
     let mut total = 0usize;
-    let items = state.bucket.map_clone(|items| {
+    let items = state.indexing.map_clone(|items| {
         total = items.len();
         let sorted_indexes = {
             let mut indexes = (0..total).collect::<Vec<_>>();
@@ -110,7 +120,7 @@ pub async fn list(
             .take(per_page)
             .map(|idx| {
                 let it = &items[idx];
-                BucketEntityDto {
+                ResponseDto {
                     uid: *it.get_uid(),
                     created: *it.get_created(),
                     name: it.get_name().to_string(),
@@ -118,6 +128,7 @@ pub async fn list(
                     r#type: it.get_type().to_string(),
                     ext: it.get_extension().to_owned(),
                     user_agent: it.get_user_agent().to_owned(),
+                    host: it.get_host().to_owned(),
                 }
             })
             .collect::<Vec<_>>()
@@ -138,5 +149,5 @@ pub async fn list(
             })
             .collect::<Vec<_>>()
     };
-    Ok::<_, ()>(Json(PaginationDto { total, data })).into()
+    Ok(Json(PaginationDto { total, data }))
 }

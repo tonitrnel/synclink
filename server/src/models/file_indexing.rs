@@ -9,7 +9,7 @@ use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BucketEntity {
+pub struct Entity {
     /// assigned uid
     uid: Uuid,
     /// created date of the content
@@ -38,18 +38,16 @@ pub struct BucketEntity {
     ext: Option<String>,
     /// user-agent
     user_agent: Option<String>,
+    host: Option<String>,
 }
 
 #[allow(unused)]
-impl BucketEntity {
+impl Entity {
     pub fn get_uid(&self) -> &Uuid {
         &self.uid
     }
     pub fn get_filename(&self) -> String {
-        match &self.ext {
-            Some(ext) => format!("{}.{}", self.name, ext),
-            None => self.name.to_string(),
-        }
+        self.name.to_string()
     }
     pub fn get_resource(&self) -> String {
         match &self.ext {
@@ -87,9 +85,12 @@ impl BucketEntity {
     pub fn get_user_agent(&self) -> &Option<String> {
         &self.user_agent
     }
+    pub fn get_host(&self) -> &Option<String> {
+        &self.host
+    }
 }
 
-impl PartialEq for BucketEntity {
+impl PartialEq for Entity {
     fn eq(&self, other: &Self) -> bool {
         self.hash == other.hash
     }
@@ -112,29 +113,20 @@ impl PreallocationFile {
     }
 }
 
-#[macro_export]
-macro_rules! cleanup_preallocation {
-    ($pre:ident) => {
-        if let Err(_err) = $pre.cleanup().await {
-            return Err(_err).into();
-        };
-    };
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Index {
     #[serde(rename = "item", default)]
-    items: Vec<BucketEntity>,
+    items: Vec<Entity>,
 }
 
-pub(crate) struct Bucket {
+pub struct FileIndexing {
     index: Arc<Mutex<Index>>,
     index_file: std::fs::File,
     path: PathBuf,
 }
 
-impl Bucket {
-    pub(crate) async fn connect(path: impl AsRef<Path>) -> Self {
+impl FileIndexing {
+    pub async fn connect(path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_owned();
         if !&path.is_dir() {
             panic!("Error: Path '{:?}' is not a directory", path.as_os_str())
@@ -167,15 +159,15 @@ impl Bucket {
         }
     }
     /// Get BucketEntity
-    pub(crate) fn get(&self, id: &Uuid) -> Option<BucketEntity> {
+    pub fn get(&self, id: &Uuid) -> Option<Entity> {
         let guard = &self.index.lock().unwrap();
         guard.items.iter().find(|it| it.uid == *id).cloned()
     }
-    pub(crate) fn has(&self, id: &Uuid) -> bool {
+    pub fn has(&self, id: &Uuid) -> bool {
         let guard = &self.index.lock().unwrap();
         guard.items.iter().any(|it| &it.uid == id)
     }
-    pub(crate) fn has_hash(&self, hash: &str) -> Option<Uuid> {
+    pub fn has_hash(&self, hash: &str) -> Option<Uuid> {
         let guard = self.index.lock().unwrap();
         if let Some(uuid) =
             guard
@@ -187,14 +179,14 @@ impl Bucket {
         }
         None
     }
-    pub(crate) fn map_clone<T, F>(&self, f: F) -> Vec<T>
+    pub fn map_clone<T, F>(&self, f: F) -> Vec<T>
     where
-        F: FnOnce(&Vec<BucketEntity>) -> Vec<T>,
+        F: FnOnce(&Vec<Entity>) -> Vec<T>,
     {
         let guard = self.index.lock().unwrap();
         f(&guard.items)
     }
-    pub(crate) async fn delete(&self, id: &Uuid) -> anyhow::Result<()> {
+    pub async fn delete(&self, id: &Uuid) -> anyhow::Result<()> {
         let mut guard = self.index.lock().unwrap();
         if let Some(idx) = guard.items.iter().position(|it| &it.uid == id) {
             let entity = guard.items.remove(idx);
@@ -227,11 +219,11 @@ impl Bucket {
         }
         Ok(())
     }
-    pub(crate) fn get_storage_path(&self) -> &PathBuf {
+    pub fn get_storage_path(&self) -> &PathBuf {
         &self.path
     }
     /// Writing entity to index file
-    async fn write_index(&self, entity: &BucketEntity) -> anyhow::Result<()> {
+    async fn write_index(&self, entity: &Entity) -> anyhow::Result<()> {
         let is_empty = self.index.lock().unwrap().items.is_empty();
         let part = format!(
             "{newline}[[item]]\n{body}",
@@ -259,7 +251,7 @@ impl Bucket {
     ///
     /// # Return
     /// Returns a tuple containing the generated UUID and the opened file, returning `Ok` on success and `Err` on failure.
-    pub(crate) async fn preallocation(
+    pub async fn preallocation(
         &self,
         filename: &Option<String>,
         size: &Option<u64>,
@@ -287,7 +279,7 @@ impl Bucket {
         Ok(PreallocationFile { uid, file, path })
     }
     /// Writing bucket to index file
-    pub(crate) async fn write(
+    pub async fn write(
         &self,
         uid: Uuid,
         user_agent: Option<String>,
@@ -295,6 +287,7 @@ impl Bucket {
         r#type: String,
         hash: String,
         size: usize,
+        host: Option<String>,
     ) -> anyhow::Result<()> {
         let now = chrono::Local::now();
         let (name, ext) = if let Some(_name) = filename.as_ref() {
@@ -308,7 +301,7 @@ impl Bucket {
         } else {
             (format!("pasted_{}", now.format("%Y-%m-%d-%H-%M")), None)
         };
-        let item = BucketEntity {
+        let item = Entity {
             uid,
             name,
             created: now.timestamp_millis(),
@@ -318,6 +311,7 @@ impl Bucket {
             r#type,
             ext,
             user_agent,
+            host,
         };
         self.write_index(&item).await?;
         self.index.lock().unwrap().items.push(item);
@@ -326,16 +320,16 @@ impl Bucket {
 }
 
 #[derive(Debug, Clone)]
-pub enum BucketAction {
-    Add(Uuid),
-    Delete(Uuid),
+pub enum IndexChangeAction {
+    AddItem(Uuid),
+    DelItem(Uuid),
 }
 
-impl BucketAction {
+impl IndexChangeAction {
     pub fn to_json(&self) -> String {
         let (action, uid) = match self {
-            BucketAction::Add(uid) => ("ADD", uid),
-            BucketAction::Delete(uid) => ("DELETE", uid),
+            IndexChangeAction::AddItem(uid) => ("ADD", uid),
+            IndexChangeAction::DelItem(uid) => ("DELETE", uid),
         };
         serde_json::json!({
             "type": action,
@@ -345,11 +339,11 @@ impl BucketAction {
     }
 }
 
-impl Display for BucketAction {
+impl Display for IndexChangeAction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let (action, uid) = match self {
-            BucketAction::Add(uid) => ("ADD", uid),
-            BucketAction::Delete(uid) => ("DELETE", uid),
+            IndexChangeAction::AddItem(uid) => ("ADD", uid),
+            IndexChangeAction::DelItem(uid) => ("DELETE", uid),
         };
         write!(f, "[{}]@{}", action, uid)
     }

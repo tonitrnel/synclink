@@ -1,26 +1,23 @@
-use crate::config::AppState;
+use crate::errors::ApiResponse;
+use crate::extactors::Headers;
+use crate::state::AppState;
 use axum::{
-    debug_handler,
     extract::State,
-    http::{header, HeaderMap, StatusCode},
+    http::{header, StatusCode},
     response::{AppendHeaders, IntoResponse},
 };
 
-#[debug_handler]
 pub async fn upload_preflight(
     State(state): State<AppState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
-    let content_hash = headers
-        .get("x-content-sha256")
-        .map(|it| String::from_utf8_lossy(it.as_bytes()).to_lowercase())
-        .unwrap_or_default();
-    match state.bucket.has_hash(&content_hash) {
-        Some(uid) => (
+    headers: Headers,
+) -> ApiResponse<impl IntoResponse> {
+    let content_hash = headers.get("x-content-sha256").try_as_string()?;
+    match state.indexing.has_hash(&content_hash) {
+        Some(uid) => Ok((
             StatusCode::CONFLICT,
             AppendHeaders([(header::LOCATION, uid.to_string())]),
         )
-            .into_response(),
-        None => StatusCode::OK.into_response(),
+            .into_response()),
+        None => Ok(StatusCode::OK.into_response()),
     }
 }

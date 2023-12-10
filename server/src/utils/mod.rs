@@ -1,13 +1,13 @@
 mod decode_uri;
-mod http_result;
+pub mod file_helper;
+mod sequential_ranges_stream;
 mod utc_to_i64;
 
 pub use decode_uri::*;
-pub use http_result::*;
 pub use utc_to_i64::*;
 
 /// read last_modified from file metadata
-pub fn last_modified(metadata: &std::fs::Metadata) -> Option<String> {
+pub fn parse_last_modified(metadata: &std::fs::Metadata) -> Option<String> {
     let modified = metadata.modified().ok()?;
     let utc_date = chrono::DateTime::<chrono::Utc>::from(modified);
     Some(utc_date.format("%a, %d %b %Y %H:%M:%S GMT").to_string())
@@ -67,8 +67,8 @@ mod tests {
     #[test]
     fn test_last_modified() {
         let metadata = std::fs::metadata(".gitignore").unwrap();
-        println!("{:?}", last_modified(&metadata));
-        assert!(last_modified(&metadata).is_some())
+        println!("{:?}", parse_last_modified(&metadata));
+        assert!(parse_last_modified(&metadata).is_some())
     }
 
     #[test]

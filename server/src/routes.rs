@@ -1,30 +1,39 @@
-use crate::config::state::AppState;
 use crate::services;
+use crate::state::AppState;
 use axum::{
+    middleware,
     routing::{delete, get, head, post},
     Router,
 };
 
-pub fn routes() -> Router<AppState> {
+pub fn build() -> Router<AppState> {
     let static_files_service = tower_http::services::ServeDir::new(std::path::Path::new("public"))
-        .append_index_html_on_directories(true);
+        .append_index_html_on_directories(true)
+        .fallback(tower_http::services::ServeFile::new("public/index.html"));
     Router::new()
         .route("/api", get(services::list))
         .route("/api/beacon", post(services::beacon))
+        .route("/api/upload", post(services::upload))
         .route(
-            "/api/upload",
-            post(services::upload).layer(axum::extract::DefaultBodyLimit::max(4 * 1024 * 1024)),
+            "/api/upload-part/allocate",
+            post(services::upload_part::allocate),
         )
-        .route("/api/upload-part/", post(services::upload_part))
+        .route(
+            "/api/upload-part/concatenate",
+            post(services::upload_part::concatenate),
+        )
+        .route("/api/upload-part/abort", post(services::upload_part::abort))
         .route(
             "/api/upload-part/:uuid",
-            post(services::upload_part).layer(axum::extract::DefaultBodyLimit::max(1024 * 1024)),
+            post(services::upload_part::append),
         )
         .route("/api/upload-preflight", head(services::upload_preflight))
         .route("/api/notify", get(services::update_notify))
+        .route("/api/stat", get(services::stat))
         .route("/api/:uuid", delete(services::delete))
         .route("/api/:uuid/metadata", get(services::get_metadata))
         .route("/api/:uuid", get(services::get))
+        .layer(middleware::from_extractor::<services::authorize::Claims>())
         .fallback_service(static_files_service)
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .layer(
