@@ -1,0 +1,88 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2023-12-07 23:41+0800\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/components/item/item.tsx:109
+msgid "can't share this file"
+msgstr "Can't share this file"
+
+#: src/components/input/input.tsx:127
+msgid "cannot to paste such files"
+msgstr "Cannot to paste such files"
+
+#: src/components/item/item.tsx:283
+msgid "continue read"
+msgstr "Continue read"
+
+#: src/components/item/item.tsx:225
+msgid "copy"
+msgstr "Copy"
+
+#: src/components/item/item.tsx:159
+msgid "delete"
+msgstr "Delete"
+
+#: src/components/item/item.tsx:141
+msgid "download"
+msgstr "Download"
+
+#: src/components/list/list.tsx:343
+msgid "no items found."
+msgstr "No items found."
+
+#: src/components/input/input.tsx:454
+msgid "paste"
+msgstr "Paste"
+
+#: src/components/input/input.tsx:98
+msgid "paste file is empty"
+msgstr "Paste file is empty"
+
+#: src/components/list/list.tsx:330
+msgid "receiving"
+msgstr "Receiving"
+
+#: src/utils/upload.ts:28
+msgid "resource already exists"
+msgstr "Resource already exists"
+
+#: src/components/input/input.tsx:399
+#: src/components/input/input.tsx:482
+msgid "send"
+msgstr "Send"
+
+#: src/components/input/input.tsx:478
+msgid "sending"
+msgstr "Sending"
+
+#: src/components/item/item.tsx:150
+msgid "share"
+msgstr "Share"
+
+#: src/components/item/item.tsx:464
+msgid "shared from"
+msgstr "shared from"
+
+#: src/components/dropzone/dropzone.tsx:30
+msgid "unable to paste directory"
+msgstr "Unable to paste directory"
+
+#: src/components/item/item.tsx:160
+#~ msgid "unknown host"
+#~ msgstr "Unknown"
+
+#: src/components/input/input.tsx:379
+#: src/components/input/input.tsx:447
+msgid "upload"
+msgstr "Upload"

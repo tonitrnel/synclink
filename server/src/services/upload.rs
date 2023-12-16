@@ -1,23 +1,22 @@
 use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
 use axum::{
-    extract::{ConnectInfo, Request, State},
+    extract::{Request, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use sha2::{Digest, Sha256};
-use std::net::SocketAddr;
 
 use crate::errors::{ApiResponse, ErrorKind};
-use crate::extactors::Headers;
+use crate::extactors::{ClientIp, Headers};
 use crate::utils::decode_uri;
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
 pub async fn upload(
     State(state): State<AppState>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    ClientIp(ip): ClientIp,
     headers: Headers,
     request: Request,
 ) -> ApiResponse<impl IntoResponse> {
@@ -35,8 +34,6 @@ pub async fn upload(
         .transpose()?;
 
     let user_agent = headers.get("user-agent").try_as_string().ok();
-
-    let host = Some(addr.ip().to_string());
 
     // Check hash exists, if it exists, then cancel upload and return uuid
     if let Some(uuid) = state.indexing.has_hash(&content_hash) {
@@ -86,7 +83,7 @@ pub async fn upload(
             content_type,
             hash,
             size,
-            host,
+            ip,
         })
         .await?;
     state.broadcast.send(IndexChangeAction::AddItem(uid))?;

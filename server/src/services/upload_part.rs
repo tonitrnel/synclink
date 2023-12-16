@@ -1,12 +1,11 @@
 use crate::errors::{ApiResponse, ErrorKind, InternalError};
-use crate::extactors::Headers;
+use crate::extactors::{ClientIp, Headers};
 use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
 use crate::utils::decode_uri;
 use anyhow::Context;
-use axum::extract::ConnectInfo;
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Query, Request, State},
     http::StatusCode,
     response::{AppendHeaders, IntoResponse},
     Json,
@@ -14,7 +13,7 @@ use axum::{
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::SeekFrom;
-use std::net::SocketAddr;
+use std::path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tokio::fs;
@@ -158,7 +157,7 @@ where
 
 /// concatenate chunks
 async fn exec_concatenate(
-    storage_path: &std::path::Path,
+    storage_path: &path::Path,
     uid: &Uuid,
     filename: &Option<String>,
 ) -> anyhow::Result<(PathBuf, usize, String)> {
@@ -186,19 +185,57 @@ async fn exec_concatenate(
     }
     let ext = filename
         .as_ref()
-        .map(std::path::Path::new)
+        .map(path::Path::new)
         .and_then(|it| it.extension())
         .map(|it| format!(".{}", it.to_string_lossy()))
         .unwrap_or("".to_string());
     let path = storage_path.join(format!("{}{}", uid, ext));
-    fs::rename(&temp, &path)
-        .await
-        .with_context(|| InternalError::RenameFileError {
-            from_path: temp.to_owned(),
-            to_path: path.to_owned(),
-        })?;
+    move_tmp_file(&temp, &path).await?;
     access_shared_sessions()?.remove(uid);
     Ok((path, size, format!("{:x}", hasher.finalize())))
+}
+
+async fn move_tmp_file(src: &path::Path, dest: &path::Path) -> anyhow::Result<()> {
+    let src_dev = get_device_id(src)?;
+    let dest_dev = get_device_id(dest)?;
+    if src_dev != dest_dev {
+        tokio::process::Command::new("/bin/mv")
+            .arg(src.display().to_string())
+            .arg(dest.display().to_string())
+            .spawn()
+            .with_context(|| "mv command failed to start")?
+            .wait()
+            .await
+            .with_context(|| "mv command failed to run")?;
+    } else {
+        fs::rename(&src, &dest)
+            .await
+            .with_context(|| InternalError::RenameFileError {
+                from_path: src.to_owned(),
+                to_path: dest.to_owned(),
+            })?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn get_device_id(path: &path::Path) -> anyhow::Result<u64> {
+    use std::os::unix::fs::MetadataExt;
+    path.parent()
+        .with_context(|| {
+            format!(
+                "The provided path '{}' has no parent directory.",
+                path.display()
+            )
+        })?
+        .metadata()
+        .map(|metadata| metadata.dev())
+        .context("Failed to get metadata for the parent directory.")
+}
+
+#[cfg(not(target_os = "linux"))]
+fn get_device_id(path: &path::Path) -> anyhow::Result<u64> {
+    Ok(0)
 }
 
 /// cleanup uploaded chunks
@@ -237,7 +274,7 @@ pub async fn allocate(
 }
 
 pub async fn append(
-    Path(id): Path<Uuid>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
     query: Query<QueryParams>,
     request: Request,
 ) -> ApiResponse<impl IntoResponse> {
@@ -258,9 +295,9 @@ pub async fn append(
 
 pub async fn concatenate(
     State(state): State<AppState>,
-    query: Query<QueryParams>,
+    ClientIp(ip): ClientIp,
     headers: Headers,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    query: Query<QueryParams>,
 ) -> ApiResponse<impl IntoResponse> {
     let id = query.id()?;
     if !access_shared_sessions()?.contains_key(&id) {
@@ -278,7 +315,6 @@ pub async fn concatenate(
         .map(|it| decode_uri(&it).map_err(ErrorKind::from))
         .transpose()?;
     let user_agent = headers.get("user-agent").try_as_string().ok();
-    let host = Some(addr.ip().to_string());
     let (path, size, hash) =
         exec_concatenate(state.indexing.get_storage_dir(), &id, &filename).await?;
     if content_hash != hash {
@@ -296,7 +332,7 @@ pub async fn concatenate(
             content_type,
             hash,
             size,
-            host,
+            ip,
         })
         .await?;
     if let Err(err) = state.broadcast.send(IndexChangeAction::AddItem(id)) {

@@ -39,7 +39,7 @@ pub struct Entity {
     pub(super) content_type: String,
     /// original file extension of the content
     pub(super) ext: Option<String>,
-    pub(super) host: Option<String>,
+    pub(super) ip: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) metadata: Option<EntityMetadata>,
 }
@@ -89,15 +89,15 @@ impl Entity {
     pub fn get_extension(&self) -> &Option<String> {
         &self.ext
     }
-    pub fn get_host(&self) -> &Option<String> {
-        &self.host
+    pub fn get_ip(&self) -> &Option<String> {
+        &self.ip
     }
-    pub fn get_host_alias(&self) -> Option<&String> {
-        let device_host_tags = &config::load().device_host_tags;
-        self.host
+    pub fn get_ip_alias(&self) -> Option<&String> {
+        let device_ip_tags = &config::load().device_ip_tags;
+        self.ip
             .as_ref()
-            .zip(device_host_tags.as_ref())
-            .and_then(|(host, tags)| tags.get(host))
+            .zip(device_ip_tags.as_ref())
+            .and_then(|(ip, tags)| tags.get(ip))
     }
     pub fn get_metadata(&self) -> &Option<EntityMetadata> {
         &self.metadata

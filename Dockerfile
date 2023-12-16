@@ -1,8 +1,10 @@
-FROM rust:alpine as builder
+FROM rust:1.74-alpine3.17 as builder
 
 WORKDIR /app
 
 RUN apk update && apk add --no-cache -U musl-dev
+
+RUN rustup upgrade
 
 COPY server/src ./src
 COPY server/Cargo.toml ./
@@ -16,7 +18,7 @@ WORKDIR /etc/synclink
 
 COPY --from=builder /app/target/release/synclink .
 
-COPY webapp/dist ./public
+COPY web/dist ./public
 
 COPY config/synclink-config.toml ./config.toml
 

@@ -1,0 +1,78 @@
+@import 'photoswipe/dist/photoswipe.css';
+
+/* Item */
+.synclink-item {
+@apply relative mt-7;
+}
+
+@media screen and (max-width: 780px) {
+  .synclink-item {
+    margin-bottom: 0;
+  }
+}
+
+.synclink-item:last-of-type {
+  border-bottom: none;
+}
+
+.synclink-item-title {
+@apply mt-0 font-semibold;
+}
+
+.synclink-item-link {
+  -webkit-appearance: none;
+  border: none;
+  background-color: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+@apply text-gray-600;
+
+  svg {
+  @apply mr-1;
+  }
+
+  &:hover {
+  @apply text-gray-900;
+  }
+
+  &:active {
+    text-shadow: 0 1px 0 #333;
+    text-decoration: underline dotted;
+  }
+}
+/* Preview Item */
+
+.synclink-item-preview {
+  max-width: 100%;
+}
+
+video.synclink-item-preview {
+  max-width: 100%;
+  object-fit: cover;
+@apply rounded;
+}
+
+figure.synclink-item-preview {
+@apply text-left m-0 overflow-hidden cursor-zoom-in max-w-max;
+}
+
+figure.synclink-item-preview img {
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  object-position: center;
+@apply rounded;
+}
+
+figure.synclink-item-preview figcaption {
+  text-align: right;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+  width: 100%;
+  text-decoration: none;
+}

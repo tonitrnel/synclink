@@ -54,8 +54,8 @@ pub struct ResponseDto {
     size: u64,
     r#type: String,
     ext: Option<String>,
-    host: Option<String>,
-    host_alias: Option<String>,
+    ip: Option<String>,
+    ip_alias: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<EntityMetadata>,
 }
@@ -72,8 +72,8 @@ impl ResponseDto {
             size: entity.get_size().to_owned(),
             r#type: entity.get_content_type().to_owned(),
             ext: entity.get_extension().to_owned(),
-            host: entity.get_host().to_owned(),
-            host_alias: entity.get_host_alias().cloned(),
+            ip: entity.get_ip().to_owned(),
+            ip_alias: entity.get_ip_alias().cloned(),
             metadata: entity.get_metadata().to_owned(),
         }
     }

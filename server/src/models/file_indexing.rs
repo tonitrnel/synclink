@@ -49,7 +49,7 @@ pub struct WriteIndexArgs {
     pub content_type: Option<String>,
     pub hash: String,
     pub size: usize,
-    pub host: Option<String>,
+    pub ip: Option<String>,
 }
 
 impl WriteIndexArgs {
@@ -79,7 +79,7 @@ impl WriteIndexArgs {
             size: self.size as u64,
             content_type: mimetype_infer(dir.join(resource), self.content_type).await,
             ext,
-            host: self.host,
+            ip: self.ip,
             metadata: None,
         }
     }
@@ -135,10 +135,8 @@ impl FileIndexing {
                 .iter()
                 .find_map(|it| if it.hash == hash { Some(it.uid) } else { None })
         {
-            println!("hash = {hash}, matched");
             return Some(uuid);
         }
-        println!("hash = {hash}, nomatched");
         None
     }
     pub fn map_clone<T, F>(&self, f: F) -> T

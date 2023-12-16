@@ -46,6 +46,7 @@ async fn load_memory_usage(pid: u32) -> anyhow::Result<u64> {
     Ok(view
         .get(23)
         .and_then(|it| it.trim().parse::<u64>().ok())
+        .map(|it| it * 4096)
         .unwrap_or(0))
 }
 

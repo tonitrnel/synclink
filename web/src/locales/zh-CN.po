@@ -1,0 +1,88 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2023-12-07 23:41+0800\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: zh-CN\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/components/item/item.tsx:109
+msgid "can't share this file"
+msgstr "无法分享这个文件"
+
+#: src/components/input/input.tsx:127
+msgid "cannot to paste such files"
+msgstr "无法粘贴此类文件"
+
+#: src/components/item/item.tsx:283
+msgid "continue read"
+msgstr "继续阅读"
+
+#: src/components/item/item.tsx:225
+msgid "copy"
+msgstr "复制"
+
+#: src/components/item/item.tsx:159
+msgid "delete"
+msgstr "删除"
+
+#: src/components/item/item.tsx:141
+msgid "download"
+msgstr "下载"
+
+#: src/components/list/list.tsx:343
+msgid "no items found."
+msgstr "未找到任何记录"
+
+#: src/components/input/input.tsx:454
+msgid "paste"
+msgstr "粘贴"
+
+#: src/components/input/input.tsx:98
+msgid "paste file is empty"
+msgstr "粘贴文件为空"
+
+#: src/components/list/list.tsx:330
+msgid "receiving"
+msgstr "接收中"
+
+#: src/utils/upload.ts:28
+msgid "resource already exists"
+msgstr "资源已存在"
+
+#: src/components/input/input.tsx:399
+#: src/components/input/input.tsx:482
+msgid "send"
+msgstr "发送"
+
+#: src/components/input/input.tsx:478
+msgid "sending"
+msgstr "发送中"
+
+#: src/components/item/item.tsx:150
+msgid "share"
+msgstr "分享"
+
+#: src/components/item/item.tsx:464
+msgid "shared from"
+msgstr "分享来自"
+
+#: src/components/dropzone/dropzone.tsx:30
+msgid "unable to paste directory"
+msgstr "无法粘贴文件夹"
+
+#: src/components/item/item.tsx:160
+#~ msgid "unknown host"
+#~ msgstr "未知主机"
+
+#: src/components/input/input.tsx:379
+#: src/components/input/input.tsx:447
+msgid "upload"
+msgstr "上传"

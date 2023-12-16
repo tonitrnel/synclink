@@ -78,7 +78,12 @@ impl IntoResponse for ErrorKind {
             ErrorKind::Forbidden => StatusCode::FORBIDDEN,
             ErrorKind::Unauthorized => StatusCode::UNAUTHORIZED,
 
-            ErrorKind::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::Internal(err) => {
+                err.chain()
+                    .skip(1)
+                    .for_each(|cause| tracing::error!("because: {}", cause));
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         };
 
         (status, message).into_response()

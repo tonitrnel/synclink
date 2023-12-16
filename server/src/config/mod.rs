@@ -37,7 +37,7 @@ pub(crate) struct Config {
     pub file_storage: storage_config::StorageConfig,
     pub logs: logs_config::LogsConfig,
     pub authorize: Option<authorize_config::AuthorizeConfig>,
-    pub device_host_tags: Option<HashMap<String, String>>,
+    pub device_ip_tags: Option<HashMap<String, String>>,
 }
 
 impl Config {

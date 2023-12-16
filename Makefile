@@ -1,14 +1,14 @@
 .ONESHELL:
 
 
-dist: build-image
-	docker save -o ./synclink.img synclink:latest
+build: build-image
+	docker save -o ./synclink.img synclink:0.2.0
 
-build-image: build-webapp
-	docker build -t synclink .
+build-image: build-web
+	docker build -t synclink:0.2.0 .
 
-build-webapp: build-sha256-binding
-	cd webapp && echo %cd%
+build-web: build-sha256-binding
+	cd web && echo %cd%
 	npm run build
 
 build-sha256-binding:
