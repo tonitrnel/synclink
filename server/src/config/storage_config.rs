@@ -17,6 +17,6 @@ impl StorageConfig {
             root_dir().join(path)
         };
         path.canonicalize()
-            .with_context(|| "Failed to parse clash settings directory.".to_string())
+            .with_context(|| "Failed to parse storage directory.".to_string())
     }
 }

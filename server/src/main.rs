@@ -13,17 +13,22 @@ mod utils;
 
 #[tokio::main]
 async fn main() {
-    let config = config::config();
+    let config = config::load();
     // Initialize logger tracing
-    logs::logs_registry(config.logs.level.to_owned());
+    let _guards = logs::logs_registry(
+        config.logs.level.to_owned(),
+        config.logs.parse_dir().unwrap(),
+    )
+    .unwrap();
     let addr = format!("{}:{}", config.server.host, config.server.port)
         .to_socket_addrs()
         .map(|mut it| it.next().unwrap())
         .unwrap();
     let (tx, _) = tokio::sync::broadcast::channel(8);
 
-    let indexing =
-        Arc::new(models::FileIndexing::connect(config.file_storage.parse_dir().unwrap()).await);
+    let indexing = Arc::new(
+        models::file_indexing::FileIndexing::new(config.file_storage.parse_dir().unwrap()).await,
+    );
     let state = state::AppState {
         indexing,
         broadcast: tx,

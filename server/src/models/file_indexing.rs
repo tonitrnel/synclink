@@ -1,100 +1,15 @@
-use crate::utils;
+use crate::models::entity::{Entity, EntityMetadata};
+use crate::models::image::Image;
+use crate::utils::mimetype_infer;
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fmt::{Display, Formatter};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Entity {
-    /// assigned uid
-    uid: Uuid,
-    /// created date of the content
-    #[serde(
-        serialize_with = "utils::serialize_i64_to_utc",
-        deserialize_with = "utils::deserialize_utc_to_i64"
-    )]
-    created: i64,
-    /// modified date of the content
-    #[serde(
-        serialize_with = "utils::serialize_option_i64_to_utc",
-        deserialize_with = "utils::deserialize_option_utc_to_i64",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    modified: Option<i64>,
-    /// original file name of the content
-    name: String,
-    /// hash of the content
-    hash: String,
-    /// length of content
-    size: u64,
-    /// mime type of the content
-    r#type: String,
-    /// original file extension of the content
-    ext: Option<String>,
-    /// user-agent
-    user_agent: Option<String>,
-    host: Option<String>,
-}
-
-#[allow(unused)]
-impl Entity {
-    pub fn get_uid(&self) -> &Uuid {
-        &self.uid
-    }
-    pub fn get_filename(&self) -> String {
-        self.name.to_string()
-    }
-    pub fn get_resource(&self) -> String {
-        match &self.ext {
-            Some(ext) => format!("{}.{}", self.uid, ext),
-            None => self.uid.to_string(),
-        }
-    }
-    pub fn get_hash(&self) -> &str {
-        &self.hash
-    }
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-    pub fn get_size(&self) -> &u64 {
-        &self.size
-    }
-    pub fn get_type(&self) -> &str {
-        &self.r#type
-    }
-    pub fn get_created(&self) -> &i64 {
-        &self.created
-    }
-    pub fn get_modified(&self) -> &Option<i64> {
-        &self.modified
-    }
-    pub fn get_created_date(&self) -> String {
-        utils::i64_to_utc(&self.created).unwrap()
-    }
-    pub fn get_modified_date(&self) -> Option<String> {
-        self.modified.map(|t| utils::i64_to_utc(&t).unwrap())
-    }
-    pub fn get_extension(&self) -> &Option<String> {
-        &self.ext
-    }
-    pub fn get_user_agent(&self) -> &Option<String> {
-        &self.user_agent
-    }
-    pub fn get_host(&self) -> &Option<String> {
-        &self.host
-    }
-}
-
-impl PartialEq for Entity {
-    fn eq(&self, other: &Self) -> bool {
-        self.hash == other.hash
-    }
-}
 
 pub struct PreallocationFile {
     pub uid: Uuid,
@@ -113,20 +28,65 @@ impl PreallocationFile {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 struct Index {
     #[serde(rename = "item", default)]
     items: Vec<Entity>,
 }
 
+#[derive(Debug)]
 pub struct FileIndexing {
     index: Arc<Mutex<Index>>,
-    index_file: std::fs::File,
-    path: PathBuf,
+    index_file: fs::File,
+    directory: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct WriteIndexArgs {
+    pub uid: Uuid,
+    pub user_agent: Option<String>,
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+    pub hash: String,
+    pub size: usize,
+    pub host: Option<String>,
+}
+
+impl WriteIndexArgs {
+    async fn into_entity(self, dir: &PathBuf) -> Entity {
+        let now = chrono::Local::now();
+        let (name, ext) = if let Some(_name) = self.filename.as_ref() {
+            let path = Path::new(_name);
+            let name = path
+                .file_name()
+                .map(|it| it.to_string_lossy().to_string())
+                .unwrap_or("untitled".to_string());
+            let ext = path.extension().map(|it| it.to_string_lossy().to_string());
+            (name, ext)
+        } else {
+            (format!("pasted_{}", now.format("%Y-%m-%d-%H-%M")), None)
+        };
+        let resource = match &ext {
+            Some(ext) => format!("{}.{}", self.uid, ext),
+            None => self.uid.to_string(),
+        };
+        Entity {
+            uid: self.uid,
+            name,
+            created: now.timestamp_millis(),
+            modified: None,
+            hash: self.hash,
+            size: self.size as u64,
+            content_type: mimetype_infer(dir.join(resource), self.content_type).await,
+            ext,
+            host: self.host,
+            metadata: None,
+        }
+    }
 }
 
 impl FileIndexing {
-    pub async fn connect(path: impl AsRef<Path>) -> Self {
+    pub async fn new(path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_owned();
         if !&path.is_dir() {
             panic!("Error: Path '{:?}' is not a directory", path.as_os_str())
@@ -154,8 +114,8 @@ impl FileIndexing {
         let path = index_path.parent().unwrap().to_path_buf();
         Self {
             index: Arc::new(Mutex::new(index)),
-            index_file: index_file.into_std().await,
-            path,
+            index_file,
+            directory: path,
         }
     }
     /// Get BucketEntity
@@ -175,72 +135,107 @@ impl FileIndexing {
                 .iter()
                 .find_map(|it| if it.hash == hash { Some(it.uid) } else { None })
         {
+            println!("hash = {hash}, matched");
             return Some(uuid);
         }
+        println!("hash = {hash}, nomatched");
         None
     }
-    pub fn map_clone<T, F>(&self, f: F) -> Vec<T>
+    pub fn map_clone<T, F>(&self, f: F) -> T
     where
-        F: FnOnce(&Vec<Entity>) -> Vec<T>,
+        F: FnOnce(&Vec<Entity>) -> T,
     {
         let guard = self.index.lock().unwrap();
         f(&guard.items)
     }
-    pub async fn delete(&self, id: &Uuid) -> anyhow::Result<()> {
-        let mut guard = self.index.lock().unwrap();
-        if let Some(idx) = guard.items.iter().position(|it| &it.uid == id) {
-            let entity = guard.items.remove(idx);
-            let is_empty = guard.items.is_empty();
-            let resource_path = self.get_storage_path().join(entity.get_resource());
-            if resource_path.exists() {
-                let result = std::fs::remove_file(&resource_path).with_context(|| {
-                    format!("Error: Remove resource file '{:?}' failed", &resource_path)
-                });
-                if let Err(err) = result {
-                    // rollback
-                    guard.items.insert(idx, entity);
-                    return Err(err);
-                }
+    async fn delete_related_files(&self, entity: &Entity) -> anyhow::Result<()> {
+        let resource_path = self.get_storage_dir().join(entity.get_resource());
+        if resource_path.exists() {
+            fs::remove_file(&resource_path).await.with_context(|| {
+                format!("Error: Remove resource file '{:?}' failed", &resource_path)
+            })?;
+        }
+        let thumbnail_path = self
+            .get_storage_dir()
+            .join(format!("{}.thumbnail", entity.get_resource()));
+        if thumbnail_path.exists() {
+            if let Err(err) = fs::remove_file(&thumbnail_path).await {
+                tracing::warn!(reason = ?err, "failed to remove thumbnail file, path = {:?}", thumbnail_path);
             };
-            let mut file = self.index_file.try_clone()?;
-            file.seek(SeekFrom::Start(0))?;
-            // Regenerate index file content
-            let content = if is_empty {
-                "".to_string()
-            } else {
-                toml::to_string(&*guard).unwrap()
-            };
-            let bytes = content.as_bytes();
-            // `write_all` is used to overwrite not truncate, so set the length here to ensure that all content is overwritten
-            file.set_len(bytes.len() as u64)?;
-            file.write_all(bytes)
-                .with_context(|| "Fatal error: Update index file failed")
-                .and_then(|_| self.sync_all())?
         }
         Ok(())
     }
-    pub fn get_storage_path(&self) -> &PathBuf {
-        &self.path
+    pub async fn delete(&self, id: &Uuid) -> anyhow::Result<()> {
+        let (idx, entity) = {
+            let mut guard = self.index.lock().unwrap();
+            if let Some(idx) = guard.items.iter().position(|it| &it.uid == id) {
+                (idx, guard.items.remove(idx))
+            } else {
+                tracing::warn!("no index matching {uid} was found.", uid = id);
+                return Ok(());
+            }
+        };
+        tracing::info!(target: "event", "delete [uuid={id}]");
+        if let Err(err) = self.delete_related_files(&entity).await {
+            tracing::error!(reason = ?err, "failed to delete related files, rollback index.");
+            self.index.lock().unwrap().items.insert(idx, entity);
+            return Err(err);
+        }
+        self.sync_index_to_storage().await?;
+        tracing::info!(target: "event", "delete [uuid={id}] successfully");
+        Ok(())
+    }
+    async fn sync_index_to_storage(&self) -> anyhow::Result<()> {
+        let mut file = self.index_file.try_clone().await?;
+        file.seek(SeekFrom::Start(0)).await?;
+        let content = {
+            let items = &self.index.lock().unwrap().items;
+            // Regenerate index file content
+            if items.is_empty() {
+                "".to_string()
+            } else {
+                let mut str = String::new();
+                for item in items {
+                    if let Err(err) = item.serialize_and_write(&mut str, "item") {
+                        tracing::error!(reason = ?err, "failed to serialize string");
+                        anyhow::bail!("failed to update index")
+                    }
+                }
+                str
+            }
+        };
+        let bytes = content.as_bytes();
+        // `write_all` is used to overwrite not truncate, so set the length here to ensure that all content is overwritten
+        file.set_len(bytes.len() as u64).await?;
+        file.write_all(bytes)
+            .await
+            .with_context(|| "failed to write index to disk")?;
+        self.sync_all().await?;
+        Ok(())
+    }
+    pub fn get_storage_dir(&self) -> &PathBuf {
+        &self.directory
     }
     /// Writing entity to index file
     async fn write_index(&self, entity: &Entity) -> anyhow::Result<()> {
-        let is_empty = self.index.lock().unwrap().items.is_empty();
-        let part = format!(
-            "{newline}[[item]]\n{body}",
-            newline = if is_empty { "" } else { "\n" },
-            body = toml::to_string(entity)?
-        );
-        let mut file = self.index_file.try_clone()?;
-        file.seek(SeekFrom::End(0))?;
+        let mut part = String::new();
+        if let Err(err) = entity.serialize_and_write(&mut part, "item") {
+            tracing::error!(reason = ?err, "failed to serialize string");
+            anyhow::bail!("failed to update index")
+        };
+        let mut file = self.index_file.try_clone().await?;
+        file.seek(SeekFrom::End(0)).await?;
         file.write_all(part.as_bytes())
+            .await
             .with_context(|| "Fatal Error: Write new index to index file failed")?;
-        self.sync_all()?;
+        self.sync_all().await?;
         Ok(())
     }
     /// Sync indexes to index file
-    fn sync_all(&self) -> anyhow::Result<()> {
+    async fn sync_all(&self) -> anyhow::Result<()> {
         self.index_file
             .sync_all()
+            .await
             .with_context(|| "Fatal Error: Sync indexes to file failed")
     }
     /// Pre-allocate a UUID and file with the option to pre-size.
@@ -262,7 +257,7 @@ impl FileIndexing {
             .map(Path::new)
             .and_then(|it| it.extension())
             .map(|it| it.to_string_lossy().to_string());
-        let path = self.path.join({
+        let path = self.directory.join({
             match ext {
                 Some(ext) => format!("{}.{}", uid, ext),
                 None => uid.to_string(),
@@ -279,42 +274,38 @@ impl FileIndexing {
         Ok(PreallocationFile { uid, file, path })
     }
     /// Writing bucket to index file
-    pub async fn write(
-        &self,
-        uid: Uuid,
-        user_agent: Option<String>,
-        filename: Option<String>,
-        r#type: String,
-        hash: String,
-        size: usize,
-        host: Option<String>,
-    ) -> anyhow::Result<()> {
-        let now = chrono::Local::now();
-        let (name, ext) = if let Some(_name) = filename.as_ref() {
-            let path = Path::new(_name);
-            let name = path
-                .file_name()
-                .map(|it| it.to_string_lossy().to_string())
-                .unwrap_or("untitled".to_string());
-            let ext = path.extension().map(|it| it.to_string_lossy().to_string());
-            (name, ext)
-        } else {
-            (format!("pasted_{}", now.format("%Y-%m-%d-%H-%M")), None)
-        };
-        let item = Entity {
-            uid,
-            name,
-            created: now.timestamp_millis(),
-            modified: None,
-            hash,
-            size: size as u64,
-            r#type,
-            ext,
-            user_agent,
-            host,
-        };
-        self.write_index(&item).await?;
-        self.index.lock().unwrap().items.push(item);
+    pub async fn write(&self, args: WriteIndexArgs) -> anyhow::Result<()> {
+        let uid = args.uid.to_string();
+        let mut entity = args.into_entity(self.get_storage_dir()).await;
+        if let Err(err) = self.prepare_related_assets(&mut entity).await {
+            tracing::warn!(reason = ?err, "failed to prepare related assets")
+        }
+        tracing::info!(target: "event",
+            "write [uuid={uid}] [filename={filename}] [mime_type={mime_type}] [ext={extension:?}]",
+            filename = entity.name, mime_type = entity.content_type, extension = entity.ext
+        );
+        self.write_index(&entity).await?;
+        self.index.lock().unwrap().items.push(entity);
+        tracing::info!(target: "event", "write [uuid={uid}] successfully");
+        Ok(())
+    }
+    pub async fn prepare_related_assets(&self, entity: &mut Entity) -> anyhow::Result<()> {
+        if Image::is_support(&entity.content_type) {
+            let image = Image::new(
+                self.get_storage_dir().join(entity.get_resource()),
+                entity.content_type.to_owned(),
+            )
+            .await?;
+            entity.metadata = Some(EntityMetadata::Image(image.get_metadata()));
+            image
+                .generate_thumbnail(
+                    self.get_storage_dir()
+                        .join(format!("{}.thumbnail", entity.get_resource())),
+                    500,
+                    500,
+                )
+                .await?;
+        }
         Ok(())
     }
 }

@@ -1,6 +1,6 @@
 use crate::errors::{ApiResponse, ErrorKind, InternalError};
 use crate::extactors::Headers;
-use crate::models::file_indexing::IndexChangeAction;
+use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
 use crate::utils::decode_uri;
 use anyhow::Context;
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::io::SeekFrom;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tokio::fs;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_stream::{Stream, StreamExt};
@@ -27,8 +27,9 @@ struct Session {
     start: u64,
 }
 
-static SESSION_MAP: OnceLock<Arc<Mutex<HashMap<String, Session>>>> = OnceLock::new();
+type Sessions = HashMap<Uuid, Session>;
 
+static SHARED_SESSIONS: OnceLock<Arc<Mutex<Sessions>>> = OnceLock::new();
 #[derive(Deserialize, Debug)]
 pub struct QueryParams {
     id: Option<Uuid>,
@@ -51,10 +52,16 @@ impl QueryParams {
     }
 }
 
-fn get_session_map() -> Arc<Mutex<HashMap<String, Session>>> {
-    SESSION_MAP
+fn access_shared_sessions() -> anyhow::Result<MutexGuard<'static, Sessions>> {
+    match SHARED_SESSIONS
         .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
-        .clone()
+        .lock()
+    {
+        Ok(guard) => Ok(guard),
+        Err(err) => {
+            anyhow::bail!("sessions lock failed, reason {:?}", err)
+        }
+    }
 }
 
 /// allocate disk resource
@@ -68,14 +75,11 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     };
     let (uid, start, path) = {
-        if let Some((uid, session)) = get_session_map()
-            .lock()
-            .unwrap()
+        if let Some((uid, session)) = access_shared_sessions()?
             .iter()
             .find(|(_, it)| it.hash == hash)
         {
-            let uid = Uuid::try_parse(uid)
-                .with_context(|| "Unexpected error, session stored illegal uuid")?;
+            let uid = uid.to_owned();
             let path = path.join(format!("{}.tmp", uid));
             if path.exists() && path.is_file() {
                 (uid, session.start, path)
@@ -104,10 +108,7 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     }
     if start == 0 {
-        get_session_map()
-            .lock()
-            .unwrap()
-            .insert(uid.to_string(), Session { hash, start: 0 });
+        access_shared_sessions()?.insert(uid, Session { hash, start: 0 });
     }
     Ok((uid, start))
 }
@@ -149,10 +150,8 @@ where
                 path: path.to_owned(),
             })?;
     }
-    {
-        if let Some(it) = get_session_map().lock().unwrap().get_mut(&uid.to_string()) {
-            it.start = end;
-        }
+    if let Some(it) = access_shared_sessions()?.get_mut(uid) {
+        it.start = end;
     }
     Ok(())
 }
@@ -198,7 +197,7 @@ async fn exec_concatenate(
             from_path: temp.to_owned(),
             to_path: path.to_owned(),
         })?;
-    get_session_map().lock().unwrap().remove(&uid.to_string());
+    access_shared_sessions()?.remove(uid);
     Ok((path, size, format!("{:x}", hasher.finalize())))
 }
 
@@ -212,7 +211,7 @@ async fn exec_cleanup(uid: &Uuid) -> anyhow::Result<()> {
         .with_context(|| InternalError::DeleteFileError {
             path: path.to_owned(),
         })?;
-    get_session_map().lock().unwrap().remove(&uid.to_string());
+    access_shared_sessions()?.remove(uid);
     Ok(())
 }
 
@@ -243,9 +242,18 @@ pub async fn append(
     request: Request,
 ) -> ApiResponse<impl IntoResponse> {
     let pos = query.pos()?;
+    let current_start_position = {
+        // Reduce the scope of the lock
+        access_shared_sessions()?.get(&id).map(|it| it.start)
+    };
+
+    // Check for duplicate chunk
+    if let Some(true) = current_start_position.map(|current| pos < current) {
+        return Ok(Json("ok!"));
+    }
     let stream = request.into_body().into_data_stream();
     exec_append(&id, stream, pos).await?;
-    Ok(Json("ok!".to_string()).into_response())
+    Ok(Json("ok!"))
 }
 
 pub async fn concatenate(
@@ -255,7 +263,10 @@ pub async fn concatenate(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> ApiResponse<impl IntoResponse> {
     let id = query.id()?;
-    let content_type = headers.get("content-type").try_as_string()?;
+    if !access_shared_sessions()?.contains_key(&id) {
+        return Ok(Json("ok!"));
+    }
+    let content_type = headers.get("content-type").try_as_string().ok();
     let content_hash = headers
         .get("x-content-sha256")
         .try_as_string()?
@@ -269,7 +280,7 @@ pub async fn concatenate(
     let user_agent = headers.get("user-agent").try_as_string().ok();
     let host = Some(addr.ip().to_string());
     let (path, size, hash) =
-        exec_concatenate(state.indexing.get_storage_path(), &id, &filename).await?;
+        exec_concatenate(state.indexing.get_storage_dir(), &id, &filename).await?;
     if content_hash != hash {
         fs::remove_file(&path)
             .await
@@ -278,7 +289,15 @@ pub async fn concatenate(
     }
     state
         .indexing
-        .write(id, user_agent, filename, content_type, hash, size, host)
+        .write(WriteIndexArgs {
+            uid: id,
+            user_agent,
+            filename,
+            content_type,
+            hash,
+            size,
+            host,
+        })
         .await?;
     if let Err(err) = state.broadcast.send(IndexChangeAction::AddItem(id)) {
         tracing::warn!(%err, "{}", InternalError::BroadcastIndexChangeError(format!("add {} action", id)));

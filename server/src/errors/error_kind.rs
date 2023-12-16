@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use std::fmt::{Display, Formatter};
+use uuid::Uuid;
 
 #[derive(Debug)]
 #[allow(unused)]
@@ -17,25 +18,41 @@ pub enum ErrorKind {
     HashMismatch,
     Unauthorized,
     Forbidden,
+    DuplicateFile(Uuid),
     Internal(anyhow::Error),
 }
 
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::QueryFieldMissing(field) => write!(f, "Query field missing: {field}"),
-            ErrorKind::HeaderFieldMissing(field) => write!(f, "Header field missing: {field}"),
-            ErrorKind::BodyFieldMissing(field) => write!(f, "Body field missing: {field}"),
-            ErrorKind::PathParameterMissing => f.write_str("Path parameter missing"),
-            ErrorKind::RangeTooLarge => f.write_str("Range too large"),
-            ErrorKind::RangeNotSupported => f.write_str("Range not supported"),
-            ErrorKind::InvalidRange => f.write_str("Invalid range"),
-            ErrorKind::RangeNotFound => f.write_str("Range not found"),
-            ErrorKind::ResourceNotFound => f.write_str("Resource not found"),
-            ErrorKind::HashMismatch => f.write_str("Hash mismatch"),
-            ErrorKind::Unauthorized => f.write_str("Unauthorized"),
-            ErrorKind::Forbidden => f.write_str("Forbidden"),
-            ErrorKind::Internal(err) => write!(f, "An internal error occurred: {err}"),
+            ErrorKind::QueryFieldMissing(field) => {
+                write!(f, "Required query field '{field}' is missing.")
+            }
+            ErrorKind::HeaderFieldMissing(field) => {
+                write!(f, "Required header field '{field}' is missing.")
+            }
+            ErrorKind::BodyFieldMissing(field) => {
+                write!(f, "Required body field '{field}' is missing.")
+            }
+            ErrorKind::PathParameterMissing => f.write_str("A required path parameter is missing."),
+            ErrorKind::RangeTooLarge => f.write_str("The specified range is too large."),
+            ErrorKind::RangeNotSupported => f.write_str("Range requests are not supported."),
+            ErrorKind::InvalidRange => f.write_str("The specified range is invalid."),
+            ErrorKind::RangeNotFound => f.write_str("The specified range does not exist."),
+            ErrorKind::ResourceNotFound => {
+                f.write_str("The requested resource could not be found.")
+            }
+            ErrorKind::HashMismatch => {
+                f.write_str("The provided hash does not match the expected hash.")
+            }
+            ErrorKind::Unauthorized => f.write_str("Access denied: unauthorized."),
+            ErrorKind::Forbidden => f.write_str("Access forbidden: insufficient permissions."),
+            ErrorKind::DuplicateFile(uid) => {
+                write!(f, "Rejected: file with UID '{uid}' already exists. ")
+            }
+            ErrorKind::Internal(_) => {
+                write!(f, "An internal error occurred. Please try again later.")
+            }
         }
     }
 }
@@ -43,7 +60,7 @@ impl Display for ErrorKind {
 impl IntoResponse for ErrorKind {
     fn into_response(self) -> Response {
         let message = self.to_string();
-        tracing::error!("{}", message);
+        tracing::error!("{:?}", self);
         let status = match &self {
             ErrorKind::QueryFieldMissing(_)
             | ErrorKind::HeaderFieldMissing(_)
@@ -55,6 +72,8 @@ impl IntoResponse for ErrorKind {
             | ErrorKind::RangeNotFound
             | ErrorKind::RangeNotSupported
             | ErrorKind::InvalidRange => StatusCode::RANGE_NOT_SATISFIABLE,
+
+            ErrorKind::DuplicateFile(_) => StatusCode::CONFLICT,
 
             ErrorKind::Forbidden => StatusCode::FORBIDDEN,
             ErrorKind::Unauthorized => StatusCode::UNAUTHORIZED,

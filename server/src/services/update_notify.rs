@@ -1,9 +1,9 @@
 use crate::state::AppState;
-use async_stream::try_stream;
 use axum::{
     extract::{ConnectInfo, State},
     http::HeaderMap,
     response::{sse, Sse},
+    BoxError,
 };
 use futures::stream;
 use serde_json::json;
@@ -15,7 +15,7 @@ pub async fn update_notify(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-) -> Sse<impl tokio_stream::Stream<Item = Result<sse::Event, std::convert::Infallible>>> {
+) -> Sse<impl tokio_stream::Stream<Item = Result<sse::Event, BoxError>>> {
     let ip = addr.ip().to_string();
     let user_agent = headers
         .get("user-agent")
@@ -31,21 +31,18 @@ pub async fn update_notify(
             tracing::info!("`{}@{}` disconnected", self.ip, self.user_agent)
         }
     }
-    let mut receiver = state.broadcast.subscribe();
-    let notify_stream = try_stream! {
-        let _guard = Guard{ ip, user_agent };
-        loop{
-            match receiver.recv().await{
-                Ok(i) => {
-                    let event = sse::Event::default().data(i.to_json());
-                    yield event;
-                },
+    let receiver = state.broadcast.subscribe();
+    let notify_stream = tokio_stream::wrappers::BroadcastStream::new(receiver).map(
+        |it| -> Result<sse::Event, BoxError> {
+            match it {
+                Ok(payload) => Ok(sse::Event::default().data(payload.to_json())),
                 Err(err) => {
-                    tracing::error!(error = ?err, "Failed to get");
+                    tracing::error!(reason = ?err, "failed to read broadcast message.");
+                    Err(Box::new(err))
                 }
             }
-        }
-    };
+        },
+    );
     let heart_stream = stream::repeat_with(|| {
         let now = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -58,7 +55,7 @@ pub async fn update_notify(
             .to_string(),
         )
     })
-    .map(|it| -> Result<sse::Event, std::convert::Infallible> { Ok(it) })
+    .map(|it| -> Result<sse::Event, BoxError> { Ok(it) })
     .throttle(Duration::from_secs(1));
     let combined_stream = stream::select(notify_stream, heart_stream);
     Sse::new(combined_stream).keep_alive(

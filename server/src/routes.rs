@@ -2,7 +2,7 @@ use crate::services;
 use crate::state::AppState;
 use axum::{
     middleware,
-    routing::{delete, get, head, post},
+    routing::{delete, get, head, post, put},
     Router,
 };
 
@@ -11,7 +11,6 @@ pub fn build() -> Router<AppState> {
         .append_index_html_on_directories(true)
         .fallback(tower_http::services::ServeFile::new("public/index.html"));
     Router::new()
-        .route("/api", get(services::list))
         .route("/api/beacon", post(services::beacon))
         .route("/api/upload", post(services::upload))
         .route(
@@ -22,17 +21,19 @@ pub fn build() -> Router<AppState> {
             "/api/upload-part/concatenate",
             post(services::upload_part::concatenate),
         )
-        .route("/api/upload-part/abort", post(services::upload_part::abort))
         .route(
-            "/api/upload-part/:uuid",
-            post(services::upload_part::append),
+            "/api/upload-part/abort",
+            delete(services::upload_part::abort),
         )
+        .route("/api/upload-part/:uuid", put(services::upload_part::append))
         .route("/api/upload-preflight", head(services::upload_preflight))
         .route("/api/notify", get(services::update_notify))
-        .route("/api/stat", get(services::stat))
-        .route("/api/:uuid", delete(services::delete))
-        .route("/api/:uuid/metadata", get(services::get_metadata))
-        .route("/api/:uuid", get(services::get))
+        .route("/api/stats", get(services::stats))
+        .route("/api/clean-dump", get(services::clean_dump))
+        .route("/api/file/:uuid", delete(services::delete))
+        .route("/api/file/:uuid", get(services::get))
+        .route("/api/:uuid", get(services::get_metadata))
+        .route("/api", get(services::list))
         .layer(middleware::from_extractor::<services::authorize::Claims>())
         .fallback_service(static_files_service)
         .layer(tower_http::trace::TraceLayer::new_for_http())
@@ -40,6 +41,7 @@ pub fn build() -> Router<AppState> {
             tower_http::cors::CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)
                 .allow_methods(tower_http::cors::Any)
+                .expose_headers(tower_http::cors::Any)
                 .allow_headers([
                     "CONTENT-TYPE".parse().unwrap(),
                     "ACCESS-TOKEN".parse().unwrap(),

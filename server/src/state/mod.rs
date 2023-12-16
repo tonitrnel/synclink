@@ -8,12 +8,12 @@ use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub indexing: Arc<models::FileIndexing>,
+    pub indexing: Arc<models::file_indexing::FileIndexing>,
     pub broadcast: broadcast::Sender<models::file_indexing::IndexChangeAction>,
 }
 
 #[async_trait]
-impl FromRequestParts<AppState> for Arc<models::FileIndexing> {
+impl FromRequestParts<AppState> for Arc<models::file_indexing::FileIndexing> {
     type Rejection = Infallible;
     async fn from_request_parts(
         _parts: &mut Parts,

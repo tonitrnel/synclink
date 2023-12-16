@@ -10,8 +10,11 @@ storage_path = "storage"
 # logger
 [logs]
 level = "debug"
-# path = "logs"
+#storage_path = "logs"
 
 # Authorize
 #[authorize]
 #secret = ""
+
+#[device_host_tags]
+#"192.168.1.3" = "My computer"

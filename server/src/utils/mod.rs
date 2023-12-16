@@ -1,9 +1,12 @@
 mod decode_uri;
 pub mod file_helper;
+mod mimetype;
 mod sequential_ranges_stream;
 mod utc_to_i64;
 
 pub use decode_uri::*;
+pub use mimetype::*;
+pub use sequential_ranges_stream::*;
 pub use utc_to_i64::*;
 
 /// read last_modified from file metadata
@@ -24,6 +27,12 @@ pub fn parse_ranges(range_value: &str) -> anyhow::Result<Vec<(Option<u64>, Optio
                 range_str
             ));
         }
+        if !range_str.contains('-') {
+            return Err(anyhow::format_err!(
+                "Invalid Range: parse range failed, Please make sure that '{}' is correct",
+                range_str
+            ));
+        }
         let mut parts = range_str.trim().splitn(2, '-');
         let start = parts.next().and_then(|it| it.parse::<u64>().ok());
         let end = parts.next().and_then(|it| it.parse::<u64>().ok());
@@ -41,6 +50,7 @@ pub fn parse_ranges(range_value: &str) -> anyhow::Result<Vec<(Option<u64>, Optio
     Ok(vec)
 }
 
+#[allow(unused)]
 pub fn format_ranges(ranges: &[(Option<u64>, Option<u64>)], total: u64) -> String {
     ranges
         .iter()
@@ -52,7 +62,7 @@ pub fn format_ranges(ranges: &[(Option<u64>, Option<u64>)], total: u64) -> Strin
             // 指定末尾的直接数
             (None, Some(last)) => {
                 let last = last.min(&total);
-                Some(format!("{}-{}/{}", total - last, total, total))
+                Some(format!("{}-{}/{}", total - last, total - 1, total))
             }
             _ => None,
         })

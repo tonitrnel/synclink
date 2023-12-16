@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::errors::InternalError;
 use anyhow::Context;
 use std::io::SeekFrom;

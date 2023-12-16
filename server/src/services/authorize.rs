@@ -1,4 +1,4 @@
-use crate::config::config;
+use crate::config;
 use crate::errors::ErrorKind;
 use axum::async_trait;
 use axum::extract::FromRequestParts;
@@ -11,7 +11,7 @@ static SECRET: OnceLock<Option<&'static str>> = OnceLock::new();
 
 fn load_secret() -> &'static Option<&'static str> {
     SECRET.get_or_init(|| {
-        let config = config();
+        let config = config::load();
         config.authorize.as_ref().map(|it| it.secret.as_str())
     })
 }

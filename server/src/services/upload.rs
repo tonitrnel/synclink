@@ -1,9 +1,9 @@
-use crate::models::file_indexing::IndexChangeAction;
+use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
 use axum::{
     extract::{ConnectInfo, Request, State},
     http::StatusCode,
-    response::{AppendHeaders, IntoResponse},
+    response::IntoResponse,
     Json,
 };
 use sha2::{Digest, Sha256};
@@ -22,7 +22,7 @@ pub async fn upload(
     request: Request,
 ) -> ApiResponse<impl IntoResponse> {
     let content_length = headers.get("content-length").try_as_u64()?;
-    let content_type = headers.get("content-type").try_as_string()?;
+    let content_type = headers.get("content-type").try_as_string().ok();
     let content_hash = headers
         .get("x-content-sha256")
         .try_as_string()?
@@ -40,11 +40,7 @@ pub async fn upload(
 
     // Check hash exists, if it exists, then cancel upload and return uuid
     if let Some(uuid) = state.indexing.has_hash(&content_hash) {
-        return Ok((
-            StatusCode::CONFLICT,
-            AppendHeaders([("location", uuid.to_string())]),
-        )
-            .into_response());
+        return Err(ErrorKind::DuplicateFile(uuid));
     }
     let (uid, size, hash) = {
         // Preallocate disk space, uuid
@@ -83,7 +79,15 @@ pub async fn upload(
 
     state
         .indexing
-        .write(uid, user_agent, filename, content_type, hash, size, host)
+        .write(WriteIndexArgs {
+            uid,
+            user_agent,
+            filename,
+            content_type,
+            hash,
+            size,
+            host,
+        })
         .await?;
     state.broadcast.send(IndexChangeAction::AddItem(uid))?;
     Ok((StatusCode::CREATED, Json(uid)).into_response())

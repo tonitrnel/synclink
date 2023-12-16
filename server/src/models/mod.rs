@@ -1,3 +1,3 @@
+pub mod entity;
 pub mod file_indexing;
-
-pub use file_indexing::FileIndexing;
+pub mod image;

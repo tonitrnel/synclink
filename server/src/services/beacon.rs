@@ -39,18 +39,22 @@ pub struct ReportObject {
 
 pub async fn beacon(body: String) {
     let body = serde_json::from_str::<ReportObject>(&body).unwrap();
+    print_beacon_logs(body)
+}
+
+fn print_beacon_logs(report: ReportObject) {
     let span = tracing::span!(
         tracing::Level::INFO,
         "beacon",
         timestamp = Utc
-            .timestamp_millis_opt(body.build.timestamp as i64)
+            .timestamp_millis_opt(report.build.timestamp as i64)
             .map(|dt| dt.format("%F %T%.6fZ").to_string())
             .unwrap(),
-        user_agent = body.system.user_agent
+        user_agent = report.system.user_agent
     );
     let _guard = span.enter();
-    for log in body.logs {
-        tracing::debug!(
+    for log in report.logs {
+        tracing::info!(
             timestamp = Utc
                 .timestamp_millis_opt(log.time as i64)
                 .map(|dt| dt.format("%F %T%.6fZ").to_string())
