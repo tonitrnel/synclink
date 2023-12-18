@@ -16,22 +16,6 @@ SyncLink 是一个设计用于运行在 NAS、软路由等类似设备上的且�
 - 前端：使用 [TypeScript](https://www.typescriptlang.org/) 和 [React](https://react.dev/) 构建
 - 后端：使用 [Rust](https://www.rust-lang.org/) 和 [Axum](https://github.com/tokio-rs/axum) 构建
 
-## 部署
-
-```shell
- docker run -d \
-                --name synclink \
-                --restart always \
-                -v /{custom_dir}/data:/etc/synclink/storage \
-                -v /{custom_dir}/config/synclink.conf:/etc/synclink/config.toml \
-                -v /{custom_dir}/logs:/etc/synclink/logs \
-                ghcr.io/tonitrnel/synclink:0.2.0
-```
-
-## 界面
-
-![screenshot1](./docs/screenshot1.png)
-
 ## 前提条件
 
 开发需要安装 [`NodeJS`](https://nodejs.org/en/download) 和 [`Rust`](https://www.rust-lang.org/tools/install)、[`WASM-Pack`](https://rustwasm.github.io/wasm-pack)

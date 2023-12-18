@@ -12,7 +12,9 @@ export const Sidebar: FC = memo(() => {
     const element = containerRef.current;
     if (!element || imgUrl) return void 0;
     const rect = element.getBoundingClientRect();
-    const url = `https://source.unsplash.com/${rect.width}x${rect.height}/daily?flower,twilight`;
+    const url = `https://source.unsplash.com/${Math.floor(
+      rect.width
+    )}x${Math.floor(rect.height)}/daily?flower,twilight`;
     sessionStorage.setItem('__decorative_img_url', url);
     setImgUrl(url);
   }, [imgUrl]);

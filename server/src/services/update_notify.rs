@@ -1,22 +1,22 @@
+use crate::extactors::ClientIp;
 use crate::state::AppState;
 use axum::{
-    extract::{ConnectInfo, State},
+    extract::State,
     http::HeaderMap,
     response::{sse, Sse},
     BoxError,
 };
 use futures::stream;
 use serde_json::json;
-use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use tokio_stream::StreamExt;
 
 pub async fn update_notify(
     State(state): State<AppState>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    ClientIp(ip): ClientIp,
     headers: HeaderMap,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<sse::Event, BoxError>>> {
-    let ip = addr.ip().to_string();
+    let ip = ip.unwrap_or("unknown".to_string());
     let user_agent = headers
         .get("user-agent")
         .map(|it| String::from_utf8(it.as_bytes().to_vec()).unwrap())

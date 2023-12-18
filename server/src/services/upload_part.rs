@@ -234,7 +234,7 @@ fn get_device_id(path: &path::Path) -> anyhow::Result<u64> {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn get_device_id(path: &path::Path) -> anyhow::Result<u64> {
+fn get_device_id(_path: &path::Path) -> anyhow::Result<u64> {
     Ok(0)
 }
 

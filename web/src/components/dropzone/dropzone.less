@@ -12,25 +12,25 @@
   flex-direction: column;
   gap: 10px;
   box-sizing: border-box;
-@apply border-4 border-dashed border-palette-ocean-blue;
+  @apply border-4 border-dashed border-palette-ocean-blue;
 
   &:before {
     content: '';
     z-index: -2;
-  @apply absolute left-0 top-0 w-full h-full bg-white;
+    @apply absolute left-0 top-0 w-full h-full bg-white;
   }
 
   &:after {
     content: '';
     z-index: -2;
-  @apply absolute left-0 top-0 w-full h-full bg-palette-ocean-blue bg-opacity-20;
+    @apply absolute left-0 top-0 w-full h-full bg-palette-ocean-blue bg-opacity-20;
   }
 }
 
 .dropzone svg {
-@apply w-12 h-12 stroke-gray-700;
+  @apply w-12 h-12 stroke-gray-700;
 }
 
 .dropzone span {
-@apply text-gray-900 font-bold;
+  @apply text-gray-900 font-bold;
 }
