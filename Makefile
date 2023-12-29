@@ -1,6 +1,6 @@
 .ONESHELL:
 
-VERSION := 0.2.1
+VERSION := 0.2.2
 
 build: build-image image-tag
 	docker save -o ./synclink.img synclink:$(VERSION)

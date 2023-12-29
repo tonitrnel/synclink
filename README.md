@@ -37,7 +37,7 @@ docker run -d \
         -v /<CUSTOM_DIR>/data:/etc/synclink/storage \
         -v /<CUSTOM_DIR>/config/synclink.conf:/etc/synclink/config.toml \
         -v /<CUSTOM_DIR>/logs:/etc/synclink/logs \
-        ghcr.io/tonitrnel/synclink:0.2.1
+        ghcr.io/tonitrnel/synclink:0.2.2
 ```
 
 ### Nginx 配置参考
