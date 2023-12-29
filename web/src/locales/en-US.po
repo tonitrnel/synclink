@@ -21,11 +21,11 @@ msgstr "Can't share this file"
 msgid "cannot to paste such files"
 msgstr "Cannot to paste such files"
 
-#: src/components/item/item.tsx:283
+#: src/components/item/item.tsx:289
 msgid "continue read"
 msgstr "Continue read"
 
-#: src/components/item/item.tsx:225
+#: src/components/item/item.tsx:229
 msgid "copy"
 msgstr "Copy"
 
@@ -37,7 +37,7 @@ msgstr "Delete"
 msgid "download"
 msgstr "Download"
 
-#: src/components/list/list.tsx:343
+#: src/components/list/list.tsx:342
 msgid "no items found."
 msgstr "No items found."
 
@@ -49,7 +49,7 @@ msgstr "Paste"
 msgid "paste file is empty"
 msgstr "Paste file is empty"
 
-#: src/components/list/list.tsx:330
+#: src/components/list/list.tsx:329
 msgid "receiving"
 msgstr "Receiving"
 
@@ -70,7 +70,7 @@ msgstr "Sending"
 msgid "share"
 msgstr "Share"
 
-#: src/components/item/item.tsx:464
+#: src/components/item/item.tsx:474
 msgid "shared from"
 msgstr "shared from"
 

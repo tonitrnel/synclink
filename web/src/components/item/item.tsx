@@ -25,6 +25,7 @@ import { clsx } from '~/utils/clsx.ts';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import { useGetFileContent } from '~/endpoints';
 import { useSnackbar } from '~/components/snackbar';
+import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
 import './item.less';
 
 dayjs.extend(relativeTime);
@@ -247,7 +248,7 @@ const TextItem: FC = memo(() => {
       // noinspection HtmlUnknownTarget
       text = text.replace(
         /(?<href>https?:\/\/[\w-_]+(?:\.\w+)+[^\s)]+)/gm,
-        `<a href="$<href>">$<href></a>`
+        `<a class='underline' target='_blank' referrerpolicy='no-referrer' href="$<href>">$<href><svg aria-hidden="true" fill="none" focusable="false" height="1em" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" class="inline ml-1 mb-0.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"></path><path d="M15 3h6v6"></path><path d="M10 14L21 3"></path></svg></a>`
       );
     }
     return text;
@@ -300,8 +301,10 @@ const TextItem: FC = memo(() => {
     </>
   );
 });
+
 const FigureItem: FC = memo(() => {
   const entity = useEntityConsumer();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [{ loaded, metadata }, setState] = useState(() => ({
     loaded: false,
     metadata: entity.metadata,
@@ -311,6 +314,9 @@ const FigureItem: FC = memo(() => {
     if (!metadata) return void 0;
     const lightbox = new PhotoSwipeLightbox({
       pswpModule: () => import('photoswipe'),
+      initialZoomLevel: (zoomLevelObject) => {
+        return isMobile ? zoomLevelObject.vFill : zoomLevelObject.fit;
+      },
       gallery: `#lightbox-${id}`,
       children: 'a',
     });
@@ -318,7 +324,7 @@ const FigureItem: FC = memo(() => {
     return () => {
       lightbox.destroy();
     };
-  }, [metadata, id]);
+  }, [metadata, id, isMobile]);
   const onLoad = useCallback((evt: SyntheticEvent<HTMLImageElement>) => {
     withProduce(setState, (draft) => {
       draft.loaded = true;
@@ -332,15 +338,20 @@ const FigureItem: FC = memo(() => {
   }, []);
   return (
     <>
-      <figure className="synclink-item-preview" id={`lightbox-${id}`}>
+      <figure
+        className="synclink-item-preview text-left m-0 overflow-hidden max-w-max h-[240px]"
+        id={`lightbox-${id}`}
+      >
         <a
           href={`${__ENDPOINT}/api/file/${entity.uid}`}
           data-pswp-src={`${__ENDPOINT}/api/file/${entity.uid}`}
           data-pswp-width={metadata?.width}
           data-pswp-height={metadata?.height}
           target="_blank"
+          className="cursor-zoom-in"
         >
           <img
+            className="rounded max-w-full max-h-full object-cover object-center"
             src={`${__ENDPOINT}/api/file/${entity.uid}?thumbnail-prefer`}
             alt={entity.name}
             data-id={entity.uid}
@@ -348,7 +359,7 @@ const FigureItem: FC = memo(() => {
           />
         </a>
         {loaded && (
-          <figcaption className="italic text-gray-500 text-sm mt-2">
+          <figcaption className="italic text-gray-500 text-sm mt-2 text-right overflow-hidden truncate w-full">
             {entity.name}
           </figcaption>
         )}
@@ -361,6 +372,7 @@ const FigureItem: FC = memo(() => {
     </>
   );
 });
+
 const VideoItem: FC = () => {
   const entity = useEntityConsumer();
   return (
@@ -368,7 +380,7 @@ const VideoItem: FC = () => {
       <video
         preload="metadata"
         controls
-        className="synclink-item-preview h-[480px]"
+        className="synclink-item-preview h-[280px] object-cover rounded max-w-full"
         controlsList="nodownload"
       >
         <source
@@ -389,7 +401,7 @@ const AudioItem: FC = () => {
   return (
     <>
       <AudioPlayer
-        className="synclink-item-preview"
+        className="synclink-item-preview pt-2"
         src={`${__ENDPOINT}/api/file/${entity.uid}`}
         title={entity.name}
         type={entity.type}
@@ -446,25 +458,22 @@ export const SynclinkItem: FC<{
     const diff = Math.abs(created.diff(dayjs(), 'days'));
     if (diff > 7) {
       return (
-        <>
+        <span>
           <span className="block text-xl text-gray-700 font-bold">
             {created.format('MMM DD ')}
           </span>
           <span className="block text-sm text-gray-600">
             {created.format('A hh:mm')}
           </span>
-        </>
+        </span>
       );
     } else {
-      return (
-        <>
-          <span className="text-gray-600">{created.fromNow()}</span>
-        </>
-      );
+      return <span className="text-gray-600">{created.fromNow()}</span>;
     }
   }, [it.created]);
   const from = useMemo(() => {
-    if (!it.ip || it.ip == '::1' || it.ip == '127.0.0.1') return void 0;
+    if (!it.ip || it.ip == '::1' || it.ip == '127.0.0.1')
+      return <span className="ml-2">shared from unknown</span>;
     return (
       <span className="ml-2">
         <span className="text-gray-400">{t`shared from`}</span>
@@ -481,11 +490,11 @@ export const SynclinkItem: FC<{
         data-uid={it.uid}
         key={it.uid}
       >
-        <div className="mb-2 text-sm">
+        <div className="mb-2 text-sm flex items-end">
           {time}
           {from}
         </div>
-        <div className="flex-1 bg-white shadow-sm rounded p-5 px-7 pad:p-7 pb-4 outline-gray-400 ">
+        <div className="flex-1 bg-white shadow-sm rounded p-5 px-3 pad:p-7 pb-4 outline-gray-400">
           {render}
         </div>
       </li>

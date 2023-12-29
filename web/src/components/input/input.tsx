@@ -236,6 +236,7 @@ export const Input: FC = memo(() => {
     textRef.current = text;
     textareaRef.current?.dispatchEvent(new CustomEvent('measure-size'));
   }, [text]);
+  // Receive share event
   useEffect(() => {
     const subscribeBroadcast = () => {
       const broadcastChannel =
@@ -293,6 +294,7 @@ export const Input: FC = memo(() => {
     }
     return subscribeBroadcast();
   }, []);
+  // rewrite keyboard 'tab' key
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea || isMobile) return void 0;
@@ -377,7 +379,7 @@ const MobileInput = forwardRef<
       <section className="relative flex items-end gap-1">
         <button
           title={t`upload`}
-          className="active:bg-gray-200 rounded-xl p-2 mb-1 mr-1 -ml-2"
+          className="active:bg-gray-200 rounded-xl p-2 -ml-2"
           onClick={handleUpload}
         >
           <HardDriveUploadIcon className="w-6 h-6 stroke-gray-600 " />
@@ -387,13 +389,12 @@ const MobileInput = forwardRef<
           value={text}
           onKeyUp={handleKeyUp}
           onChange={handleChange}
-          className="sl-textarea w-auto flex-1 py-3 min-h-0 h-auto"
+          className="sl-textarea w-auto flex-1 py-2 min-h-0 h-auto"
           rows={1}
-          placeholder="Just write something..."
         />
         <button
           disabled={sending}
-          className="bg-info-main text-white rounded px-3 py-2 mb-2 ml-2 active:bg-info-dark active:bg-opacity-80 select-none"
+          className="bg-info-main text-white rounded px-3 py-2 ml-2 active:bg-info-dark active:bg-opacity-80 select-none mb-0.5"
           onClick={handleSend}
         >
           {t`send`}
@@ -439,7 +440,6 @@ const NonMobileInput = forwardRef<
           onChange={handleChange}
           className="sl-textarea"
           rows={1}
-          placeholder="Just write something..."
         />
         <div className="flex mt-4 items-center justify-between">
           <div className="flex gap-2">

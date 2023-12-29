@@ -20,7 +20,7 @@ export const Layout: FC = () => {
         <main className="flex-1 h-full overflow-hidden">
           <List className="relative flex-1 h-full box-border px-4 pr-3 pad:px-40 overflow-y-auto" />
         </main>
-        <footer className="py-4 pad:pt-2 mx-auto w-full mt-2 z-10 bg-white pad:bg-gray-100 box-border px-6 pad:px-40  shadow-revert-md">
+        <footer className="py-2 pad:py-4 pad:pt-2 mx-auto w-full mt-2 z-10 bg-white pad:bg-gray-100 box-border px-4 pad:px-40  shadow-revert-md">
           <Input />
         </footer>
       </section>

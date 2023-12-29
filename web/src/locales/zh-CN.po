@@ -21,11 +21,11 @@ msgstr "无法分享这个文件"
 msgid "cannot to paste such files"
 msgstr "无法粘贴此类文件"
 
-#: src/components/item/item.tsx:283
+#: src/components/item/item.tsx:289
 msgid "continue read"
 msgstr "继续阅读"
 
-#: src/components/item/item.tsx:225
+#: src/components/item/item.tsx:229
 msgid "copy"
 msgstr "复制"
 
@@ -37,7 +37,7 @@ msgstr "删除"
 msgid "download"
 msgstr "下载"
 
-#: src/components/list/list.tsx:343
+#: src/components/list/list.tsx:342
 msgid "no items found."
 msgstr "未找到任何记录"
 
@@ -49,7 +49,7 @@ msgstr "粘贴"
 msgid "paste file is empty"
 msgstr "粘贴文件为空"
 
-#: src/components/list/list.tsx:330
+#: src/components/list/list.tsx:329
 msgid "receiving"
 msgstr "接收中"
 
@@ -70,7 +70,7 @@ msgstr "发送中"
 msgid "share"
 msgstr "分享"
 
-#: src/components/item/item.tsx:464
+#: src/components/item/item.tsx:474
 msgid "shared from"
 msgstr "分享来自"
 

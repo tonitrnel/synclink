@@ -76,7 +76,7 @@ export const Snackbar: FC<
           id={id}
           message={message}
           action={actionElement}
-          className="flex items-center pl-6 pr-10 py-2 rounded shadow-xl text-white gap-3 leading-none"
+          className="flex items-center pl-2 pad:pl-6 pr-4 pad:pr-10 pad:py-2 rounded shadow-xl text-white gap-3 leading-none"
         />
       </motion.li>
     );

@@ -1,7 +1,7 @@
 import type { LinguiConfig } from '@lingui/conf';
 
 export default {
-  locales: ['en', 'zh-CN'],
+  locales: ['en-US', 'zh-CN'],
   catalogs: [
     {
       path: 'src/locales/{locale}',
