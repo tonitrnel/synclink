@@ -5,7 +5,7 @@ use std::fmt::Write;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum EntityMetadata {
     Image(ImageMetadata),
 }
@@ -40,7 +40,11 @@ pub struct Entity {
     /// original file extension of the content
     pub(super) ext: Option<String>,
     pub(super) ip: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(super) caption: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) tags: Vec<String>,
+    #[serde(skip_serializing, default)]
     pub(super) metadata: Option<EntityMetadata>,
 }
 
@@ -70,6 +74,12 @@ impl Entity {
     }
     pub fn get_size(&self) -> &u64 {
         &self.size
+    }
+    pub fn get_tags(&self) -> &[String] {
+        &self.tags
+    }
+    pub fn get_caption(&self) -> &str {
+        &self.caption
     }
     pub fn get_content_type(&self) -> &str {
         &self.content_type
@@ -102,11 +112,21 @@ impl Entity {
     pub fn get_metadata(&self) -> &Option<EntityMetadata> {
         &self.metadata
     }
-
     pub fn serialize_and_write(&self, writer: &mut String, key: &str) -> anyhow::Result<()> {
-        write!(writer, "\n[[{}]]\n", key);
-        let s = toml::to_string(&self)?.replacen("[metadata]", &format!("[{}.metadata]", key), 1);
-        write!(writer, "{s}");
+        writeln!(writer, "[[{}]]", key);
+        write!(writer, "{}", toml::to_string(&self)?);
+        if let Some(metadata) = &self.metadata {
+            let s = toml::to_string(metadata)?;
+            #[allow(clippy::write_literal)]
+            writeln!(
+                writer,
+                "metadata = {prefix}{value}{suffix}",
+                prefix = "{ ",
+                suffix = " }",
+                value = s.trim_end().replace('\n', ", ")
+            )?;
+        }
+        writeln!(writer)?;
         Ok(())
     }
 }

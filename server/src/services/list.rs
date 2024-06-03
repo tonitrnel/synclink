@@ -56,6 +56,8 @@ pub struct ResponseDto {
     ext: Option<String>,
     ip: Option<String>,
     ip_alias: Option<String>,
+    tags: Vec<String>,
+    caption: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<EntityMetadata>,
 }
@@ -74,6 +76,8 @@ impl ResponseDto {
             ext: entity.get_extension().to_owned(),
             ip: entity.get_ip().to_owned(),
             ip_alias: entity.get_ip_alias().cloned(),
+            tags: entity.get_tags().to_vec(),
+            caption: entity.get_caption().to_owned(),
             metadata: entity.get_metadata().to_owned(),
         }
     }

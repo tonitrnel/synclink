@@ -50,6 +50,8 @@ pub struct WriteIndexArgs {
     pub hash: String,
     pub size: usize,
     pub ip: Option<String>,
+    pub caption: String,
+    pub tags: Vec<String>,
 }
 
 impl WriteIndexArgs {
@@ -81,6 +83,8 @@ impl WriteIndexArgs {
             ext,
             ip: self.ip,
             metadata: None,
+            caption: self.caption,
+            tags: self.tags,
         }
     }
 }

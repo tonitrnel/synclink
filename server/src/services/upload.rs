@@ -84,6 +84,8 @@ pub async fn upload(
             hash,
             size,
             ip,
+            caption: String::new(),
+            tags: Vec::new(),
         })
         .await?;
     state.broadcast.send(IndexChangeAction::AddItem(uid))?;

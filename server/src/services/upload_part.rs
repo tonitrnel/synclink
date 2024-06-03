@@ -36,6 +36,13 @@ pub struct QueryParams {
     size: Option<u64>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct ConcatenateQueryParams {
+    id: Uuid,
+    tags: Option<String>,
+    caption: Option<String>,
+}
+
 impl QueryParams {
     fn id(&self) -> Result<Uuid, ErrorKind> {
         self.id
@@ -297,9 +304,19 @@ pub async fn concatenate(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     headers: Headers,
-    query: Query<QueryParams>,
+    query: Query<ConcatenateQueryParams>,
 ) -> ApiResponse<impl IntoResponse> {
-    let id = query.id()?;
+    let id = query.id;
+    let tags = query
+        .tags
+        .as_ref()
+        .map(|it| {
+            it.split(',')
+                .map(|it| it.trim().to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let caption = query.caption.clone().unwrap_or_default();
     if !access_shared_sessions()?.contains_key(&id) {
         return Ok(Json("ok!"));
     }
@@ -333,6 +350,8 @@ pub async fn concatenate(
             hash,
             size,
             ip,
+            caption,
+            tags,
         })
         .await?;
     if let Err(err) = state.broadcast.send(IndexChangeAction::AddItem(id)) {
