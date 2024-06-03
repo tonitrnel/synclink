@@ -1,5 +1,5 @@
 use crate::errors::{ApiResponse, ErrorKind, InternalError};
-use crate::extactors::Headers;
+use crate::extractors::Headers;
 use crate::state::AppState;
 use crate::utils::{
     format_ranges, parse_last_modified, parse_ranges, ByteRangeBoundaryBuilder,

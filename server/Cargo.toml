@@ -13,18 +13,23 @@ uuid = { version = "1.6.0", features = ["v4", "serde"] }
 sha2 = "0.10.6"
 toml = "0.8.8"
 futures = "0.3.29"
-axum = { version = "0.7.2", features = ["default", "multipart", "macros"] }
+axum = { version = "0.7.5", features = ["default", "multipart", "macros"] }
 tokio = { version = "1.26.0", features = ["full"] }
-tokio-util = { version = "0.7.8", features = ["full"] }
-tokio-stream = { version = "0.1.14", features = ["full"] }
+tokio-util = { version = "0.7.8", features = ["io"] }
+tokio-stream = { version = "0.1.14", features = ["sync"] }
 tower = "0.4.13"
-tower-http = { version = "0.5.0", features = ["full"] }
+tower-http = { version = "0.5.2", features = ["cors", "trace", "fs"] }
 tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+tracing-subscriber = { version = "0.3.18", features = ["default", "chrono", "json"] }
 tracing-error = "0.2.0"
-tracing-appender = "0.2.3"
 anyhow = { version = "1.0.75", features = ["backtrace"] }
 thiserror = "1.0.50"
 infer = { version = "0.15.0", default-features = false }
 image = "0.24.7"
 simdutf8 = "0.1.4"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+panic = "abort"

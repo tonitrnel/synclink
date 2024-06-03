@@ -9,7 +9,7 @@ use axum::{
 use sha2::{Digest, Sha256};
 
 use crate::errors::{ApiResponse, ErrorKind};
-use crate::extactors::{ClientIp, Headers};
+use crate::extractors::{ClientIp, Headers};
 use crate::utils::decode_uri;
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;

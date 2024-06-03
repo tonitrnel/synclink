@@ -1,10 +1,16 @@
+use crate::middlewares::trace_id::{TraceId, TraceIdLayer};
 use crate::services;
 use crate::state::AppState;
+use axum::body::Body;
+use axum::http::Request;
+use axum::response::Response;
 use axum::{
     middleware,
     routing::{delete, get, head, post, put},
     Router,
 };
+use std::time::Duration;
+use tracing::Span;
 
 pub fn build() -> Router<AppState> {
     let static_files_service = tower_http::services::ServeDir::new(std::path::Path::new("public"))
@@ -36,7 +42,32 @@ pub fn build() -> Router<AppState> {
         .route("/api", get(services::list))
         .layer(middleware::from_extractor::<services::authorize::Claims>())
         .fallback_service(static_files_service)
-        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<Body>| {
+                    let trace_id = request.extensions().get::<TraceId>().unwrap();
+                    tracing::debug_span!(
+                        "request",
+                        trace_id = %trace_id,
+                    )
+                })
+                .on_request(|req: &Request<Body>, _span: &Span| {
+                    tracing::debug!(
+                        method = %req.method(),
+                        uri = %req.uri(),
+                        version = %format!("{:?}", req.version()),
+                        "started processing request"
+                    );
+                })
+                .on_response(|res: &Response, latency: Duration, _span: &Span| {
+                    tracing::debug!(
+                        status = ?res.status(),
+                        latency = %format!("{}ms", latency.as_millis()),
+                        "finished processing request"
+                    );
+                }),
+        )
+        .layer(TraceIdLayer::new())
         .layer(
             tower_http::cors::CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)

@@ -17,7 +17,7 @@ impl Headers {
         }
     }
 }
-
+#[allow(unused)]
 trait FromHeaderName {
     fn get(&self, name: HeaderName) -> HeaderValueTransformer;
 }

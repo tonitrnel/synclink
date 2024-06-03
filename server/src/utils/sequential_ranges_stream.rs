@@ -1,6 +1,7 @@
 use std::io::SeekFrom;
 use std::ops::Range;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Result};
+use tokio::sync::mpsc::error::TrySendError;
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
@@ -198,8 +199,10 @@ where
                         );
                     }
                     return;
-                } else if let Err(err) = tx.send(chunk).await {
-                    tracing::warn!(reason = err.to_string(), "chunk is discarded");
+                } else if let Err(err) = tx.try_send(chunk) {
+                    if !matches!(err, TrySendError::Closed(_)) {
+                        tracing::warn!(reason = err.to_string(), "chunk is discarded");
+                    }
                     return;
                 }
             }

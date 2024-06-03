@@ -1,5 +1,5 @@
 use crate::errors::ApiResponse;
-use crate::extactors::Headers;
+use crate::extractors::Headers;
 use crate::state::AppState;
 use axum::{
     extract::State,

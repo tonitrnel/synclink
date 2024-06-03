@@ -5,11 +5,13 @@ use axum::http::request::Parts;
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct AppState {
     pub indexing: Arc<models::file_indexing::FileIndexing>,
     pub broadcast: broadcast::Sender<models::file_indexing::IndexChangeAction>,
+    pub shutdown_signal: CancellationToken,
 }
 
 #[async_trait]

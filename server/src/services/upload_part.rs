@@ -1,5 +1,5 @@
 use crate::errors::{ApiResponse, ErrorKind, InternalError};
-use crate::extactors::{ClientIp, Headers};
+use crate::extractors::{ClientIp, Headers};
 use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
 use crate::utils::decode_uri;
