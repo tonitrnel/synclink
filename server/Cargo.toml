@@ -24,9 +24,10 @@ tracing-subscriber = { version = "0.3.18", features = ["default", "chrono", "jso
 tracing-error = "0.2.0"
 anyhow = { version = "1.0.75", features = ["backtrace"] }
 thiserror = "1.0.50"
-infer = { version = "0.15.0", default-features = false }
+infer = { version = "0.16.0", default-features = false }
 image = "0.24.7"
 simdutf8 = "0.1.4"
+tar = "0.4.41"
 
 [profile.release]
 strip = true

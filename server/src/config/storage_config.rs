@@ -1,11 +1,13 @@
-use std::path::PathBuf;
+use crate::config::root_dir;
 use anyhow::Context;
 use serde::Deserialize;
-use crate::config::root_dir;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct StorageConfig {
     pub storage_path: String,
+    pub quota: Option<usize>,
+    pub max_size_of: Option<usize>,
 }
 
 impl StorageConfig {

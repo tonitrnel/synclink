@@ -6,6 +6,8 @@ port = 8080
 # File storage
 [file_storage]
 storage_path = "storage"
+#quota = 240g
+#max_size_of = 120m
 
 # logger
 [logs]

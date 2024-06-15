@@ -1,3 +1,4 @@
+use crate::config;
 use crate::models::entity::{Entity, EntityMetadata};
 use crate::models::image::Image;
 use crate::utils::mimetype_infer;
@@ -19,12 +20,11 @@ pub struct PreallocationFile {
 
 impl PreallocationFile {
     /// 清理文件
-    pub async fn cleanup(self) -> anyhow::Result<()> {
+    pub async fn cleanup(self) {
         drop(self.file);
-        fs::remove_file(&self.path)
-            .await
-            .with_context(|| format!("Error: Cleanup file failed from {:?}", self.path))?;
-        Ok(())
+        if let Err(err) = fs::remove_file(&self.path).await {
+            tracing::error!(reason = ?err, "Error: Failed to cleanup file from {:?}", self.path)
+        };
     }
 }
 
@@ -268,6 +268,7 @@ impl FileIndexing {
         let file = fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&path)
             .await?;
         if let Some(size) = size {
@@ -309,6 +310,35 @@ impl FileIndexing {
                 .await?;
         }
         Ok(())
+    }
+    pub fn check_file_size_limit(&self, file_size: u64) -> anyhow::Result<()> {
+        if let Some(max_size_of) = config::load().file_storage.max_size_of {
+            if max_size_of >= file_size as usize {
+                Ok(())
+            } else {
+                anyhow::bail!("The file size exceeds the maximum limit. Allowed maximum size is {max_size_of} bytes, but the file size is {file_size} bytes.")
+            }
+        } else {
+            Ok(())
+        }
+    }
+    pub fn check_storage_quota_exceeded(&self, file_size: u64) -> anyhow::Result<()> {
+        if let Some(quota) = config::load().file_storage.quota {
+            let current_storage = self
+                .index
+                .lock()
+                .unwrap()
+                .items
+                .iter()
+                .fold(0, |a, b| a + *b.get_size());
+            if ((current_storage + file_size) as usize) < quota {
+                Ok(())
+            } else {
+                anyhow::bail!("Adding this file exceeds the storage quota. Current storage usage is ${current_storage} bytes plus the file size of ${file_size} bytes exceeds the quota of ${quota} bytes.")
+            }
+        } else {
+            Ok(())
+        }
     }
 }
 

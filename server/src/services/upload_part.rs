@@ -12,10 +12,11 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::io::SeekFrom;
+use std::io::{Read, SeekFrom};
 use std::path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use tar::Archive;
 use tokio::fs;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_stream::{Stream, StreamExt};
@@ -102,6 +103,7 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
         let file = fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .append(true)
             .open(&path)
             .await
             .with_context(|| InternalError::AccessFileError {
@@ -167,6 +169,7 @@ async fn exec_concatenate(
     storage_path: &path::Path,
     uid: &Uuid,
     filename: &Option<String>,
+    is_archive: bool,
 ) -> anyhow::Result<(PathBuf, usize, String)> {
     use sha2::{Digest, Sha256};
     use tokio_util::io::ReaderStream;
@@ -181,21 +184,39 @@ async fn exec_concatenate(
             path: path.to_owned(),
         })?;
     let mut hasher = Sha256::new();
-    let mut stream = ReaderStream::new(file);
     let mut size = 0;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.with_context(|| InternalError::ReadStreamError {
-            path: path.to_owned(),
-        })?;
-        size += chunk.len();
-        hasher.update(&chunk);
+    if is_archive {
+        let mut file = file.into_std().await;
+        size = file.metadata().unwrap().len() as usize;
+        let mut archive = Archive::new(&mut file);
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            hasher.update(entry.path_bytes());
+            let mut buf = [0; 4096];
+            loop {
+                let n = entry.read(&mut buf).unwrap();
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+            }
+        }
+    } else {
+        let mut stream = ReaderStream::new(file);
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.with_context(|| InternalError::ReadStreamError {
+                path: path.to_owned(),
+            })?;
+            size += chunk.len();
+            hasher.update(&chunk);
+        }
     }
     let ext = filename
         .as_ref()
         .map(path::Path::new)
         .and_then(|it| it.extension())
         .map(|it| format!(".{}", it.to_string_lossy()))
-        .unwrap_or("".to_string());
+        .unwrap_or_default();
     let path = storage_path.join(format!("{}{}", uid, ext));
     move_tmp_file(&temp, &path).await?;
     access_shared_sessions()?.remove(uid);
@@ -332,8 +353,16 @@ pub async fn concatenate(
         .map(|it| decode_uri(&it).map_err(ErrorKind::from))
         .transpose()?;
     let user_agent = headers.get("user-agent").try_as_string().ok();
-    let (path, size, hash) =
-        exec_concatenate(state.indexing.get_storage_dir(), &id, &filename).await?;
+    let (path, size, hash) = exec_concatenate(
+        state.indexing.get_storage_dir(),
+        &id,
+        &filename,
+        content_type
+            .as_ref()
+            .map(|t| t == "application/x-tar")
+            .unwrap_or(false),
+    )
+    .await?;
     if content_hash != hash {
         fs::remove_file(&path)
             .await
