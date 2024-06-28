@@ -11,7 +11,7 @@ mod upload_preflight;
 
 pub use beacon::beacon;
 pub use delete::delete;
-pub use get::get;
+pub use get::{get, get_virtual_directory, get_virtual_file};
 pub use list::{get_metadata, list};
 pub use stats::{clean_dump, stats};
 pub use update_notify::update_notify;

@@ -1,7 +1,7 @@
 use crate::config;
 use crate::models::entity::{Entity, EntityMetadata};
 use crate::models::image::Image;
-use crate::utils::mimetype_infer;
+use crate::utils::guess_mimetype_from_path;
 use anyhow::Context;
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
@@ -79,7 +79,7 @@ impl WriteIndexArgs {
             modified: None,
             hash: self.hash,
             size: self.size as u64,
-            content_type: mimetype_infer(dir.join(resource), self.content_type).await,
+            content_type: guess_mimetype_from_path(dir.join(resource), self.content_type).await,
             ext,
             ip: self.ip,
             metadata: None,
@@ -157,13 +157,27 @@ impl FileIndexing {
                 format!("Error: Remove resource file '{:?}' failed", &resource_path)
             })?;
         }
-        let thumbnail_path = self
-            .get_storage_dir()
-            .join(format!("{}.thumbnail", entity.get_resource()));
-        if thumbnail_path.exists() {
-            if let Err(err) = fs::remove_file(&thumbnail_path).await {
-                tracing::warn!(reason = ?err, "failed to remove thumbnail file, path = {:?}", thumbnail_path);
-            };
+        // 缩略图
+        {
+            let thumbnail_path = self
+                .get_storage_dir()
+                .join(format!("{}.thumbnail", entity.get_resource()));
+            if thumbnail_path.exists() {
+                if let Err(err) = fs::remove_file(&thumbnail_path).await {
+                    tracing::warn!(reason = ?err, "failed to remove thumbnail file, path = {:?}", thumbnail_path);
+                };
+            }
+        }
+        // 索引
+        {
+            let idx_path = self
+                .get_storage_dir()
+                .join(format!("{}.idx", entity.get_resource()));
+            if idx_path.exists() {
+                if let Err(err) = fs::remove_file(&idx_path).await {
+                    tracing::warn!(reason = ?err, "failed to remove index file, path = {:?}", idx_path);
+                };
+            }
         }
         Ok(())
     }

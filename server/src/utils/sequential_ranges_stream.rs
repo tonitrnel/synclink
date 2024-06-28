@@ -5,11 +5,11 @@ use tokio::sync::mpsc::error::TrySendError;
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
-pub struct SequentialRangesReader<F>
+pub struct SequentialRangesReader<R>
 where
-    F: AsyncSeek + AsyncRead + Unpin + Send + 'static,
+    R: AsyncSeek + AsyncRead + Unpin + Send + 'static,
 {
-    reader: F,
+    reader: R,
     ranges: Vec<Range<usize>>,
     chunk_size: usize,
     offset: usize,
@@ -50,16 +50,16 @@ impl ByteRangeBoundaryBuilder {
     }
 }
 
-impl<F> SequentialRangesReader<F>
+impl<R> SequentialRangesReader<R>
 where
-    F: AsyncSeek + AsyncRead + Unpin + Send + 'static,
+    R: AsyncSeek + AsyncRead + Unpin + Send + 'static,
 {
-    pub fn new(reader: F, ranges: Vec<Range<usize>>, boundaries: Option<Vec<Vec<u8>>>) -> Self {
+    pub fn new(reader: R, ranges: Vec<Range<usize>>, boundaries: Option<Vec<Vec<u8>>>) -> Self {
         // println!("ranges = {:?}", ranges);
         Self::new_with_chunk_size(reader, ranges, boundaries, 4 * 1024 * 1024)
     }
     pub fn new_with_chunk_size(
-        reader: F,
+        reader: R,
         ranges: Vec<Range<usize>>,
         boundaries: Option<Vec<Vec<u8>>>,
         chunk_size: usize,

@@ -1,5 +1,8 @@
+use crate::errors::{ApiResponse, ErrorKind};
+use crate::extractors::{ClientIp, Headers};
 use crate::models::file_indexing::{IndexChangeAction, PreallocationFile, WriteIndexArgs};
 use crate::state::AppState;
+use crate::utils::decode_uri;
 use axum::body::BodyDataStream;
 use axum::extract::Query;
 use axum::{
@@ -11,12 +14,7 @@ use axum::{
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;
-use tar::Archive;
-use tokio::fs::File;
-
-use crate::errors::{ApiResponse, ErrorKind};
-use crate::extractors::{ClientIp, Headers};
-use crate::utils::decode_uri;
+use tar::{Archive, EntryType};
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
@@ -97,6 +95,9 @@ async fn handle_archive(
                 ErrorKind::from(err)
             })?;
             hasher.update(entry.path_bytes());
+            if entry.header().entry_type() == EntryType::Directory {
+                continue;
+            }
             let mut buf = [0; 4096];
             loop {
                 let n = entry.read(&mut buf).unwrap();

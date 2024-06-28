@@ -4,19 +4,25 @@ mod mimetype;
 mod sequential_ranges_stream;
 mod utc_to_i64;
 
+use chrono::TimeZone;
 pub use decode_uri::*;
 pub use mimetype::*;
 pub use sequential_ranges_stream::*;
 pub use utc_to_i64::*;
 
 /// read last_modified from file metadata
-pub fn parse_last_modified(metadata: &std::fs::Metadata) -> Option<String> {
+pub fn format_last_modified_from_metadata(metadata: &std::fs::Metadata) -> Option<String> {
     let modified = metadata.modified().ok()?;
     let utc_date = chrono::DateTime::<chrono::Utc>::from(modified);
     Some(utc_date.format("%a, %d %b %Y %H:%M:%S GMT").to_string())
 }
 
-pub fn parse_ranges(range_value: &str) -> anyhow::Result<Vec<(Option<u64>, Option<u64>)>> {
+pub fn format_last_modified_from_u64(mtime: u64) -> Option<String> {
+    let utc_date = chrono::Utc.timestamp_opt(mtime as i64, 0).single()?;
+    Some(utc_date.format("%a, %d %b %Y %H:%M:%S GMT").to_string())
+}
+
+pub fn parse_range_from_str(range_value: &str) -> anyhow::Result<Vec<(Option<u64>, Option<u64>)>> {
     let mut is_end = false;
     let ranges = range_value.trim_start_matches("bytes=").split(',');
     let mut vec = Vec::new();
@@ -77,33 +83,45 @@ mod tests {
     #[test]
     fn test_last_modified() {
         let metadata = std::fs::metadata(".gitignore").unwrap();
-        println!("{:?}", parse_last_modified(&metadata));
-        assert!(parse_last_modified(&metadata).is_some())
+        println!("{:?}", format_last_modified_from_metadata(&metadata));
+        assert!(format_last_modified_from_metadata(&metadata).is_some())
     }
 
     #[test]
     fn test_parse_ranges() {
         // similar request all bytes of file
-        assert_eq!(parse_ranges("bytes=0-").unwrap(), vec![(Some(0), None)]);
+        assert_eq!(
+            parse_range_from_str("bytes=0-").unwrap(),
+            vec![(Some(0), None)]
+        );
         // request from 9500 byte to the end of file
         assert_eq!(
-            parse_ranges("bytes=9500-").unwrap(),
+            parse_range_from_str("bytes=9500-").unwrap(),
             vec![(Some(9500), None)]
         );
-        assert_eq!(parse_ranges("bytes=1-").unwrap(), vec![(Some(1), None)]);
-        assert!(parse_ranges("bytes=5-, 4-5").is_err());
-        assert_eq!(parse_ranges("bytes=1-2").unwrap(), vec![(Some(1), Some(2))]);
-        assert_eq!(parse_ranges("bytes=-2").unwrap(), vec![(None, Some(2))]);
         assert_eq!(
-            parse_ranges("bytes=0-0,-1").unwrap(),
+            parse_range_from_str("bytes=1-").unwrap(),
+            vec![(Some(1), None)]
+        );
+        assert!(parse_range_from_str("bytes=5-, 4-5").is_err());
+        assert_eq!(
+            parse_range_from_str("bytes=1-2").unwrap(),
+            vec![(Some(1), Some(2))]
+        );
+        assert_eq!(
+            parse_range_from_str("bytes=-2").unwrap(),
+            vec![(None, Some(2))]
+        );
+        assert_eq!(
+            parse_range_from_str("bytes=0-0,-1").unwrap(),
             vec![(Some(0), Some(0)), (None, Some(1))]
         );
-        assert!(parse_ranges("bytes=").is_err());
+        assert!(parse_range_from_str("bytes=").is_err());
         assert_eq!(
-            parse_ranges("bytes=500-600,601-999").unwrap(),
+            parse_range_from_str("bytes=500-600,601-999").unwrap(),
             vec![(Some(500), Some(600)), (Some(601), Some(999))]
         );
-        assert!(parse_ranges("bytes=ao-fg").is_err());
+        assert!(parse_range_from_str("bytes=ao-fg").is_err());
     }
 
     #[test]

@@ -38,6 +38,11 @@ pub fn build() -> Router<AppState> {
         .route("/api/clean-dump", get(services::clean_dump))
         .route("/api/file/:uuid", delete(services::delete))
         .route("/api/file/:uuid", get(services::get))
+        .route("/api/directory/:uuid", get(services::get_virtual_directory))
+        .route(
+            "/api/directory/:uuid/*path",
+            get(services::get_virtual_file),
+        )
         .route("/api/:uuid", get(services::get_metadata))
         .route("/api", get(services::list))
         .layer(middleware::from_extractor::<services::authorize::Claims>())
