@@ -2,12 +2,14 @@ mod decode_uri;
 pub mod file_helper;
 mod mimetype;
 mod sequential_ranges_stream;
+mod session_manager;
 mod utc_to_i64;
 
 use chrono::TimeZone;
 pub use decode_uri::*;
 pub use mimetype::*;
 pub use sequential_ranges_stream::*;
+pub use session_manager::*;
 pub use utc_to_i64::*;
 
 /// read last_modified from file metadata
