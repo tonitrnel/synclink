@@ -27,6 +27,11 @@ build-sha256-binding:
 	wasm-pack build
 	wasm-pack pack
 
+build-tar-binding:
+	cd wasm/tar
+	wasm-pack build
+	wasm-pack pack
+
 image-tag:
 	docker rmi --force ghcr.io/tonitrnel/synclink:$(PKG_VER)
 	docker tag synclink:$(PKG_VER) ghcr.io/tonitrnel/synclink:$(PKG_VER)

@@ -16,14 +16,17 @@ import {
   SendIcon,
   XIcon,
   FilesIcon as PasteIcon,
+  ArrowLeftRightIcon,
+  FileUpIcon,
+  FolderUpIcon,
 } from 'icons';
 import { DropZone } from '../dropzone';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { openFilePicker } from '~/utils/open-file-picker.ts';
 import {
-  __CACHE_NAME,
-  __CHANNEL,
-  __PREFIX,
+  __CACHE_NAME__,
+  __CHANNEL__,
+  __PREFIX__,
   IGNORE_FILE_TYPE,
 } from '~/constants';
 import { Logger } from '~/utils/logger.ts';
@@ -32,7 +35,12 @@ import { t } from '@lingui/macro';
 import { useSnackbar } from '~/components/snackbar';
 import { featureCheck } from '~/utils/feature-check.ts';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
-import { clamp } from '@painted/shared';
+import { ExtractProps } from '~/constants/types.ts';
+import { InputTextarea } from 'primereact/inputtextarea';
+import type { TooltipOptions } from 'primereact/tooltip/tooltipoptions';
+import { Button } from 'primereact/button';
+import { P2pFileDeliveryDialog } from '~/components/file-delivery-dialog';
+import { useDialog } from '~/utils/hooks/use-dialog.ts';
 import './input.less';
 
 const logger = new Logger('Input');
@@ -47,9 +55,9 @@ export const Input: FC = memo(() => {
   const handleSend = useMemo(
     () =>
       executeAsyncTask(async () => {
-        setSending(true);
         const value = textRef.current.trim();
         if (value.length === 0) return void 0;
+        setSending(true);
         try {
           await upload(new File([value], '', { type: 'text/plain' }));
           setText('');
@@ -63,7 +71,7 @@ export const Input: FC = memo(() => {
           setSending(false);
         }
       }),
-    [snackbar]
+    [snackbar],
   );
   const handleUpload = useMemo(
     () =>
@@ -77,7 +85,7 @@ export const Input: FC = memo(() => {
           logger.error('Upload Failed', e);
         }
       }),
-    []
+    [],
   );
   const handlePaste = useMemo(
     () =>
@@ -110,7 +118,7 @@ export const Input: FC = memo(() => {
                 return it.getType(type);
               })
               .filter((it): it is NonNullable<typeof it> => Boolean(it))
-              .reverse()
+              .reverse(),
           );
           const item = items[0];
           if (item.type.startsWith('text/')) {
@@ -138,7 +146,7 @@ export const Input: FC = memo(() => {
           }
         }
       }),
-    [snackbar]
+    [snackbar],
   );
   const handleKeyUp = useMemo<KeyboardEventHandler>(
     () =>
@@ -148,7 +156,7 @@ export const Input: FC = memo(() => {
           await handleSend();
         }
       }),
-    [handleSend]
+    [handleSend],
   );
   const handleClear = useCallback(() => {
     setText('');
@@ -157,13 +165,19 @@ export const Input: FC = memo(() => {
     (evt) => {
       setText(evt.target.value);
     },
-    []
+    [],
   );
-  const handleReceivedTransferData = useCallback(
-    async (files: File[]) => {
+  const handleReceivedTransferData = useCallback<
+    NonNullable<ExtractProps<typeof DropZone>['onReceivedTransferData']>
+  >(
+    async (filesOrEntries) => {
       try {
-        for (const file of files) {
-          await upload(file);
+        if (filesOrEntries.type == 'multi-file') {
+          for (const file of filesOrEntries.files) {
+            await upload(file);
+          }
+        } else {
+          await upload(filesOrEntries.entries);
         }
       } catch (e) {
         logger.error('Upload Failed', e);
@@ -173,64 +187,8 @@ export const Input: FC = memo(() => {
         });
       }
     },
-    [snackbar]
+    [snackbar],
   );
-  // Register "measure-size" event
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    const container = textarea?.parentElement;
-    if (!textarea || !container) return void 0;
-    let measureTimer: number | void = void 0;
-    const fontSize = 14;
-    const lineHeight = 1.5;
-    const lineHeightPixels = fontSize * lineHeight;
-    const measure = document.createElement('span');
-    let initialized = false;
-    let previousHeight = 0;
-    const initialize = () => {
-      measure.className = 'sl-input-measure';
-      const computedStyle = window.getComputedStyle(textarea);
-      if (!computedStyle.width.trim()) return void 0;
-      measure.style.setProperty('font-family', computedStyle.fontFamily);
-      measure.style.setProperty('font-size', `${fontSize}px`);
-      measure.style.setProperty('line-height', `${lineHeight}`);
-      measure.style.setProperty('width', computedStyle.width);
-      container.appendChild(measure);
-      initialized = true;
-    };
-    const measureSize = () => {
-      if (!initialized) {
-        window.requestAnimationFrame(initialize);
-        return void 0;
-      }
-      if (measureTimer) window.cancelAnimationFrame(measureTimer);
-      measureTimer = window.requestAnimationFrame(() => {
-        const value = textarea.value;
-        measure.innerText = textarea.value || ' ';
-        const actualHeight =
-          measure.offsetHeight + (value.endsWith('\n') ? lineHeightPixels : 0);
-        const height = clamp(lineHeightPixels, actualHeight, 300);
-        if (
-          actualHeight > 300 &&
-          textarea.selectionStart === value.length &&
-          textarea.scrollHeight > textarea.clientHeight
-        ) {
-          textarea.scrollTo({ top: textarea.scrollHeight });
-        }
-        if (previousHeight === height) {
-          return void 0;
-        }
-        previousHeight = height;
-        textarea.style.setProperty('height', `${height}px`);
-      });
-    };
-    textarea.addEventListener('measure-size', measureSize);
-    window.requestAnimationFrame(initialize);
-    return () => {
-      container.removeChild(measure);
-      textarea.removeEventListener('measure-size', measureSize);
-    };
-  }, []);
   // Dispatch the "measure-size" event and update text ref when the text change
   useEffect(() => {
     textRef.current = text;
@@ -240,7 +198,7 @@ export const Input: FC = memo(() => {
   useEffect(() => {
     const subscribeBroadcast = () => {
       const broadcastChannel =
-        'BroadcastChannel' in self ? new BroadcastChannel(__CHANNEL) : null;
+        'BroadcastChannel' in self ? new BroadcastChannel(__CHANNEL__) : null;
       if (!broadcastChannel) return void 0;
       broadcastChannel.addEventListener('message', (evt) => {
         logger.debug(`[Broadcast]: ${evt.data}`);
@@ -251,7 +209,7 @@ export const Input: FC = memo(() => {
     };
     const read = async () => {
       logger.debug(`Received files detected ${location.search}`);
-      const cache = await caches.open(__CACHE_NAME);
+      const cache = await caches.open(__CACHE_NAME__);
       logger.debug(`Opened cache`);
       const requests = await cache.keys();
       logger.debug(`Total ${requests.length} items.`);
@@ -265,14 +223,14 @@ export const Input: FC = memo(() => {
         const blob = await response.blob();
         const filename =
           response.headers.get('x-raw-filename') ||
-          new URL(request.url).pathname.slice(__PREFIX.length + 21); // two `-`, 13-digits timestamp, 6-digits hex index
+          new URL(request.url).pathname.slice(__PREFIX__.length + 21); // two `-`, 13-digits timestamp, 6-digits hex index
         const file = new File([blob], decodeURIComponent(filename), {
           type:
             blob.type ||
             response.headers.get('content-type') ||
             'application/octet-stream',
           lastModified: new Date(
-            response.headers.get('last-modified') || Date.now()
+            response.headers.get('last-modified') || Date.now(),
           ).getTime(),
         });
         await upload(file);
@@ -325,7 +283,10 @@ export const Input: FC = memo(() => {
     const listener = async (evt: ClipboardEvent) => {
       const files = evt.clipboardData?.files;
       if (!files || files?.length == 0) return void 0;
-      await handleReceivedTransferData([...files]);
+      await handleReceivedTransferData({
+        type: 'multi-file',
+        files: [...files],
+      });
     };
     document.addEventListener('paste', listener);
     return () => {
@@ -344,20 +305,22 @@ export const Input: FC = memo(() => {
         handleSend={handleSend}
       />
     );
-  return (
-    <NonMobileInput
-      ref={textareaRef}
-      text={text}
-      sending={sending}
-      handleKeyUp={handleKeyUp}
-      handleChange={handleChange}
-      handleUpload={handleUpload}
-      handleSend={handleSend}
-      handleClear={handleClear}
-      handlePaste={handlePaste}
-      handleReceivedTransferData={handleReceivedTransferData}
-    />
-  );
+  else {
+    return (
+      <NonMobileInput
+        ref={textareaRef}
+        text={text}
+        sending={sending}
+        handleKeyUp={handleKeyUp}
+        handleChange={handleChange}
+        handleUpload={handleUpload}
+        handleSend={handleSend}
+        handleClear={handleClear}
+        handlePaste={handlePaste}
+        handleReceivedTransferData={handleReceivedTransferData}
+      />
+    );
+  }
 });
 
 const MobileInput = forwardRef<
@@ -373,7 +336,7 @@ const MobileInput = forwardRef<
 >(
   (
     { text, sending, handleKeyUp, handleChange, handleUpload, handleSend },
-    ref
+    ref,
   ) => {
     return (
       <section className="relative flex items-end gap-1">
@@ -401,7 +364,7 @@ const MobileInput = forwardRef<
         </button>
       </section>
     );
-  }
+  },
 );
 const NonMobileInput = forwardRef<
   HTMLTextAreaElement,
@@ -414,7 +377,9 @@ const NonMobileInput = forwardRef<
     handlePaste: MouseEventHandler<HTMLButtonElement>;
     handleClear: MouseEventHandler<HTMLButtonElement>;
     handleSend: MouseEventHandler<HTMLButtonElement>;
-    handleReceivedTransferData: (files: File[]) => Promise<void>;
+    handleReceivedTransferData: ExtractProps<
+      typeof DropZone
+    >['onReceivedTransferData'];
   }
 >(
   (
@@ -429,34 +394,66 @@ const NonMobileInput = forwardRef<
       handleSend,
       handleReceivedTransferData,
     },
-    ref
+    ref,
   ) => {
+    const p2pFileDialog = useDialog(P2pFileDeliveryDialog);
     return (
-      <section className="relative">
-        <textarea
+      <section className="relative border border-gray-200 rounded-xl p-2">
+        {p2pFileDialog.visible && (
+          <p2pFileDialog.Dialog {...p2pFileDialog.DialogProps} />
+        )}
+        <InputTextarea
           ref={ref}
           value={text}
           onKeyUp={handleKeyUp}
           onChange={handleChange}
-          className="sl-textarea"
-          rows={1}
+          className="w-full border-none shadow-none"
+          placeholder="Enter your message here..."
+          autoResize
+          rows={2}
         />
-        <div className="flex mt-4 items-center justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <button
-              title={t`upload`}
-              className="sl-button p-3 rounded-lg"
+            <Button
+              tooltip={t`upload file`}
+              tooltipOptions={ButtonTooltipOptionsObj}
+              className="p-2 rounded-lg"
               onClick={handleUpload}
+              severity="secondary"
+              text
             >
-              <HardDriveUploadIcon className="w-6 h-6 stroke-gray-500" />
-            </button>
-            <button
-              title={t`paste`}
-              className="sl-button p-3 rounded-lg "
+              <FileUpIcon className="w-5 h-5 stroke-grey-600" />
+            </Button>
+            <Button
+              tooltip={t`upload folder`}
+              tooltipOptions={ButtonTooltipOptionsObj}
+              className="p-2 rounded-lg"
+              onClick={handleUpload}
+              severity="secondary"
+              text
+            >
+              <FolderUpIcon className="w-5 h-5 stroke-grey-600" />
+            </Button>
+            <Button
+              tooltip={t`paste`}
+              tooltipOptions={ButtonTooltipOptionsObj}
+              className="p-2 rounded-lg"
               onClick={handlePaste}
+              severity="secondary"
+              text
             >
-              <PasteIcon className="w-6 h-6 stroke-gray-500" />
-            </button>
+              <PasteIcon className="w-5 h-5 stroke-grey-600" />
+            </Button>
+            <Button
+              tooltip={t`peer to peer file delivery`}
+              tooltipOptions={ButtonTooltipOptionsObj}
+              className="p-2 rounded-lg"
+              severity="secondary"
+              onClick={p2pFileDialog.open}
+              text
+            >
+              <ArrowLeftRightIcon className="w-5 h-5 stroke-grey-600" />
+            </Button>
           </div>
           <div className="flex gap-2">
             <button
@@ -465,14 +462,14 @@ const NonMobileInput = forwardRef<
               onClick={handleClear}
               className="text-gray-500 hover:text-gray-600 cursor-pointer"
             >
-              <XIcon className="w-6 h-6 stroke-currentColor" />
+              <XIcon className="w-5 h-5 stroke-currentColor" />
             </button>
-            <button
+            <Button
+              severity="secondary"
               title="Send (Ctrl + Enter)"
               onClick={handleSend}
-              className="sl-button sl-button-with-icon flex items-center rounded-lg overflow-hidden"
             >
-              <span className="py-3 h-6 px-6 box-content text-gray-600 leading-snug">
+              <span className="box-content text-white mr-2">
                 {sending ? (
                   <>
                     <span>{t`sending`}</span>
@@ -482,12 +479,19 @@ const NonMobileInput = forwardRef<
                   <span>{t`send`}</span>
                 )}
               </span>
-              <SendIcon className="p-3 box-content w-6 h-6 stroke-gray-500" />
-            </button>
+              <SendIcon className="box-content w-5 h-5 stroke-white" />
+            </Button>
           </div>
         </div>
         <DropZone onReceivedTransferData={handleReceivedTransferData} />
       </section>
     );
-  }
+  },
 );
+
+const ButtonTooltipOptionsObj = {
+  appendTo: () => document.querySelector('app#root')!,
+  position: 'bottom',
+  showDelay: 1000,
+  hideDelay: 300,
+} satisfies TooltipOptions;

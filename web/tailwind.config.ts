@@ -1,7 +1,11 @@
 import type { Config } from 'tailwindcss';
 
 export default {
-  content: ['./src/**/*.{ts,tsx}'],
+  content: [
+    './index.html',
+    './src/**/*.{ts,tsx}',
+    './node_modules/primereact/**/*.{js,ts,jsx,tsx}',
+  ],
   important: '#root',
   theme: {
     extend: {
@@ -85,7 +89,7 @@ export default {
 
       '3xl': '1536px',
       // => @media (min-width: 1536px) { ... }
-    } satisfies Config['theme']['screens'],
+    },
   },
   plugins: [],
 } satisfies Config;

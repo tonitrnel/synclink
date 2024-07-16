@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite';
+import { defineConfig, UserConfig } from 'vite';
 import type { CompilerOptions } from 'typescript';
 import react from '@vitejs/plugin-react-swc';
-import svgr from 'vite-plugin-svgr';
+import svgr from '@svgr/rollup';
 import { lingui } from '@lingui/vite-plugin';
 import wasm from 'vite-plugin-wasm';
 import top_await from 'vite-plugin-top-level-await';
@@ -10,9 +10,9 @@ import path from 'node:path';
 
 const __PROJECT = process.cwd();
 const parseProject = async () => {
-  return fs
-    .readFile(path.join(__PROJECT, '/package.json'))
-    .then<{ version: string }>((buf) => JSON.parse(buf.toString()));
+  return fs.readFile(path.join(__PROJECT, '/package.json')).then<{
+    version: string;
+  }>((buf) => JSON.parse(buf.toString()));
 };
 const parseTSAlias = async () => {
   try {
@@ -30,11 +30,11 @@ const parseTSAlias = async () => {
         alias[key.toString().replace('/*', '')] = path.join(
           __PROJECT,
           baseUrl,
-          paths[key][0]?.replace('/*', '')
+          paths[key][0]?.replace('/*', ''),
         );
         return alias;
       },
-      { '@': path.join(__PROJECT, 'src') } as Record<string, string>
+      { '@': path.join(__PROJECT, 'src') } as Record<string, string>,
     );
   } catch (e) {
     console.error('[Vite] Parse tsconfig failed, return empty alias', e);
@@ -47,9 +47,9 @@ export default defineConfig(async ({ command }) => {
   const project = await parseProject();
   return {
     define: {
-      __ENDPOINT: command == 'build' ? '""' : '"http://localhost:8080"',
-      __VERSION: JSON.stringify(project.version),
-      __BUILD_TIMESTAMP: Date.now(),
+      __ENDPOINT__: command == 'build' ? '""' : '"http://localhost:8080"',
+      __VERSION__: JSON.stringify(project.version),
+      __BUILD_TIMESTAMP__: Date.now(),
     },
     plugins: [
       wasm(),
@@ -71,7 +71,7 @@ export default defineConfig(async ({ command }) => {
       },
     },
     worker: {
-      plugins: [wasm(), top_await()],
+      plugins: () => [wasm(), top_await()],
     },
-  };
+  } satisfies UserConfig;
 });

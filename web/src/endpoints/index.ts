@@ -1,4 +1,5 @@
 import { createHttpFactory } from '@painted/http';
+import type { InferSType } from '@painted/http';
 
 export const useGetList = createHttpFactory('GET:/api')
   .apply<
@@ -27,6 +28,8 @@ export const useGetList = createHttpFactory('GET:/api')
         ext?: string;
         ip?: string;
         ip_alias?: string;
+        tags?: string[];
+        caption?: string;
         metadata?: {
           width: number;
           height: number;
@@ -51,3 +54,96 @@ export const useGetStats = createHttpFactory('GET:/api/stats')
     }
   >()
   .doQueryRequest();
+
+export const useGetDirectory = createHttpFactory('GET:/api/directory/{id}')
+  .apply<
+    'Response',
+    {
+      path: string;
+      mtime: number;
+      size: number;
+      mimetype: string | null;
+      is_file: boolean;
+      hash: string | null;
+    }[]
+  >()
+  .doQueryRequest();
+
+export const useGetSseConnections = createHttpFactory(
+  'GET:/api/sse/connections',
+)
+  .apply<
+    'Response',
+    {
+      id: string;
+      ip_alias: string | null;
+      user_agent: string;
+    }[]
+  >()
+  .doQueryRequest();
+
+export const usePostCreateP2PRequest = createHttpFactory('POST:/api/p2p/create')
+  .apply<
+    'Body',
+    {
+      client_id: string;
+      target_id: string;
+      supports_rtc: boolean;
+    }
+  >()
+  .apply<
+    'Response',
+    {
+      request_id: string;
+      status: string;
+    }
+  >()
+  .doMutationRequest();
+
+export const usePostAcceptP2PRequest = createHttpFactory('POST:/api/p2p/accept')
+  .apply<
+    'Body',
+    {
+      request_id: string;
+      client_id: string;
+      supports_rtc: boolean;
+    }
+  >()
+  .apply<
+    'Response',
+    {
+      status: string;
+    }
+  >()
+  .doMutationRequest();
+
+export const useDeleteDiscardP2PRequest = createHttpFactory(
+  'DELETE:/api/p2p/discard',
+)
+  .apply<
+    'Body',
+    {
+      request_id: string;
+    }
+  >()
+  .apply<
+    'Response',
+    {
+      msg: string;
+    }
+  >()
+  .doMutationRequest();
+
+export const sendP2PSignaling = createHttpFactory('POST:/api/p2p/signaling')
+  .apply<
+    'Body',
+    {
+      request_id: string;
+      client_id: string;
+      payload: [0, RTCSessionDescriptionInit] | [1, RTCIceCandidate];
+    }
+  >()
+  .apply<'Response', { msg: string }>()
+  .doRequest();
+
+export type InferResponse<T> = InferSType<T, 'Response'>;

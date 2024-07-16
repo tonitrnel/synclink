@@ -1,19 +1,32 @@
-import { calculateHash, calculateHashFromStream } from './calculate-hash.ts';
+import {
+  calculateHash,
+  calculateHashFromDirectory,
+  calculateHashFromStream,
+} from './calculate-hash.ts';
 import { UploadManager } from '~/components/upload-manager';
 import { Logger } from '~/utils/logger.ts';
 import { t } from '@lingui/macro';
+import { DirEntry } from '~/constants/types.ts';
+import { calculateTarSize } from '~/utils/calculate-tarsize.ts';
+import { toTarStream } from '~/utils/to-tar-stream.ts';
+import { progressStream } from '~/utils/progress-stream.ts';
+import { TarExtractor } from '../../../wasm/tar/pkg';
+import { createTransmissionRateCalculator } from './transmission-rate-calculator.ts';
 
 const logger = new Logger('upload');
 
-const preflight = async (hash: string): Promise<boolean> => {
-  return fetch(`${__ENDPOINT}/api/upload-preflight`, {
-    method: 'HEAD',
-    headers: {
-      'X-Content-Sha256': hash,
+const preflight = async (hash: string, size: number): Promise<boolean> => {
+  return fetch(
+    `${__ENDPOINT__}/api/upload-preflight?size=${size}&hash=${hash}`,
+    {
+      method: 'HEAD',
+      headers: {
+        'X-Content-Sha256': hash,
+      },
     },
-  }).then(
+  ).then(
     (res) => res.status === 409,
-    () => true
+    () => true,
   );
 };
 
@@ -23,7 +36,7 @@ const preflight = async (hash: string): Promise<boolean> => {
  */
 const fastPerform = async (file: File) => {
   const hash = await calculateHash(file.arrayBuffer(), 'SHA-256');
-  const alreadyExists = await preflight(hash);
+  const alreadyExists = await preflight(hash, file.size);
   if (alreadyExists) {
     throw new Error(t`resource already exists`);
   }
@@ -33,7 +46,7 @@ const fastPerform = async (file: File) => {
   if (file.name.length > 0) {
     headers['x-raw-filename'] = encodeURI(file.name);
   }
-  await fetch(`${__ENDPOINT}/api/upload`, {
+  await fetch(`${__ENDPOINT__}/api/upload`, {
     method: 'POST',
     body: file,
     headers,
@@ -66,12 +79,12 @@ const slowPerform = async (file: File) => {
       onSpeedChange: (speed) => manager.onHashCalculatingSpeedChange(speed),
       onProgressChange(loaded: number) {
         manager.onHashCalculatingProgressChange(
-          Math.floor((loaded / file.size) * 100)
+          Math.floor((loaded / file.size) * 100),
         );
       },
     });
     const setupTime = Date.now();
-    const alreadyExists = await preflight(hash);
+    const alreadyExists = await preflight(hash, file.size);
     if (alreadyExists) return manager.entryCompleteStage();
     // 100 MB
     const uid = await (file.size > 104_857_600 ? uploadByParts : uploadByWhole)(
@@ -87,7 +100,84 @@ const slowPerform = async (file: File) => {
         onAllSent: () => {
           manager.entryServerProcessStage();
         },
-      }
+      },
+    );
+    logger.debug(`upload success, ${uid}`);
+    manager.setLoaded(file.size, (file.size / (Date.now() - setupTime)) * 1000);
+    manager.entryCompleteStage();
+  } catch (e) {
+    logger.error(e);
+    manager.failed(String(e));
+  }
+};
+const dirPerform = async (entries: readonly DirEntry[]) => {
+  if (entries.length !== 1) throw new Error('only one directory');
+  const abort = new AbortController();
+  const size = calculateTarSize(entries);
+  const filename = entries[0].name;
+  const mimetype = 'application/x-tar';
+  const setupTime = Date.now();
+  const manager = await UploadManager.oneshot.fire({
+    filename,
+    mimetype,
+    abort: (reason) => abort.abort(reason),
+    timestamp: Date.now(),
+    total: size,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    retry: () => {},
+  });
+  const hash = await calculateHashFromDirectory(entries, {
+    signal: abort.signal,
+    onReady: () => {
+      manager.entryHashCalculatingStage();
+    },
+    onSpeedChange: (speed) => manager.onHashCalculatingSpeedChange(speed),
+    onProgressChange(loaded: number) {
+      manager.onHashCalculatingProgressChange(
+        Math.floor((loaded / size) * 100),
+      );
+    },
+  });
+  if (await preflight(hash, size)) {
+    throw new Error(t`directory already exists`);
+  }
+  // const headers: Record<string, string> = {
+  //   'x-content-sha256': hash,
+  //   'Content-Type': 'application/x-tar',
+  //   'x-raw-filename': entries[0].name,
+  // };
+  let progress = 0;
+  const stream = toTarStream(entries).pipeThrough(
+    progressStream({
+      onProgress(loaded: number) {
+        const _progress = Math.floor((loaded / size) * 10000) / 100;
+        if (_progress > progress + 4) {
+          progress = _progress;
+          console.log('progress', progress);
+        }
+      },
+    }),
+  );
+  const blob = await new Response(stream).blob();
+  const file = new File([blob], filename, {
+    type: mimetype,
+  });
+  // 100 MB
+  try {
+    const uid = await (file.size > 104_857_600 ? uploadByParts : uploadByWhole)(
+      file,
+      {
+        hash,
+        setupTime,
+        signal: abort.signal,
+        chunkSize: 104_857_600,
+        manager,
+        onReady: () => manager.ready(),
+        onProgress: (loaded, speed) => manager.setLoaded(loaded, speed),
+        onAllSent: () => {
+          manager.entryServerProcessStage();
+        },
+      },
     );
     logger.debug(`upload success, ${uid}`);
     manager.setLoaded(file.size, (file.size / (Date.now() - setupTime)) * 1000);
@@ -101,32 +191,30 @@ const slowPerform = async (file: File) => {
 const uploadByWhole = (
   file: File,
   options: {
+    caption?: string;
+    tags?: string[];
     hash: string;
     setupTime: number;
     signal: AbortSignal;
     manager: UploadManager;
     onReady(): void;
     onProgress(loaded: number, speed: number): void;
-  }
+  },
 ): Promise<string> => {
   const xhr = new XMLHttpRequest();
   options.signal.throwIfAborted();
   options.signal.addEventListener('abort', xhr.abort);
-  const previousLoadState = {
-    loaded: 0,
-    time: options.setupTime,
-  };
+  const q = new URLSearchParams(
+    [
+      ['tags', options.tags?.join(',')],
+      ['caption', options.caption],
+    ].filter((it): it is [string, string] => it[1] !== undefined),
+  );
+  const transmissionRate = createTransmissionRateCalculator();
   return new Promise<string>((resolve, reject) => {
     xhr.upload.addEventListener('progress', (evt) => {
       if (!evt.lengthComputable) return void 0;
-      const now = Date.now();
-      const speed =
-        ((evt.loaded - previousLoadState.loaded) /
-          (now - previousLoadState.time)) *
-        1000;
-      previousLoadState.loaded = evt.loaded;
-      previousLoadState.time = now;
-      options.onProgress(evt.loaded, speed || 0);
+      options.onProgress(evt.loaded, transmissionRate(evt.loaded));
     });
     xhr.addEventListener('load', () => {
       if (xhr.readyState !== 4) return void 0;
@@ -138,10 +226,16 @@ const uploadByWhole = (
     });
     xhr.addEventListener('error', () => {
       reject(
-        new Error(`code: ${xhr.status}, ${xhr.statusText}, ${xhr.responseText}`)
+        new Error(
+          `code: ${xhr.status}, ${xhr.statusText}, ${xhr.responseText}`,
+        ),
       );
     });
-    xhr.open('POST', `${__ENDPOINT}/api/upload`, true);
+    xhr.open(
+      'POST',
+      `${__ENDPOINT__}/api/upload${q.size > 0 ? '?' + q.toString() : ''}`,
+      true,
+    );
     xhr.setRequestHeader('x-content-sha256', options.hash);
     xhr.setRequestHeader('x-raw-filename', encodeURI(file.name));
     xhr.send(file);
@@ -152,6 +246,8 @@ const uploadByParts = async (
   file: File,
   options: {
     hash: string;
+    caption?: string;
+    tags?: string[];
     setupTime: number;
     signal: AbortSignal;
     chunkSize: number;
@@ -159,21 +255,17 @@ const uploadByParts = async (
     onReady(): void;
     onProgress(loaded: number, speed: number): void;
     onAllSent(): void;
-  }
+  },
 ): Promise<string> => {
-  const previousLoadState = {
-    loaded: 0,
-    time: options.setupTime,
-  };
   // console.log('Pre-allocating...');
   const [uid, start] = await fetch(
-    `${__ENDPOINT}/api/upload-part/allocate?size=${file.size}`,
+    `${__ENDPOINT__}/api/upload-part/allocate?size=${file.size}`,
     {
       method: 'POST',
       headers: {
         'x-content-sha256': options.hash,
       },
-    }
+    },
   )
     .then((res) => {
       if (res.ok) return res.text();
@@ -187,31 +279,21 @@ const uploadByParts = async (
   // const totalChunks = Math.ceil(file.size / options.chunkSize);
   // let count = 1;
   options.signal.addEventListener('abort', async () => {
-    await fetch(`${__ENDPOINT}/api/upload-part/abort?id=${uid}`, {
+    await fetch(`${__ENDPOINT__}/api/upload-part/abort?id=${uid}`, {
       method: 'DELETE',
     }).catch(console.error);
   });
+  const transmissionRate = createTransmissionRateCalculator();
   const send = async (start: number) => {
     const end = start + options.chunkSize;
     const chunk = file.slice(start, end);
 
     const xhr = new XMLHttpRequest();
-    let previousSpeed = 0;
     await new Promise((resolve, reject) => {
       xhr.upload.addEventListener('progress', (evt) => {
         if (!evt.lengthComputable) return void 0;
-        const now = Date.now();
-        const speed =
-          ((evt.loaded - previousLoadState.loaded) /
-            (now - previousLoadState.time)) *
-          1000;
-        previousLoadState.loaded = evt.loaded;
-        previousLoadState.time = now;
-        previousSpeed = speed;
-        options.onProgress(
-          start + evt.loaded,
-          (speed + previousSpeed || 2) / 2
-        );
+        const transmitted = start + evt.loaded;
+        options.onProgress(transmitted, transmissionRate(transmitted));
       });
       xhr.addEventListener('load', () => {
         if (xhr.readyState !== 4) return void 0;
@@ -224,14 +306,14 @@ const uploadByParts = async (
       xhr.addEventListener('error', () => {
         reject(
           new Error(
-            `code: ${xhr.status}, ${xhr.statusText}, ${xhr.responseText}`
-          )
+            `code: ${xhr.status}, ${xhr.statusText}, ${xhr.responseText}`,
+          ),
         );
       });
       xhr.open(
         'PUT',
-        `${__ENDPOINT}/api/upload-part/${uid}?pos=${start}`,
-        true
+        `${__ENDPOINT__}/api/upload-part/${uid}?pos=${start}`,
+        true,
       );
       xhr.send(chunk);
     });
@@ -244,7 +326,14 @@ const uploadByParts = async (
   await send(start);
   // console.log('Merging...');
   options.onAllSent();
-  await fetch(`${__ENDPOINT}/api/upload-part/concatenate?id=${uid}`, {
+  const q = new URLSearchParams(
+    [
+      ['id', uid],
+      ['tags', options.tags?.join(',')],
+      ['caption', options.caption],
+    ].filter((it): it is [string, string] => it[1] !== undefined),
+  );
+  await fetch(`${__ENDPOINT__}/api/upload-part/concatenate?${q}`, {
     method: 'POST',
     headers: {
       'content-type': file.type,
@@ -257,11 +346,52 @@ const uploadByParts = async (
   return uid;
 };
 
-export const upload = async (file: File) => {
-  // 2 MB
-  if (file.size < 2_097_152) {
-    return fastPerform(file);
-  } else {
-    return slowPerform(file);
+export const upload = async (fileOrEntries: File | readonly DirEntry[]) => {
+  if (fileOrEntries instanceof File) {
+    if (fileOrEntries.type == 'application/x-tar') {
+      const extractor = TarExtractor.create(4096);
+      const reader = fileOrEntries.stream().getReader();
+      while (true) {
+        const result = extractor.pull();
+        let flow: 'continue' | 'break' = 'continue';
+        switch (result.type) {
+          case 'further': {
+            const { done, value } = await reader.read();
+            if (done) {
+              if (extractor.pullable()) {
+                flow = 'continue';
+              } else {
+                flow = 'break';
+              }
+              break;
+            }
+            extractor.push(value!);
+            break;
+          }
+          case 'header': {
+            console.log(result.payload);
+            break;
+          }
+          case 'data': {
+            break;
+          }
+        }
+        if (flow === 'continue') {
+          continue;
+        }
+        if (flow === 'break') {
+          break;
+        }
+      }
+    }
+    // 2 MB
+    if (fileOrEntries.size < 2_097_152) {
+      return fastPerform(fileOrEntries);
+    } else {
+      return slowPerform(fileOrEntries);
+    }
+  }
+  if (Array.isArray(fileOrEntries)) {
+    return dirPerform(fileOrEntries);
   }
 };

@@ -2,7 +2,6 @@ import {
   FC,
   memo,
   MouseEvent,
-  MouseEventHandler,
   ReactNode,
   SyntheticEvent,
   useCallback,
@@ -17,15 +16,26 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { IEntity } from '~/constants/types.ts';
 import { copy } from '~/utils/copy.ts';
-import { DownloadCloudIcon, Share2Icon, EraserIcon, CopyIcon } from 'icons';
+import {
+  DownloadCloudIcon,
+  Share2Icon,
+  EraserIcon,
+  CopyIcon,
+  FolderIcon,
+  FileIcon,
+} from 'icons';
 import dayjs from 'dayjs';
 import { t } from '@lingui/macro';
 import { withProduce } from '~/utils/with-produce.ts';
 import { clsx } from '~/utils/clsx.ts';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
-import { useGetFileContent } from '~/endpoints';
+import { useGetDirectory, useGetFileContent, InferResponse } from '~/endpoints';
 import { useSnackbar } from '~/components/snackbar';
+import type { TreeNode } from 'primereact/treenode';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
+import { toTreeByPath } from '~/utils/to-tree-by-path.ts';
+import { TreeTable } from 'primereact/treetable';
+import { Column } from 'primereact/column';
 import './item.less';
 
 dayjs.extend(relativeTime);
@@ -60,12 +70,12 @@ const SynclinkItemMenu: FC<{
     const onDelete = useMemo(
       () =>
         executeAsyncTask(async (uid: string) => {
-          await fetch(`${__ENDPOINT}/api/file/${uid}`, {
+          await fetch(`${__ENDPOINT__}/api/file/${uid}`, {
             method: 'DELETE',
           });
           document.body.dispatchEvent(new CustomEvent('refresh-stats'));
         }),
-      []
+      [],
     );
     const onShare = useMemo(
       () =>
@@ -80,25 +90,25 @@ const SynclinkItemMenu: FC<{
             if (entity.size > 5_242_880) {
               return {
                 title: entity.name,
-                url: `${__ENDPOINT}/api/file/${entity.uid}`,
+                url: `${__ENDPOINT__}/api/file/${entity.uid}`,
               };
             }
             if (entity.type.startsWith('text/')) {
               return {
                 title: entity.name,
-                text: await fetch(`${__ENDPOINT}/api/file/${entity.uid}`).then(
-                  (res) => res.text()
-                ),
+                text: await fetch(
+                  `${__ENDPOINT__}/api/file/${entity.uid}`,
+                ).then((res) => res.text()),
               };
             }
             return {
               title: entity.name,
               files: [
-                await fetch(`${__ENDPOINT}/api/file/${entity.uid}`)
+                await fetch(`${__ENDPOINT__}/api/file/${entity.uid}`)
                   .then((res) => res.blob())
                   .then(
                     (blob) =>
-                      new File([blob], entity.name, { type: entity.type })
+                      new File([blob], entity.name, { type: entity.type }),
                   ),
               ],
             };
@@ -118,13 +128,13 @@ const SynclinkItemMenu: FC<{
             });
           }
         }),
-      [snackbar]
+      [snackbar],
     );
     const onDownload = useCallback(() => {
-      window.open(`${__ENDPOINT}/api/file/${entity.uid}?raw`, '_blank');
+      window.open(`${__ENDPOINT__}/api/file/${entity.uid}?raw`, '_blank');
     }, [entity.uid]);
     return (
-      <div className="flex gap-3 items-center whitespace-nowrap">
+      <div className="flex gap-3 items-center whitespace-nowrap text-sm">
         {slots
           .filter((it): it is CustomMenu => typeof it === 'object')
           .map((it) => (
@@ -138,7 +148,7 @@ const SynclinkItemMenu: FC<{
           ))}
         {features.includes('downloadable') && (
           <button className="synclink-item-link" onClick={onDownload}>
-            <DownloadCloudIcon className="w-5 h-5" />
+            <DownloadCloudIcon className="w-4 h-4" />
             <span className="capitalize">{t`download`}</span>
           </button>
         )}
@@ -147,7 +157,7 @@ const SynclinkItemMenu: FC<{
             className="synclink-item-link"
             onClick={() => onShare(entity)}
           >
-            <Share2Icon className="w-5 h-5" />
+            <Share2Icon className="w-4 h-4" />
             <span className="capitalize">{t`share`}</span>
           </button>
         )}
@@ -156,13 +166,13 @@ const SynclinkItemMenu: FC<{
             className="synclink-item-link"
             onClick={() => onDelete(entity.uid)}
           >
-            <EraserIcon className="w-5 h-5" />
+            <EraserIcon className="w-4 h-4" />
             <span className="capitalize">{t`delete`}</span>
           </button>
         )}
       </div>
     );
-  }
+  },
 );
 const SynclinkItemMetadata: FC<{
   entity: IEntity;
@@ -176,7 +186,7 @@ const SynclinkItemMetadata: FC<{
         </span>
       )}
       {features.includes('type') && (
-        <span className="text-gray-600 block leading-none italic truncate text-sm pr-4 pad:pr-10">
+        <span className="text-gray-400 block leading-none truncate text-sm pr-4 pad:pr-10">
           {entity.type}
         </span>
       )}
@@ -203,20 +213,20 @@ const TextItem: FC = memo(() => {
     expandable: false,
     expanded: false,
   }));
-  const handleDoubleClick = useCallback<
-    MouseEventHandler<HTMLParagraphElement>
-  >((evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    const selection = window.getSelection();
-
-    if (selection) {
-      selection.removeAllRanges();
-      const range = document.createRange();
-      range.selectNodeContents(evt.currentTarget);
-      selection.addRange(range);
-    }
-  }, []);
+  // const handleDoubleClick = useCallback<
+  //   MouseEventHandler<HTMLParagraphElement>
+  // >((evt) => {
+  //   evt.preventDefault();
+  //   evt.stopPropagation();
+  //   const selection = window.getSelection();
+  //
+  //   if (selection) {
+  //     selection.removeAllRanges();
+  //     const range = document.createRange();
+  //     range.selectNodeContents(evt.currentTarget);
+  //     selection.addRange(range);
+  //   }
+  // }, []);
   const copyButton = useMemo<CustomMenu>(
     () => ({
       key: 'copy',
@@ -231,7 +241,7 @@ const TextItem: FC = memo(() => {
         </>
       ),
     }),
-    [content]
+    [content],
   );
   const html = useMemo(() => {
     if (!content) return '';
@@ -248,7 +258,7 @@ const TextItem: FC = memo(() => {
       // noinspection HtmlUnknownTarget
       text = text.replace(
         /(?<href>https?:\/\/[\w-_]+(?:\.\w+)+[^\s)]+)/gm,
-        `<a class='underline' target='_blank' referrerpolicy='no-referrer' href="$<href>">$<href><svg aria-hidden="true" fill="none" focusable="false" height="1em" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" class="inline ml-1 mb-0.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"></path><path d="M15 3h6v6"></path><path d="M10 14L21 3"></path></svg></a>`
+        `<a class='underline' target='_blank' referrerpolicy='no-referrer' href="$<href>">$<href><svg aria-hidden="true" fill="none" focusable="false" height="1em" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" class="inline ml-1 mb-0.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"></path><path d="M15 3h6v6"></path><path d="M10 14L21 3"></path></svg></a>`,
       );
     }
     return text;
@@ -277,9 +287,8 @@ const TextItem: FC = memo(() => {
       ) : (
         <p
           className={clsx(
-            'w-full whitespace-break-spaces break-words text-gray-900 mt-0 min-h-[32px] italic leading-relaxed'
+            'w-full whitespace-break-spaces break-words text-gray-900 mt-0 min-h-[32px] italic leading-relaxed',
           )}
-          onDoubleClick={handleDoubleClick}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       )}
@@ -301,7 +310,6 @@ const TextItem: FC = memo(() => {
     </>
   );
 });
-
 const FigureItem: FC = memo(() => {
   const entity = useEntityConsumer();
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -339,20 +347,20 @@ const FigureItem: FC = memo(() => {
   return (
     <>
       <figure
-        className="synclink-item-preview text-left m-0 overflow-hidden max-w-max h-[240px]"
+        className="synclink-item-preview text-left m-0 overflow-hidden max-w-max"
         id={`lightbox-${id}`}
       >
         <a
-          href={`${__ENDPOINT}/api/file/${entity.uid}`}
-          data-pswp-src={`${__ENDPOINT}/api/file/${entity.uid}`}
+          href={`${__ENDPOINT__}/api/file/${entity.uid}`}
+          data-pswp-src={`${__ENDPOINT__}/api/file/${entity.uid}`}
           data-pswp-width={metadata?.width}
           data-pswp-height={metadata?.height}
           target="_blank"
           className="cursor-zoom-in"
         >
           <img
-            className="rounded max-w-full max-h-full object-cover object-center"
-            src={`${__ENDPOINT}/api/file/${entity.uid}?thumbnail-prefer`}
+            className="rounded max-h-[360px] object-cover object-center"
+            src={`${__ENDPOINT__}/api/file/${entity.uid}?thumbnail-prefer`}
             alt={entity.name}
             data-id={entity.uid}
             onLoad={onLoad}
@@ -372,7 +380,6 @@ const FigureItem: FC = memo(() => {
     </>
   );
 });
-
 const VideoItem: FC = () => {
   const entity = useEntityConsumer();
   return (
@@ -384,7 +391,7 @@ const VideoItem: FC = () => {
         controlsList="nodownload"
       >
         <source
-          src={`${__ENDPOINT}/api/file/${entity.uid}`}
+          src={`${__ENDPOINT__}/api/file/${entity.uid}`}
           type={entity.type}
         />
       </video>
@@ -402,7 +409,7 @@ const AudioItem: FC = () => {
     <>
       <AudioPlayer
         className="synclink-item-preview pt-2"
-        src={`${__ENDPOINT}/api/file/${entity.uid}`}
+        src={`${__ENDPOINT__}/api/file/${entity.uid}`}
         title={entity.name}
         type={entity.type}
       />
@@ -410,6 +417,91 @@ const AudioItem: FC = () => {
         <SynclinkItemMetadata entity={entity} />
         <SynclinkItemMenu entity={entity} />
       </div>
+    </>
+  );
+};
+type RecordData = {
+  name: string;
+  size: string;
+  type: string;
+  __raw: InferResponse<typeof useGetDirectory>[number];
+};
+const DirectoryItem: FC = () => {
+  const entity = useEntityConsumer();
+  const { data: list, pending } = useGetDirectory({
+    path: {
+      id: entity.uid,
+    },
+  });
+  const nodes = useMemo<TreeNode[]>(() => {
+    if (!list) return [];
+    const folderSizes = calculateFolderSizes(list);
+
+    return toTreeByPath(list || [], (item, name) => ({
+      id: item.path,
+      key: item.hash || item.path,
+      data: {
+        name: name,
+        size: item.is_file
+          ? formatBytes(item.size)
+          : formatBytes(folderSizes[item.path]) || '',
+        type: item.mimetype || '-',
+        __raw: item,
+      } satisfies RecordData,
+      expanded: !item.is_file,
+      leaf: item.is_file,
+    }));
+  }, [list]);
+  return (
+    <>
+      <div className="synclink-item-header">
+        {/*<p className="synclink-item-title">{entity.uid}</p>*/}
+        {/*<pre>{JSON.stringify(toTreeByPath(list || []), null, 2)}</pre>*/}
+        <TreeTable
+          id="path"
+          value={nodes}
+          tableStyle={{ minWidth: '50rem' }}
+          loading={pending}
+        >
+          <Column
+            field="name"
+            header="Name"
+            expander
+            className="truncate"
+            body={NameColumn}
+          />
+          <Column field="size" header="Size" />
+          <Column field="type" header="Type" />
+          <Column body={ActionColumn} align="right" />
+        </TreeTable>
+      </div>
+      <div className="mt-4 flex justify-between">
+        <SynclinkItemMetadata entity={entity} />
+        <SynclinkItemMenu entity={entity} />
+      </div>
+    </>
+  );
+};
+const NameColumn: FC<{ data: RecordData; options: unknown }> = ({ data }) => {
+  return (
+    <>
+      {data.__raw.is_file ? (
+        <FileIcon className="inline w-5 h-5 mr-1" />
+      ) : (
+        <FolderIcon className="inline w-5 h-5 mr-1" />
+      )}
+      <span className="align-middle">{data.name}</span>
+    </>
+  );
+};
+const ActionColumn: FC<{ data: RecordData; options: unknown }> = ({ data }) => {
+  if (!data.__raw.is_file) return null;
+  return (
+    <>
+      <button className="synclink-item-link">
+        <DownloadCloudIcon className="w-4 h-4" />
+        <span className="capitalize">{t`download`}</span>
+      </button>
     </>
   );
 };
@@ -449,10 +541,17 @@ export const SynclinkItem: FC<{
         return <VideoItem />;
       case 'audio':
         return <AudioItem />;
+      case 'application':
+        switch (file.format) {
+          case 'x-tar':
+            return <DirectoryItem />;
+          default:
+            return <UnknownItem />;
+        }
       default:
         return <UnknownItem />;
     }
-  }, [file.category]);
+  }, [file.category, file.format]);
   const time = useMemo(() => {
     const created = dayjs(it.created);
     const diff = Math.abs(created.diff(dayjs(), 'days'));
@@ -490,7 +589,7 @@ export const SynclinkItem: FC<{
         data-uid={it.uid}
         key={it.uid}
       >
-        <div className="mb-2 text-sm flex items-end">
+        <div className="mb-2 text-sm flex items-end bg-[#f6f8fa] px-6 py-4">
           {time}
           {from}
         </div>
@@ -501,3 +600,27 @@ export const SynclinkItem: FC<{
     </EntityProvider>
   );
 });
+
+const calculateFolderSizes = (
+  items: InferResponse<typeof useGetDirectory>,
+): Record<string, number> => {
+  const folderSizes: Record<string, number> = {};
+  items.forEach((item) => {
+    if (!item.is_file) {
+      folderSizes[item.path] = 0;
+    }
+  });
+  items.forEach((item) => {
+    if (item.is_file) {
+      let folderPath = item.path.substring(0, item.path.lastIndexOf('/'));
+      while (folderPath) {
+        const path = folderPath + '/';
+        if (Reflect.has(folderSizes, path)) {
+          folderSizes[path] += item.size;
+        }
+        folderPath = folderPath.substring(0, folderPath.lastIndexOf('/'));
+      }
+    }
+  });
+  return folderSizes;
+};

@@ -2,41 +2,46 @@ import { FC, memo, useEffect, useRef, useState } from 'react';
 import { ReactComponent as LogoIcon } from '~/assets/logo.svg';
 import { AudioGlobalController } from '~/components/audio-player';
 import { Stats } from '~/components/stats';
+import './sidebar.less';
 
 export const Sidebar: FC = memo(() => {
   const containerRef = useRef<HTMLElement>(null);
   const [imgUrl, setImgUrl] = useState<string | undefined>(
-    () => sessionStorage.getItem('__decorative_img_url')?.trim() || void 0
+    () => localStorage.getItem('__decorative_img_url')?.trim() || void 0,
   );
   useEffect(() => {
     const element = containerRef.current;
     if (!element || imgUrl) return void 0;
-    const rect = element.getBoundingClientRect();
-    const url = `https://source.unsplash.com/${Math.floor(
-      rect.width
-    )}x${Math.floor(rect.height)}/daily?flower,twilight`;
-    sessionStorage.setItem('__decorative_img_url', url);
+    const url = `${window.location.href}/bg.jpg`;
+    localStorage.setItem('__decorative_img_url', url);
     setImgUrl(url);
   }, [imgUrl]);
   return (
-    <section
+    <aside
       ref={containerRef}
-      className="relative flex-1 flex h-full items-center justify-center bg-cover bg-center"
-      style={{
-        backgroundImage: imgUrl ? `url("${imgUrl}")` : void 0,
-      }}
+      className="relative flex-1 flex h-full items-center justify-center"
     >
+      <div className="absolute w-full h-full -z-10">
+        {imgUrl && (
+          <img
+            src={imgUrl}
+            alt=""
+            className="w-full h-full object-cover object-center aside-bg"
+          />
+        )}
+        <div className="absolute w-full h-full left-0 top-0 aside-overlay" />
+      </div>
       <header className="absolute left-12 top-12 flex items-center gap-2">
         <LogoIcon className="w-12 h-12" />
-        <h1 className="ml-2 text-3xl">
+        <h1 className="ml-2 text-3xl text-white">
           <span>Sync</span>
-          <span className="text-white">Link</span>
+          <span>Link</span>
         </h1>
       </header>
-      <div className="absolute bottom-8 right-6 flex gap-2 items-center h-8">
+      <div className="absolute bottom-0 flex gap-2 items-center w-full h-20 justify-end px-8 aside-footer">
         <AudioGlobalController />
         <Stats className="text-white text-sm items-center flex gap-2 capitalize italic" />
       </div>
-    </section>
+    </aside>
   );
 });

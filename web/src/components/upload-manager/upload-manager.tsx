@@ -277,7 +277,7 @@ const Task: FC<
           opacity: 0,
           x: -10,
         }}
-        className="relative mt-6 p-4 border border-solid border-palette-ocean-blue bg-[#f3f6f7]"
+        className="relative mt-6 p-4 border border-solid border-palette-ocean-blue bg-[#f3f6f7] rounded-xl"
       >
         <div className="flex items-center justify-between gap-2 h-20">
           {/*<div className="flex items-center justify-center w-16 h-16 font-semibold rounded-2xl border border-solid border-gray-400 capitalize">*/}

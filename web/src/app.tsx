@@ -5,13 +5,14 @@ import { I18nProvider } from '@lingui/react';
 import { i18n } from '@lingui/core';
 import { SnackbarProvider } from '~/components/snackbar/snackbar-provider.tsx';
 import { createHttpClient, HttpClientProvider } from '@painted/http';
+import { type APIOptions, PrimeReactProvider } from 'primereact/api';
 import dayjs from 'dayjs';
 import { dayjsLocales } from '~/locales/dayjs-shim.ts';
-import './app.less';
+import './app.css';
 
 const DynamicI18nLayer: FC<PropsWithChildren> = ({ children }) => {
   const [language] = useState(
-    () => localStorage.getItem('language') || navigator.language
+    () => localStorage.getItem('language') || navigator.language,
   );
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -21,7 +22,7 @@ const DynamicI18nLayer: FC<PropsWithChildren> = ({ children }) => {
           await (
             dayjsLocales[language as keyof typeof dayjsLocales] ||
             dayjsLocales['en']
-          )().then((mod) => mod.default)
+          )().then((mod) => mod.default),
         );
       })(),
       dynamicActivate(language),
@@ -37,7 +38,7 @@ const CredentialLayer: FC<PropsWithChildren> = ({ children }) => {
   const [secret] = useState(() => localStorage.getItem('secret')?.trim());
   const client = useMemo(() => {
     return createHttpClient({
-      baseUrl: __ENDPOINT,
+      baseUrl: __ENDPOINT__,
       fetcher: async (request) => {
         if (secret) {
           request.headers.append('Authorization', `Bearer ${secret}`);
@@ -76,13 +77,20 @@ const CredentialLayer: FC<PropsWithChildren> = ({ children }) => {
   return <HttpClientProvider value={client}>{children}</HttpClientProvider>;
 };
 
+const PRIME_OPTIONS = {
+  appendTo: () => document.querySelector('app#root')!,
+  ripple: false,
+} satisfies APIOptions
+
 function App() {
   return (
     <DynamicI18nLayer>
       <CredentialLayer>
-        <SnackbarProvider>
-          <Layout />
-        </SnackbarProvider>
+        <PrimeReactProvider value={PRIME_OPTIONS}>
+          <SnackbarProvider>
+            <Layout />
+          </SnackbarProvider>
+        </PrimeReactProvider>
       </CredentialLayer>
     </DynamicI18nLayer>
   );

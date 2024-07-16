@@ -24,11 +24,13 @@ export const Snackbar: FC<
 > = memo(
   ({
     id,
+    title,
     message,
     onClose,
     autoHideDuration = 5000,
     action,
     variant = 'default',
+    size = 'md',
   }) => {
     // const autoHideDuration = useConstant(() => _autoHideDuration);
     useEffect(() => {
@@ -47,7 +49,7 @@ export const Snackbar: FC<
       if (isFunction(action))
         return action(
           id,
-          'w-5 h-5 cursor-pointer rounded-full p-1 bg-gray-300 bg-opacity-0 hover:bg-opacity-50'
+          'w-5 h-5 cursor-pointer rounded-full p-1 bg-gray-300 bg-opacity-0 hover:bg-opacity-50',
         );
       else return action;
     }, [action, id]);
@@ -70,60 +72,113 @@ export const Snackbar: FC<
           transition: { duration: 0.2 },
         }}
         layout="position"
-        className="relative pointer-events-auto list-none "
+        className="relative pointer-events-auto list-none"
       >
         <Variant
           id={id}
+          title={title}
           message={message}
           action={actionElement}
-          className="flex items-center pl-2 pad:pl-6 pr-4 pad:pr-10 pad:py-2 rounded shadow-xl text-white gap-3 leading-none"
+          className={clsx(
+            'flex items-center shadow-xl text-white gap-2 leading-none rounded-lg border border-solid border-gray-300',
+            {
+              sm: 'p-3',
+              md: 'p-4',
+              lg: 'p-5',
+            }[size],
+          )}
         />
       </motion.li>
     );
-  }
+  },
 );
 
 const SnackbarVariants = {
-  default: ({ message, className, action }) => {
+  default: ({ title, message, className, action }) => {
     return (
-      <div className={clsx(className)}>
-        <div className="flex-1 py-4">{message}</div>
+      <div className={clsx('bg-[#fbfcfe] text-black', className)}>
+        <div className="flex-1">
+          {title ? (
+            <>
+              <p className="leading-normal">{title}</p>
+              <p className="leading-normal text-gray-400">{message}</p>
+            </>
+          ) : (
+            message
+          )}
+        </div>
         {action}
       </div>
     );
   },
-  error: ({ message, className, action }) => {
+  error: ({ title, message, className, action }) => {
     return (
       <div className={clsx('bg-error-main', className)}>
-        <XCircleIcon className="fill-white stroke-error-main w-7 h-7" />
-        <div className="flex-1 py-4">{message}</div>
+        <XCircleIcon className="fill-error-main stroke-white w-5 h-5 mr-1" />
+        <div className="flex-1">
+          {title ? (
+            <>
+              <p className="leading-normal">{title}</p>
+              <p className="leading-normal text-gray-200">{message}</p>
+            </>
+          ) : (
+            message
+          )}
+        </div>
         {action}
       </div>
     );
   },
-  warning: ({ message, className, action }) => {
+  warning: ({ title, message, className, action }) => {
     return (
       <div className={clsx('bg-warning-main', className)}>
-        <AlertTriangleIcon className="fill-white stroke-warning-main w-7 h-7" />
-        <div className="flex-1 py-4">{message}</div>
+        <AlertTriangleIcon className="fill-warning-main stroke-white w-5 h-5 mr-1" />
+        <div className="flex-1">
+          {title ? (
+            <>
+              <p className="leading-normal">{title}</p>
+              <p className="leading-normal text-gray-200">{message}</p>
+            </>
+          ) : (
+            message
+          )}
+        </div>
         {action}
       </div>
     );
   },
-  success: ({ message, className, action }) => {
+  success: ({ title, message, className, action }) => {
     return (
       <div className={clsx('bg-success-main', className)}>
-        <CheckCircle2Icon className="fill-white stroke-success-main w-7 h-7" />
-        <div className="flex-1 py-4">{message}</div>
+        <CheckCircle2Icon className="fill-success-main stroke-white w-5 h-5 mr-1" />
+        <div className="flex-1">
+          {title ? (
+            <>
+              <p className="leading-normal">{title}</p>
+              <p className="leading-normal text-gray-200">{message}</p>
+            </>
+          ) : (
+            message
+          )}
+        </div>
         {action}
       </div>
     );
   },
-  info: ({ message, className, action }) => {
+  info: ({ title, message, className, action }) => {
     return (
       <div className={clsx('bg-info-main', className)}>
-        <AlertCircleIcon className="fill-white stroke-info-main w-7 h-7" />
-        <div className="flex-1 py-4">{message}</div>
+        <AlertCircleIcon className="fill-info-main stroke-white w-5 h-5 mr-1" />
+        <div className="flex-1">
+          {title ? (
+            <>
+              <p className="leading-normal">{title}</p>
+              <p className="leading-normal text-gray-200">{message}</p>
+            </>
+          ) : (
+            message
+          )}
+        </div>
         {action}
       </div>
     );
@@ -131,7 +186,7 @@ const SnackbarVariants = {
 } satisfies Record<
   NonNullable<SnackbarProps['variant']>,
   FC<
-    Pick<SnackbarProps, 'message' | 'className'> & {
+    Pick<SnackbarProps, 'message' | 'title' | 'className'> & {
       id: string;
       action?: ReactNode;
     }

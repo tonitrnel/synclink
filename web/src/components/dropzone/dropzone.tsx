@@ -9,16 +9,97 @@ import {
 } from 'react';
 import { ReactComponent as SendIcon } from '~/assets/send.svg';
 import { IGNORE_FILE_TYPE } from '~/constants';
+import type { DirEntry } from '~/constants/types.ts';
 import './dropzone.less';
-import { useSnackbar } from '~/components/snackbar';
-import { t } from '@lingui/macro';
+
+type SettledDirEntry = Exclude<DirEntry, { type: 'file' }>;
+
+const scanFiles = async (items: FileSystemEntry[]): Promise<DirEntry[]> => {
+  const tree: DirEntry[] = [];
+  const stack: Array<
+    [
+      list: DirEntry[],
+      entries: FileSystemEntry[],
+      parent: SettledDirEntry | null,
+    ]
+  > = [[tree, items, null]];
+  const remove_prefix = (str: string, prefix: string) =>
+    str.startsWith(prefix) ? str.slice(prefix.length) : str;
+  const mtimeStack: Array<[entry: SettledDirEntry, mtime: number]> = [];
+  while (stack.length > 0) {
+    const [list, entries, parent] = stack.pop()!;
+    let mtime = 0;
+    for (const entry of entries) {
+      if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        const entries = await new Promise<FileSystemEntry[]>(
+          (resolve, reject) =>
+            reader.readEntries(
+              (entries) => resolve(entries),
+              (err) => reject(err),
+            ),
+        );
+        const children: DirEntry[] = [];
+        const index = list.length;
+        list.push({
+          name: entry.name,
+          path: remove_prefix(entry.fullPath + '/', '/'),
+          type: 'directory',
+          mtime: 0,
+          children,
+        });
+        stack.push([children, entries, list[index] as SettledDirEntry]);
+      } else {
+        const file = await new Promise<File>((resolve, reject) =>
+          (entry as FileSystemFileEntry).file(
+            (file) => resolve(file),
+            (err) => reject(err),
+          ),
+        );
+        if (file.lastModified > mtime) {
+          mtime = file.lastModified;
+        }
+        list.push({
+          name: entry.name,
+          path: remove_prefix(entry.fullPath, '/'),
+          type: 'file',
+          mtime: file.lastModified,
+          file,
+        });
+      }
+    }
+    if (parent) mtimeStack.push([parent, mtime]);
+  }
+  while (mtimeStack.length > 0) {
+    const [entry, mtime] = mtimeStack.pop()!;
+    if (mtime > entry.mtime) {
+      Reflect.set(entry, 'mtime', mtime);
+    }
+    for (const child of entry.children.filter(
+      (it): it is SettledDirEntry => it.mtime == 0,
+    )) {
+      Reflect.set(child, 'mtime', entry.mtime);
+    }
+  }
+  return tree;
+};
 
 export const DropZone: FC<{
-  onReceivedTransferData?(files: File[], rawTransferData: DataTransfer): void;
+  onReceivedTransferData?(
+    filesOrEntries:
+      | {
+          readonly type: 'multi-file';
+          readonly files: readonly File[];
+        }
+      | {
+          readonly type: 'dir-entries';
+          readonly entries: readonly DirEntry[];
+        },
+    rawTransferData?: DataTransfer,
+  ): void;
 }> = memo(({ onReceivedTransferData }) => {
   const [drop, setDrop] = useState(false);
   const triedRef = useRef(0);
-  const snackbar = useSnackbar();
   const handleDrop = useCallback<DragEventHandler>(
     async (evt) => {
       evt.preventDefault();
@@ -26,33 +107,38 @@ export const DropZone: FC<{
       setDrop(false);
       const items = Array.from(evt.dataTransfer.items);
       if (items.some((it) => it.webkitGetAsEntry()?.isDirectory)) {
-        snackbar.enqueueSnackbar({
-          message: t`unable to paste directory`,
-          variant: 'warning',
-        });
-      }
-      const files = await Promise.all(
-        items
-          .filter(
-            (_, i) => !IGNORE_FILE_TYPE.includes(evt.dataTransfer.types[i])
-          )
-          // ignore directory
-          .filter((it) => it.webkitGetAsEntry()?.isFile ?? true)
-          .reverse()
-          .map((it, i) => {
-            const file = it.getAsFile();
-            if (file) return Promise.resolve(file);
-            const type = evt.dataTransfer.types[i];
-            return new Promise<File>((resolve) => {
-              it.getAsString((it) => {
-                resolve(new File([it], '', { type }));
+        const entries = await scanFiles(
+          items.map((it) => it.webkitGetAsEntry()!),
+        );
+        onReceivedTransferData?.(
+          { type: 'dir-entries', entries },
+          evt.dataTransfer,
+        );
+      } else {
+        const files = await Promise.all(
+          items
+            .filter(
+              (_, i) => !IGNORE_FILE_TYPE.includes(evt.dataTransfer.types[i]),
+            )
+            .reverse()
+            .map((it, i) => {
+              const file = it.getAsFile();
+              if (file) return Promise.resolve(file);
+              const type = evt.dataTransfer.types[i];
+              return new Promise<File>((resolve) => {
+                it.getAsString((it) => {
+                  resolve(new File([it], '', { type }));
+                });
               });
-            });
-          })
-      );
-      onReceivedTransferData?.(files, evt.dataTransfer);
+            }),
+        );
+        onReceivedTransferData?.(
+          { type: 'multi-file', files },
+          evt.dataTransfer,
+        );
+      }
     },
-    [onReceivedTransferData, snackbar]
+    [onReceivedTransferData],
   );
   useEffect(() => {
     let forbidden = false;
@@ -60,6 +146,8 @@ export const DropZone: FC<{
       // evt: DragEvent
       // Dragging inside the page
       if (forbidden) return void 0;
+      const dialog = document.querySelector('*[role="dialog"]');
+      if (dialog) return void 0;
       triedRef.current++;
       if (triedRef.current === 1) {
         setDrop(true);
@@ -110,13 +198,15 @@ export const DropZone: FC<{
   }, [drop]);
   if (!drop) return null;
   return (
-    <div
+    <section
       className="dropzone"
       onDrop={handleDrop}
       onDragOver={(evt) => evt.preventDefault()}
     >
-      <SendIcon />
-      <span>Drop here</span>
-    </div>
+      <div className="dropzone-wrapper">
+        <SendIcon />
+        <span>Drag and Drop file here</span>
+      </div>
+    </section>
   );
 });

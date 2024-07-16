@@ -4,13 +4,15 @@ import { Input } from '~/components/input';
 import { List } from '~/components/list';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
 import { Sidebar } from '~/components/sidebar';
+import { SCROLLBAR_WIDTH } from '~/utils/get-scrollbar-width.ts';
+import { P2PFileReceiver } from '../file-delivery-dialog';
 
 export const Layout: FC = () => {
   const isDesktop = useMediaQuery('(min-width: 1280px)');
   return (
     <>
       {isDesktop && <Sidebar />}
-      <section className="flex-[2] relative flex flex-col pad:py-4 box-border h-full my-0 overflow-hidden bg-gray-100">
+      <section className="flex-[2] relative flex flex-col box-border h-full my-0 overflow-hidden">
         {!isDesktop && (
           <header className="relative z-10 flex items-center gap-2 p-4 border-b border-b-gray-200 shadow">
             <LogoIcon className="w-8 h-8" />
@@ -18,12 +20,21 @@ export const Layout: FC = () => {
           </header>
         )}
         <main className="flex-1 h-full overflow-hidden">
-          <List className="relative flex-1 h-full box-border px-4 pr-3 pad:px-40 overflow-y-auto" />
+          <List className="relative flex-1 h-full box-border px-4 pad:px-40 overflow-y-auto" />
         </main>
-        <footer className="py-2 pad:py-4 pad:pt-2 mx-auto w-full mt-2 z-10 bg-white pad:bg-gray-100 box-border px-4 pad:px-40  shadow-revert-md">
+        <footer
+          className="py-2 pad:py-4 pad:pt-2 mx-auto w-full mt-2 z-10 box-border px-4 pad:px-40 shadow-revert-md"
+          style={{
+            paddingRight:
+              isDesktop && SCROLLBAR_WIDTH > 0
+                ? `calc(10rem + ${SCROLLBAR_WIDTH / 2}px)`
+                : undefined,
+          }}
+        >
           <Input />
         </footer>
       </section>
+      <P2PFileReceiver/>
     </>
   );
 };
