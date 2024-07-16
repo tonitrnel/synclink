@@ -64,9 +64,6 @@ fn parse_mimetype_from_bytes(bytes: &[u8]) -> Option<String> {
 }
 
 pub async fn guess_mimetype_from_path(path: PathBuf, content_type: Option<String>) -> String {
-    if let Some(content_type) = content_type {
-        return content_type;
-    }
     let mut file = File::open(&path).await.ok().unwrap();
     let capacity = file
         .metadata()
@@ -94,7 +91,7 @@ pub async fn guess_mimetype_from_path(path: PathBuf, content_type: Option<String
             return mime;
         }
     }
-    String::from("application/octet-stream")
+    content_type.unwrap_or_else(|| String::from("application/octet-stream"))
 }
 pub fn guess_mimetype_from_bytes(bytes: &[u8], ext: Option<&str>) -> String {
     if let Some(mime) = parse_mimetype_from_bytes(bytes) {
