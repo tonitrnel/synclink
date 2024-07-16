@@ -20,6 +20,7 @@ pub enum ErrorKind {
     Forbidden,
     DuplicateFile(Uuid),
     Internal(anyhow::Error),
+    BadRequest(anyhow::Error),
 }
 
 impl Display for ErrorKind {
@@ -53,6 +54,9 @@ impl Display for ErrorKind {
             ErrorKind::Internal(_) => {
                 write!(f, "An internal error occurred. Please try again later.")
             }
+            ErrorKind::BadRequest(error) => {
+                write!(f, "{error}")
+            }
         }
     }
 }
@@ -81,9 +85,10 @@ impl IntoResponse for ErrorKind {
             ErrorKind::Internal(err) => {
                 err.chain()
                     .skip(1)
-                    .for_each(|cause| tracing::error!("because: {}", cause));
+                    .for_each(|cause| tracing::error!("Because: {}", cause));
                 StatusCode::INTERNAL_SERVER_ERROR
             }
+            ErrorKind::BadRequest(_) => StatusCode::BAD_REQUEST,
         };
 
         (status, message).into_response()

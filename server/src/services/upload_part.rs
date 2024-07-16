@@ -2,7 +2,7 @@ use crate::errors::{ApiResponse, ErrorKind, InternalError};
 use crate::extractors::{ClientIp, Headers};
 use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
-use crate::utils::decode_uri;
+use crate::utils::{decode_uri, SessionManager};
 use anyhow::Context;
 use axum::{
     extract::{Query, Request, State},
@@ -11,11 +11,11 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::io::{Read, SeekFrom};
 use std::path;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 use tar::Archive;
 use tokio::fs;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -27,9 +27,7 @@ struct Session {
     start: u64,
 }
 
-type Sessions = HashMap<Uuid, Session>;
-
-static SHARED_SESSIONS: OnceLock<Arc<Mutex<Sessions>>> = OnceLock::new();
+static SHARED_SESSIONS: OnceLock<Arc<SessionManager<Uuid, Session>>> = OnceLock::new();
 #[derive(Deserialize, Debug)]
 pub struct QueryParams {
     id: Option<Uuid>,
@@ -59,16 +57,10 @@ impl QueryParams {
     }
 }
 
-fn access_shared_sessions() -> anyhow::Result<MutexGuard<'static, Sessions>> {
-    match SHARED_SESSIONS
-        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
-        .lock()
-    {
-        Ok(guard) => Ok(guard),
-        Err(err) => {
-            anyhow::bail!("sessions lock failed, reason {:?}", err)
-        }
-    }
+fn access_shared_sessions() -> Arc<SessionManager<Uuid, Session>> {
+    SHARED_SESSIONS
+        .get_or_init(|| SessionManager::new(Duration::from_secs(300)))
+        .clone()
 }
 
 /// allocate disk resource
@@ -82,7 +74,8 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     };
     let (uid, start, path) = {
-        if let Some((uid, session)) = access_shared_sessions()?
+        if let Some((uid, session)) = access_shared_sessions()
+            .guard()
             .iter()
             .find(|(_, it)| it.hash == hash)
         {
@@ -116,7 +109,7 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     }
     if start == 0 {
-        access_shared_sessions()?.insert(uid, Session { hash, start: 0 });
+        access_shared_sessions().insert(uid, Session { hash, start: 0 });
     }
     Ok((uid, start))
 }
@@ -158,7 +151,8 @@ where
                 path: path.to_owned(),
             })?;
     }
-    if let Some(it) = access_shared_sessions()?.get_mut(uid) {
+    let sessions = access_shared_sessions();
+    if let Some(it) = sessions.guard().get_mut(uid) {
         it.start = end;
     }
     Ok(())
@@ -219,7 +213,7 @@ async fn exec_concatenate(
         .unwrap_or_default();
     let path = storage_path.join(format!("{}{}", uid, ext));
     move_tmp_file(&temp, &path).await?;
-    access_shared_sessions()?.remove(uid);
+    access_shared_sessions().remove(uid);
     Ok((path, size, format!("{:x}", hasher.finalize())))
 }
 
@@ -276,7 +270,7 @@ async fn exec_cleanup(uid: &Uuid) -> anyhow::Result<()> {
         .with_context(|| InternalError::DeleteFileError {
             path: path.to_owned(),
         })?;
-    access_shared_sessions()?.remove(uid);
+    access_shared_sessions().remove(uid);
     Ok(())
 }
 
@@ -309,7 +303,7 @@ pub async fn append(
     let pos = query.pos()?;
     let current_start_position = {
         // Reduce the scope of the lock
-        access_shared_sessions()?.get(&id).map(|it| it.start)
+        access_shared_sessions().get(&id).map(|it| it.start)
     };
 
     // Check for duplicate chunk
@@ -338,7 +332,7 @@ pub async fn concatenate(
         })
         .unwrap_or_default();
     let caption = query.caption.clone().unwrap_or_default();
-    if !access_shared_sessions()?.contains_key(&id) {
+    if !access_shared_sessions().contains_key(&id) {
         return Ok(Json("ok!"));
     }
     let content_type = headers.get("content-type").try_as_string().ok();
@@ -383,7 +377,10 @@ pub async fn concatenate(
             tags,
         })
         .await?;
-    if let Err(err) = state.broadcast.send(IndexChangeAction::AddItem(id)) {
+    if let Err(err) = state
+        .notify_manager
+        .send(IndexChangeAction::AddItem(id).into())
+    {
         tracing::warn!(%err, "{}", InternalError::BroadcastIndexChangeError(format!("add {} action", id)));
     }
     Ok(Json("ok!"))

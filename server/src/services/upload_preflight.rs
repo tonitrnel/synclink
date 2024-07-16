@@ -30,9 +30,9 @@ pub async fn upload_preflight(
         )
             .into_response());
     }
-    if let Err(_err) = state.indexing.check_file_size_limit(query.size) {
-        return Ok(StatusCode::PAYLOAD_TOO_LARGE.into_response());
-    }
+    // if let Err(_err) = state.indexing.check_file_size_limit(query.size) {
+    //     return Ok(StatusCode::PAYLOAD_TOO_LARGE.into_response());
+    // }
     if let Err(_err) = state.indexing.check_storage_quota_exceeded(query.size) {
         return Ok(StatusCode::INSUFFICIENT_STORAGE.into_response());
     }

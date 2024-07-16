@@ -21,11 +21,11 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
         let shutdown_signal = shutdown_signal.clone();
         let dir = args.config.file_storage.parse_dir()?;
         join_set.spawn(async move {
-            let (tx, _) = tokio::sync::broadcast::channel(8);
             let indexing = Arc::new(models::file_indexing::FileIndexing::new(dir).await);
             let state = state::AppState {
                 indexing,
-                broadcast: tx,
+                notify_manager: Arc::new(crate::services::NotifyManager::new()),
+                socket_manager: Arc::new(crate::services::P2PSocketManager::new()),
                 shutdown_signal: shutdown_signal.clone(),
             };
             let routes = routes::build().with_state(state);

@@ -21,12 +21,14 @@ pub async fn stats(State(state): State<AppState>) -> ApiResponse<Json<Value>> {
     });
     let version = env!("CARGO_PKG_VERSION");
     let uptime = config::uptime();
+    let storage_quota = config::load().file_storage.quota.unwrap_or(0);
 
     Ok(Json(json!({
         "version": version,
         "disk_usage": disk_usage,
         "memory_usage": memory_usage,
         "query_elapsed": now.elapsed().as_millis() as u64,
+        "storage_quota": storage_quota,
         "uptime": uptime
     })))
 }

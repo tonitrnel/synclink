@@ -151,6 +151,9 @@ pub struct TarDirResponseDto {
     path: String,
     mtime: u64,
     size: u64,
+    mimetype: Option<String>,
+    is_file: bool,
+    hash: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct TarDirIndex {
@@ -171,6 +174,9 @@ impl From<TarDirIndex> for TarDirResponseDto {
             path: value.path,
             mtime: value.mtime,
             size: value.size,
+            mimetype: value.mimetype,
+            is_file: EntryType::new(value.e_type).is_file(),
+            hash: value.hash,
         }
     }
 }
@@ -210,7 +216,7 @@ pub async fn get_virtual_directory(
 
 pub async fn get_virtual_file(
     State(state): State<AppState>,
-    Path((id, file_path)): Path<(Uuid, String)>,
+    Path((id, file_path_or_hash)): Path<(Uuid, String)>,
     headers: Headers,
     query: Query<GetQueryParams>,
     method: Method,
@@ -230,7 +236,14 @@ pub async fn get_virtual_file(
     let data = parse_tar_index(&path).await?;
     let meta = data
         .into_iter()
-        .find(|it| it.path == file_path)
+        .find(|it| {
+            it.path == file_path_or_hash
+                || it
+                    .hash
+                    .as_ref()
+                    .map(|hash| hash == &file_path_or_hash)
+                    .unwrap_or(false)
+        })
         .ok_or_else(|| ErrorKind::ResourceNotFound)?;
     if !EntryType::new(meta.e_type).is_file() {
         return Err(ErrorKind::Internal(anyhow::Error::msg(
@@ -492,7 +505,7 @@ mod partial {
     }
 
     impl AsyncSeek for FilePartial {
-        fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> std::io::Result<()> {
+        fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
             let this = self.get_mut();
             let pos = match pos {
                 SeekFrom::Start(offset) => this.start + offset as usize,
@@ -510,7 +523,7 @@ mod partial {
             Ok(())
         }
 
-        fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
+        fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
             let this = self.get_mut();
             AsyncSeek::poll_complete(Pin::new(&mut this.inner), cx)
         }
@@ -520,7 +533,7 @@ mod partial {
             self: Pin<&mut Self>,
             cx: &mut Context<'_>,
             dst: &mut ReadBuf<'_>,
-        ) -> Poll<std::io::Result<()>> {
+        ) -> Poll<io::Result<()>> {
             let this = self.get_mut();
             let max_read_length = this.end - this.pos;
             if max_read_length == 0 {

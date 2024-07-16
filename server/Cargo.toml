@@ -13,7 +13,7 @@ uuid = { version = "1.6.0", features = ["v4", "serde"] }
 sha2 = "0.10.6"
 toml = "0.8.8"
 futures = "0.3.29"
-axum = { version = "0.7.5", features = ["default", "multipart", "macros"] }
+axum = { version = "0.7.5", features = ["default", "multipart", "macros", "ws"] }
 tokio = { version = "1.26.0", features = ["full"] }
 tokio-util = { version = "0.7.8", features = ["io"] }
 tokio-stream = { version = "0.1.14", features = ["sync"] }
@@ -28,6 +28,7 @@ infer = { version = "0.16.0", default-features = false }
 image = "0.24.7"
 simdutf8 = "0.1.4"
 tar = "0.4.41"
+pin-project-lite = "0.2.14"
 
 [profile.release]
 strip = true

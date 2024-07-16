@@ -13,7 +13,10 @@ pub async fn delete(
 ) -> ApiResponse<Json<String>> {
     state.indexing.delete(&id).await?;
 
-    if let Err(err) = state.broadcast.send(IndexChangeAction::DelItem(id)) {
+    if let Err(err) = state
+        .notify_manager
+        .send(IndexChangeAction::DelItem(id).into())
+    {
         tracing::warn!("broadcast {} failed", err);
     }
     Ok(Json("ok!".to_string()))

@@ -185,6 +185,8 @@ pub async fn upload(
             tags,
         })
         .await?;
-    state.broadcast.send(IndexChangeAction::AddItem(uid))?;
+    state
+        .notify_manager
+        .send(IndexChangeAction::AddItem(uid).into())?;
     Ok((StatusCode::CREATED, Json(uid)).into_response())
 }

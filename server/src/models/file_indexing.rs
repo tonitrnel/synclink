@@ -325,17 +325,17 @@ impl FileIndexing {
         }
         Ok(())
     }
-    pub fn check_file_size_limit(&self, file_size: u64) -> anyhow::Result<()> {
-        if let Some(max_size_of) = config::load().file_storage.max_size_of {
-            if max_size_of >= file_size as usize {
-                Ok(())
-            } else {
-                anyhow::bail!("The file size exceeds the maximum limit. Allowed maximum size is {max_size_of} bytes, but the file size is {file_size} bytes.")
-            }
-        } else {
-            Ok(())
-        }
-    }
+    // pub fn check_file_size_limit(&self, file_size: u64) -> anyhow::Result<()> {
+    //     if let Some(max_size_of) = config::load().file_storage.max_size_of_file {
+    //         if max_size_of >= file_size as usize {
+    //             Ok(())
+    //         } else {
+    //             anyhow::bail!("The file size exceeds the maximum limit. Allowed maximum size is {max_size_of} bytes, but the file size is {file_size} bytes.")
+    //         }
+    //     } else {
+    //         Ok(())
+    //     }
+    // }
     pub fn check_storage_quota_exceeded(&self, file_size: u64) -> anyhow::Result<()> {
         if let Some(quota) = config::load().file_storage.quota {
             let current_storage = self
@@ -365,12 +365,12 @@ pub enum IndexChangeAction {
 impl IndexChangeAction {
     pub fn to_json(&self) -> String {
         let (action, uid) = match self {
-            IndexChangeAction::AddItem(uid) => ("ADD", uid),
-            IndexChangeAction::DelItem(uid) => ("DELETE", uid),
+            IndexChangeAction::AddItem(uid) => ("RECORD_ADDED", uid),
+            IndexChangeAction::DelItem(uid) => ("RECORD_DELETED", uid),
         };
         serde_json::json!({
             "type": action,
-            "uid": uid
+            "payload": uid
         })
         .to_string()
     }
