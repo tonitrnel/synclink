@@ -1,0 +1,12 @@
+Dockerfile
+
+server/target
+
+wasm/*/pkg
+wasm/*/target
+
+web/.swc
+web/dist
+web/node_modules
+
+.*/

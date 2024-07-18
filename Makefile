@@ -18,7 +18,7 @@ build-image:
 		--build-arg RUSTC_VERSION=$(RUSTC_VERSION) \
 		-t synclink:$(PKG_VER) .
 
-build-web: build-sha256-binding
+build-web: build-sha256-binding build-tar-binding
 	cd web
 	npm run build
 
