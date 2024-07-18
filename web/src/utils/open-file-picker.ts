@@ -2,7 +2,7 @@ const wait = (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-let element: HTMLInputElement | null = null;
+let input: HTMLInputElement | null = null;
 
 interface LikeFileArray extends Array<File> {
   reason: 'change' | 'cancel';
@@ -11,42 +11,42 @@ interface LikeFileArray extends Array<File> {
 export const openFilePicker = (
   accept: string[],
   multiple = false,
-  directory = false
+  directory = false,
 ) => {
   return new Promise<LikeFileArray>((resolve) => {
-    if (element) {
-      element.type = '';
-      element.value = '';
-      document.body.removeChild(element);
+    if (input) {
+      input.type = '';
+      input.value = '';
+      document.body.removeChild(input);
     }
     let inputIsAttached = false;
     let userIsConfirmed = false; // Chrome 选择文件夹时会二次确认是否上传
     const addInputToBody = () => {
-      if (!element) throw new Error('input element lost unexpectedly');
-      document.body.appendChild(element);
+      if (!input) throw new Error('input element lost unexpectedly');
+      document.body.appendChild(input);
       inputIsAttached = true;
     };
     const delInputFromBody = () => {
       inputIsAttached = false;
-      if (element) {
-        document.body.removeChild(element);
-        element = null;
+      if (input) {
+        document.body.removeChild(input);
+        input = null;
       }
     };
-    element = document.createElement('input');
-    element.type = 'file';
-    element.accept = accept.join(',');
-    element.style.display = 'none';
-    element.multiple = multiple;
-    if (directory) element.webkitdirectory = true;
-    const onCancelListener = async () => {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept.join(',');
+    input.style.display = 'none';
+    input.multiple = multiple;
+    if (directory) input.webkitdirectory = true;
+    const cancelDetector = async () => {
       await wait(500);
       if (!inputIsAttached) return void 0;
       if (directory && !userIsConfirmed) {
         userIsConfirmed = true;
-        window.addEventListener('focus', onCancelListener, { once: true });
-        window.addEventListener('touchend', onCancelListener, { once: true });
-        window.addEventListener('mousemove', onCancelListener, { once: true });
+        window.addEventListener('focus', cancelDetector);
+        window.addEventListener('touchend', cancelDetector);
+        window.addEventListener('mousemove', cancelDetector);
         return void 0;
       }
       // console.log('onCancel', element?.files);
@@ -54,25 +54,31 @@ export const openFilePicker = (
       result.reason = 'cancel';
       resolve(result);
       delInputFromBody();
-      window.removeEventListener('focus', onCancelListener);
-      window.removeEventListener('touchend', onCancelListener);
-      window.removeEventListener('mousemove', onCancelListener);
+      window.removeEventListener('focus', cancelDetector);
+      window.removeEventListener('touchend', cancelDetector);
+      window.removeEventListener('mousemove', cancelDetector);
     };
-    element.onchange = (ev) => {
+    input.addEventListener('change', (evt) => {
       // console.log('onChange');
-      window.removeEventListener('focus', onCancelListener);
-      window.removeEventListener('touchend', onCancelListener);
-      window.removeEventListener('mousemove', onCancelListener);
+      window.removeEventListener('focus', cancelDetector);
+      window.removeEventListener('touchend', cancelDetector);
+      window.removeEventListener('mousemove', cancelDetector);
       const result = [
-        ...((ev.target as HTMLInputElement).files ?? []),
+        ...((evt.target as HTMLInputElement).files ?? []),
       ] as LikeFileArray;
       result.reason = 'change';
       resolve(result);
       delInputFromBody();
-    };
-    window.addEventListener('focus', onCancelListener, { once: true });
-    window.addEventListener('touchend', onCancelListener, { once: true });
+    })
+    input.addEventListener('click', () => {
+      window.addEventListener('focus', cancelDetector);
+      window.addEventListener('touchend', cancelDetector);
+    });
     addInputToBody();
-    element.click();
+    if ('showPicker' in HTMLInputElement.prototype) {
+      input.showPicker();
+    } else {
+      input.click();
+    }
   });
 };

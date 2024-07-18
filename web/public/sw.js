@@ -55,8 +55,8 @@ self.addEventListener('fetch', (fetchEvent) => {
                 'content-length': mediaFile.size,
                 'content-type': mediaFile.type,
                 'last-modified': new Date(mediaFile.lastModified).toGMTString(),
-                'x-raw-filename': encodeURIComponent(mediaFile.name),
-              },
+                'x-raw-filename': encodeURIComponent(mediaFile.name)
+              }
             })
           );
         }
@@ -67,4 +67,19 @@ self.addEventListener('fetch', (fetchEvent) => {
       })()
     );
   }
+});
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url == '/' && 'focus' in client)
+          return client.focus();
+      }
+      if (self.clients.openWindow)
+        return self.clients.openWindow('/');
+    })
+  );
 });

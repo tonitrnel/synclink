@@ -241,7 +241,7 @@ const Task: FC<
         100
       );
     }, [data, uploaded, stage]);
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const isMobile = useMediaQuery(useMediaQuery.MOBILE_QUERY);
 
     useEffect(() => {
       let timer: number | null = null;

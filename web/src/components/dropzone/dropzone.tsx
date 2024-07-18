@@ -84,17 +84,19 @@ const scanFiles = async (items: FileSystemEntry[]): Promise<DirEntry[]> => {
   return tree;
 };
 
+export type FilesOrEntries =
+  | {
+      readonly type: 'multi-file';
+      readonly files: readonly File[];
+    }
+  | {
+      readonly type: 'dir-entries';
+      readonly entries: readonly DirEntry[];
+    };
+
 export const DropZone: FC<{
   onReceivedTransferData?(
-    filesOrEntries:
-      | {
-          readonly type: 'multi-file';
-          readonly files: readonly File[];
-        }
-      | {
-          readonly type: 'dir-entries';
-          readonly entries: readonly DirEntry[];
-        },
+    filesOrEntries: FilesOrEntries,
     rawTransferData?: DataTransfer,
   ): void;
 }> = memo(({ onReceivedTransferData }) => {

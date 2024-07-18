@@ -27,3 +27,5 @@ export const useMediaQuery = (query: string): boolean => {
   }, [list, query]);
   return matches;
 };
+useMediaQuery.MOBILE_QUERY = '(max-width: 768px)';
+useMediaQuery.DESKTOP_QUERY = '(min-width: 1280px)';

@@ -8,12 +8,12 @@ import { InputText } from 'primereact/inputtext';
 import { Tooltip } from 'primereact/tooltip';
 
 interface State {
-  files: {}[];
+  files: File[];
   tags: string[];
   caption: string;
 }
 
-export const FileFilterDialog: FC<{
+export const FileUploadDialog: FC<{
   mode: 'file' | 'directory';
   visible: boolean;
   onClose: () => void;
@@ -23,7 +23,7 @@ export const FileFilterDialog: FC<{
     tags: [],
     caption: '',
   }));
-  const onConfirm = useCallback(() => {}, []);
+  // const onConfirm = useCallback(() => {}, []);
   const onCancel = useCallback(() => {}, []);
   const onChipsChange = useCallback((evt: ChipsChangeEvent) => {
     const value = !evt.value ? [] : evt.value;

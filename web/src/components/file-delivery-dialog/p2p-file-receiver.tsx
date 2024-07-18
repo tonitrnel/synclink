@@ -31,6 +31,20 @@ export const P2PFileReceiver: FC = () => {
           contentClassName: 'border border-solid border-gray-300 rounded-lg',
           detail: <Message requestId={id} onClose={closeToast} />,
         });
+        if (document.visibilityState == 'hidden') {
+          Notification.requestPermission().then((permission) => {
+            // If the user accepts, let's create a notification
+            if (permission === 'granted') {
+              new Notification(
+                '村民想向你分享了一些神秘的文件',
+                {
+                  body: '请在网页端决定是否要接受',
+                },
+              );
+              // …
+            }
+          });
+        }
       }),
     );
   }, [p2pFileDialog]);

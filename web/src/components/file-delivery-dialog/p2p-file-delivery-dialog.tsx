@@ -21,13 +21,15 @@ import { Dialog } from 'primereact/dialog';
 import { Divider } from 'primereact/divider';
 import { getBrowserInfo, getDeviceType } from '~/utils/get-device-type.ts';
 import {
+  AlertCircleIcon,
+  CheckCircleIcon,
   LaptopIcon,
+  LoaderCircleIcon,
   PcCaseIcon,
   SmartphoneIcon,
   TabletIcon,
   UploadIcon,
   XCircleIcon,
-  XIcon,
 } from 'icons';
 import { Button } from 'primereact/button';
 import { Loading } from '~/components/loading';
@@ -39,7 +41,11 @@ import { clsx } from '~/utils/clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { formatBytes } from '~/utils/format-bytes';
 import { useLatestRef } from '@painted/shared';
-import { createTransmissionRateCalculator } from '~/utils/transmission-rate-calculator';
+import {
+  createRemainingTimeCalculator,
+  createTransmissionRateCalculator,
+} from '~/utils/transmission-rate-calculator';
+import { formatSeconds } from '~/utils/format-time';
 
 type Panel =
   | {
@@ -122,7 +128,7 @@ export const P2pFileDeliveryDialog: FC<{
     [mode, onClose],
   );
   useEffect(() => {
-    notifyManager.disableAutoDisconnect = true;
+    notifyManager.keepConnection = true;
     return notifyManager.batch(
       notifyManager.on('USER_CONNECTED', () => {
         refresh().catch(console.error);
@@ -141,7 +147,7 @@ export const P2pFileDeliveryDialog: FC<{
         }
         refresh().catch(console.error);
       }),
-      () => void (notifyManager.disableAutoDisconnect = false),
+      () => void (notifyManager.keepConnection = false),
     );
   }, [refresh, mode, participantsRef, onClose]);
   const panel = ((): Panel => {
@@ -274,9 +280,15 @@ const Invitations: FC<{
   const [pin, setPin] = useState<{
     enabled: boolean;
     value: string | undefined;
-  }>(() => ({ enabled: false, value: undefined }));
+  }>(() => ({
+    enabled: false,
+    value: undefined,
+  }));
   const onTogglePin = useCallback((evt: InputSwitchChangeEvent) => {
-    setPin({ enabled: evt.value, value: undefined });
+    setPin({
+      enabled: evt.value,
+      value: undefined,
+    });
   }, []);
   const onPinChange = useCallback((evt: InputOtpChangeEvent) => {
     withProduce(
@@ -346,7 +358,7 @@ const Invitations: FC<{
 };
 
 enum ConnectStatus {
-  WaitingForAccptance = 1,
+  WaitingForAcceptance = 1,
   Connecting,
   TestingAvailability,
   Connected,
@@ -359,7 +371,7 @@ const P2PConnectControl: FC<{
   receiverId?: string;
   mode: 'sender' | 'receiver';
   onCancel(): void;
-  onSuccess(conn: RTCImpl): void;
+  onSuccess(conn: RTCImpl, delay: number): void;
 }> = ({ mode, receiverId, onSuccess, onCancel }) => {
   const [state, setState] = useState<{
     error: Error | undefined;
@@ -370,7 +382,7 @@ const P2PConnectControl: FC<{
     error: undefined,
     status:
       mode == 'sender'
-        ? ConnectStatus.WaitingForAccptance
+        ? ConnectStatus.WaitingForAcceptance
         : ConnectStatus.Accepted,
     protocol: 'webrtc',
     delay: 0,
@@ -380,7 +392,7 @@ const P2PConnectControl: FC<{
 
   const statusTexts = useMemo(
     () => ({
-      [ConnectStatus.WaitingForAccptance]: '等待对方接受',
+      [ConnectStatus.WaitingForAcceptance]: '等待对方接受',
       [ConnectStatus.Connecting]: `正在连接中，采用 ${state.protocol}`,
       [ConnectStatus.TestingAvailability]: '测试可用性中',
       [ConnectStatus.Connected]: `已连接，延迟 ${state.delay}ms`,
@@ -417,13 +429,14 @@ const P2PConnectControl: FC<{
           const delay = await conn.ping();
           delays.push(delay);
         }
+        const delay = Math.ceil(
+          delays.reduce((a, b) => a + b, 0) / delays.length,
+        );
         withProduce(setState, (draft) => {
-          draft.delay = Math.ceil(
-            delays.reduce((a, b) => a + b, 0) / delays.length,
-          );
+          draft.delay = delay;
           draft.status = ConnectStatus.Connected;
         });
-        onSuccess(conn);
+        onSuccess(conn, delay);
         // 放在该组件销毁时关闭连接，conn 已经转移处理者
         conn = undefined;
       } catch (e) {
@@ -440,7 +453,7 @@ const P2PConnectControl: FC<{
     }
     return notifyManager.batch(
       notifyManager.on('P2P_EXCHANGE', async (value) => {
-        console.log('exchange', value);
+        // console.log('exchange', value);
         clientId = notifyManager.clientId;
         requestId = value.request_id;
         if (!requestId) throw new Error('Unexpected error, missing requestId');
@@ -453,14 +466,14 @@ const P2PConnectControl: FC<{
             if (value.participants[0] == clientId) {
               const webrtc = new P2PRtc(requestId, clientId);
               await webrtc.createSender();
-              console.log(webrtc);
+              // console.log(webrtc);
               conn = webrtc;
             }
             break;
           }
           case 'websocket': {
             const websocket = new P2PSocket(requestId, clientId!);
-            console.log(websocket);
+            // console.log(websocket);
             conn = websocket;
           }
         }
@@ -575,8 +588,13 @@ interface FileMetadata {
   type: string;
   date: number;
 }
+
 interface DeliveryFile extends FileMetadata {
   progress: number;
+  transmitted: number;
+  eta: number;
+  rate: number;
+  aborted: boolean;
 }
 
 const P2PFileDelivery: FC<{
@@ -587,6 +605,7 @@ const P2PFileDelivery: FC<{
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [deliveryItems, setDeliveryItems] = useState<DeliveryFile[]>([]);
+  const [rtt, setRTT] = useState(() => conn.rtt);
   const sendFile = useCallback(
     async (file: File) => {
       const fileSeq = seqRef.current;
@@ -603,58 +622,110 @@ const P2PFileDelivery: FC<{
         draft.push({
           ...fileMetadata,
           progress: 0,
+          transmitted: 0,
+          eta: Infinity,
+          rate: 0,
+          aborted: false,
         });
       });
-      conn.send(
-        new TextEncoder().encode(JSON.stringify(fileMetadata)),
-        PacketFlag.META,
-      );
-      if (!(await recvACKPacket(conn, fileSeq, 0, 5000))) {
-        console.error(new AckTimeoutError(fileSeq, 5000));
-        return void 0;
-      }
-      const total = file.size;
-      let transmitted = 0;
-      let packetSeq = 0;
-      const reader = createLimitedStream(file.stream(), 128 * 1024).getReader();
-      const transmissionRate = createTransmissionRateCalculator(
-        fileMetadata.date,
-      );
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        packetSeq += 1;
-        const buf = new ArrayBuffer(value.length + ACK_PACKET_LENGTH);
-        createACKPacket(fileSeq, packetSeq, buf);
-        new Uint8Array(buf, ACK_PACKET_LENGTH, value.length).set(value);
-        const bytes = new Uint8Array(buf);
-        let ackReceived = false;
-        for (let i = 0; i <= 3; i++) {
-          conn.send(bytes);
-          if (i > 0)
-            console.log(`Attempt ${i}th retransmit packet #${packetSeq}`);
-          if (!(await recvACKPacket(conn, fileSeq, packetSeq, 5_000))) {
-            continue;
+      try {
+        conn.send(
+          new TextEncoder().encode(JSON.stringify(fileMetadata)),
+          PacketFlag.META,
+        );
+        if (!(await recvACKPacket(conn, fileSeq, 0, 5_000))) {
+          console.error(new AckTimeoutError(fileSeq, 5_000));
+          return void 0;
+        }
+        const total = file.size;
+        let transmitted = 0;
+        let packetSeq = 0;
+        let previousUpdateTime = Date.now();
+        const reader = createLimitedStream(
+          file.stream(),
+          16 * 1024,
+        ).getReader();
+        const getTransmissionRate = createTransmissionRateCalculator(
+          fileMetadata.date,
+        );
+        const getRemainingTime = createRemainingTimeCalculator(
+          fileMetadata.size,
+        );
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            withProduce(setDeliveryItems, (draft) => {
+              const target = draft.find((it) => it.seq == fileSeq);
+              if (!target) return void 0;
+              target.eta = 0;
+              target.transmitted = target.size;
+              target.progress = 100;
+              target.rate = getTransmissionRate(target.size);
+            });
+            break;
           }
-          ackReceived = true;
-          break;
+          if (!value) continue;
+          packetSeq += 1;
+          const buf = new ArrayBuffer(value.length + ACK_PACKET_LENGTH);
+          createACKPacket(fileSeq, packetSeq, buf);
+          new Uint8Array(buf, ACK_PACKET_LENGTH, value.length).set(value);
+          const bytes = new Uint8Array(buf);
+          let ackReceived = false;
+          for (let i = 0; i <= 3; i++) {
+            await conn.waitForDrain();
+            if (i > 0) {
+              console.log(
+                `发送 packet #${fileSeq}_${packetSeq} 失败，Attempt ${i}th retransmit`,
+              );
+            }
+            conn.send(bytes);
+            if (!(await recvACKPacket(conn, fileSeq, packetSeq, 5_000))) {
+              continue;
+            }
+            console.log(`发送 PACKET #${fileSeq}_${packetSeq} success!`);
+            ackReceived = true;
+            break;
+          }
+          if (!ackReceived) {
+            console.warn(
+              `Failed to send packet #${fileSeq}_${packetSeq}; exited!`,
+            );
+            withProduce(setDeliveryItems, (draft) => {
+              const target = draft.find((it) => it.seq == fileSeq);
+              if (!target) return void 0;
+              target.aborted = true;
+            });
+            // console.error(new AckTimeoutError(packetSeq, 5_000));
+            break;
+          }
+          const packetLength = value.length;
+          transmitted += packetLength;
+          const currentTime = Date.now();
+          const eta = getRemainingTime(transmitted, currentTime);
+          const rate = getTransmissionRate(transmitted, currentTime);
+          // 限制 UI 刷新频率
+          if (currentTime - previousUpdateTime > 1000) {
+            previousUpdateTime = currentTime;
+            withProduce(setDeliveryItems, (draft) => {
+              const target = draft.find((it) => it.seq == fileSeq);
+              if (!target) return void 0;
+              target.progress = Math.ceil((transmitted / total) * 100);
+              target.transmitted = transmitted;
+              target.eta = eta;
+              target.rate = rate;
+            });
+          }
+          // console.log(
+          //   `transmitted: ${formatBytes(transmitted)}/${formatBytes(total)}(${((transmitted / total) * 100).toFixed(2)}); rate: ${formatBytes(rate)}/s; eta: ${formatSeconds(eta)}; packet #${packetSeq}(${formatBytes(packetLength)})`,
+          // );
         }
-        if (!ackReceived) {
-          console.log(`Failed to send packet #${packetSeq}`);
-          console.error(new AckTimeoutError(packetSeq, 5_000));
-          break;
-        }
-        const packetLength = value.length;
-        transmitted += packetLength;
+      } catch (e) {
+        console.error(e);
         withProduce(setDeliveryItems, (draft) => {
           const target = draft.find((it) => it.seq == fileSeq);
           if (!target) return void 0;
-          target.progress = Math.ceil((transmitted / total) * 100);
+          target.aborted = true;
         });
-        console.log(
-          `transmitted: ${formatBytes(transmitted)}/${formatBytes(total)}(${((transmitted / total) * 100).toFixed(2)}); rate: ${formatBytes(transmissionRate(transmitted))}/s; packet #${packetSeq}(${formatBytes(packetLength)})`,
-        );
       }
     },
     [conn],
@@ -663,8 +734,9 @@ const P2PFileDelivery: FC<{
     (evt: ChangeEvent<HTMLInputElement>) => {
       const files = evt.target.files;
       if (!files || files.length == 0) return void 0;
-      const file = files[0];
-      sendFile(file);
+      for (const file of files) {
+        sendFile(file);
+      }
     },
     [sendFile],
   );
@@ -680,8 +752,7 @@ const P2PFileDelivery: FC<{
     ) => {
       console.log(`准备下载文件，name: ${filename}`);
       try {
-        const blob = await new Response(stream).blob();
-        const file = new File([blob], filename, {
+        const file = new File([await streamToBlob(stream, type)], filename, {
           type,
           lastModified,
         });
@@ -713,57 +784,137 @@ const P2PFileDelivery: FC<{
             draft.push({
               ...metadata,
               progress: 0,
+              transmitted: 0,
+              eta: Infinity,
+              rate: 0,
+              aborted: false,
             });
           });
           const fileSeq = metadata.seq;
           const total = metadata.size;
           let received = 0;
           let packetSeq = 0;
-          const transmissionRate = createTransmissionRateCalculator(
+          let previousUpdateTime = Date.now();
+          const getTransmissionRate = createTransmissionRateCalculator(
             metadata.date,
           );
+          const getRemainingTime = createRemainingTimeCalculator(metadata.size);
+          const markFileAsAborted = () => {
+            withProduce(setDeliveryItems, (draft) => {
+              const target = draft.find((it) => it.seq == fileSeq);
+              if (!target) return void 0;
+              target.aborted = true;
+            });
+          };
+          const updateProgress = () => {
+            const currentTime = Date.now();
+            const rate = getTransmissionRate(received, currentTime);
+            const eta = getRemainingTime(received, currentTime);
+
+            // 限制 UI 刷新频率
+            if (currentTime - previousUpdateTime > 1000) {
+              previousUpdateTime = currentTime;
+              withProduce(setDeliveryItems, (draft) => {
+                const target = draft.find((it) => it.seq == fileSeq);
+                if (!target) return;
+                target.progress = Math.ceil((received / total) * 100);
+                target.transmitted = received;
+                target.eta = eta;
+                target.rate = rate;
+              });
+            }
+          };
+          const finalizeTransfer = () => {
+            const currentTime = Date.now();
+            const rate = getTransmissionRate(received, currentTime);
+            const eta = getRemainingTime(received, currentTime);
+
+            withProduce(setDeliveryItems, (draft) => {
+              const target = draft.find((it) => it.seq == fileSeq);
+              if (!target) return;
+              target.eta = eta;
+              target.rate = rate;
+              target.transmitted = target.size;
+              target.progress = 100;
+            });
+
+            receiver!.return();
+          };
           // 表示已收到 Metadata Packet 数据, packetSeq 为 0
-          console.log('fileSeq', fileSeq, 'packetSeq', packetSeq);
+          // console.log('fileSeq', fileSeq, 'packetSeq', packetSeq);
           conn.send(createACKPacket(fileSeq, packetSeq), PacketFlag.ACK);
-          let receiver: AsyncGenerator<ArrayBuffer> | undefined = undefined;
+          let receiver: AsyncGenerator<ArrayBuffer, void> | undefined =
+            undefined;
           const stream = new ReadableStream({
             async start() {
               receiver = await conn.recv();
             },
             async pull(controller) {
+              // console.log('start pull', fileSeq, packetSeq + 1);
               if (!receiver) throw new Error('Unexpected loss of receiver');
               try {
-                const { done, value } = await receiver.next();
-                if (done) {
-                  controller.close();
-                  return void 0;
+                let packet: ArrayBuffer | undefined,
+                  _packetSeq: number | undefined;
+                // 如果多文件同时传输，receiver 会接收到其他文件的 packet，因此需要循环直到找到符合的 packet
+                while (packet === undefined || _packetSeq === undefined) {
+                  const { done, value } = await receiver.next();
+                  if (done) {
+                    markFileAsAborted();
+                    controller.error(
+                      new StreamAbnormalTerminationError(total, received),
+                    );
+                    return void 0;
+                  }
+                  if (!value) continue;
+                  const [_fileSeq, _packetSeq2] = parseACKPacket(value);
+                  // console.log(
+                  //   'pull success',
+                  //   `excepted: ${fileSeq}_${packetSeq + 1}`,
+                  //   'done',
+                  //   done,
+                  //   value?.byteLength || 'empty',
+                  //   `[${_fileSeq}_${_packetSeq}]`,
+                  // );
+
+                  // Ignore packet from non-target file
+                  if (_fileSeq !== fileSeq) continue;
+                  _packetSeq = _packetSeq2;
+                  packet = value;
+                  break;
                 }
-                if (!value) return void 0;
-                packetSeq += 1;
-                const [_fileSeq, _packetSeq] = parseACKPacket(value);
-                // 不是目标文件的 packet, 忽略
-                if (_fileSeq !== fileSeq) return void 0;
-                if (_packetSeq !== packetSeq) {
+
+                // 顺序错乱，结束并标记文件传输异常中止
+                if (_packetSeq !== packetSeq + 1) {
+                  markFileAsAborted();
                   controller.error(
-                    new PacketSequenceError(packetSeq, _packetSeq),
+                    new PacketSequenceError(packetSeq + 1, _packetSeq),
                   );
+                  receiver.return();
                   return void 0;
                 }
-                controller.enqueue(new Uint8Array(value.slice(8)));
-                const packetLength = value.byteLength - 8;
+
+                // 推入 packet 至文件流
+                // console.log('接收 PACKET', fileSeq, _packetSeq);
+                packetSeq = _packetSeq;
+                controller.enqueue(new Uint8Array(packet.slice(8)));
+
+                // 发送 ACK
+                const packetLength = packet.byteLength - 8;
                 received += packetLength;
-                conn.send(createACKPacket(fileSeq, packetSeq), PacketFlag.ACK);
-                console.log('发送 ACK', fileSeq, packetSeq);
-                withProduce(setDeliveryItems, (draft) => {
-                  const target = draft.find((it) => it.seq == fileSeq);
-                  if (!target) return void 0;
-                  target.progress = Math.ceil((received / total) * 100);
-                });
-                console.log(
-                  `received: ${formatBytes(received)}/${formatBytes(total)}(${((received / total) * 100).toFixed(2)}); rate: ${formatBytes(transmissionRate(received))}/s; packet #${packetSeq}(${formatBytes(packetLength)})`,
-                );
-                if (received >= total) controller.close();
+                // await conn.waitForDrain();
+                conn.send(createACKPacket(fileSeq, _packetSeq), PacketFlag.ACK);
+                // console.log('发送 ACK', fileSeq, _packetSeq);
+
+                // 刷新 UI
+                if (received >= total) {
+                  finalizeTransfer();
+                  controller.close();
+                } else {
+                  updateProgress();
+                }
               } catch (e) {
+                markFileAsAborted();
+                receiver.return();
                 controller.error(e);
               }
             },
@@ -776,11 +927,16 @@ const P2PFileDelivery: FC<{
       conn.on('CONNECTION_CLOSE', ({ code, reason }) => {
         onClose(code, reason);
       }),
+      conn.on('RTT_CHANGE', (rtt) => setRTT(rtt)),
       () => conn.close(),
     );
   }, [conn, downloadFile, onClose]);
   return (
     <section className="flex flex-col w-full items-center gap-2">
+      <p className="w-full flex text-left gap-1">
+        <span>Protocol: {conn.protocol}</span>
+        <span>RTT: {rtt}ms</span>
+      </p>
       <div
         ref={containerRef}
         className="flex flex-col items-center justify-center border border-dashed border-gray-300 w-full h-[180px] rounded"
@@ -799,6 +955,7 @@ const P2PFileDelivery: FC<{
         <input
           ref={inputRef}
           type="file"
+          multiple
           className="hidden"
           onChange={onInputChange}
         />
@@ -812,24 +969,33 @@ const P2PFileDelivery: FC<{
             deliveryItems.map((it) => (
               <li
                 key={it.seq}
-                className="flex items-center w-full rounded-xl border border-gray-200 p-2 my-2 relative gap-2"
+                className="flex items-center w-full border-b border-gray-100 p-2 my-2 relative gap-2"
               >
-                <div className="w-[42px] h-[42px] rounded-xl bg-[#fef5eb] text-[#f7921a] flex items-center justify-center">
-                  {it.name.split('.').pop()?.toUpperCase() || 'FILE'}
-                </div>
                 <div className="flex flex-col flex-1 overflow-hidden">
-                  <div className="w-full truncate text-lg" title={it.name}>
+                  <div
+                    className="w-full truncate leading-relaxed"
+                    title={it.name}
+                  >
                     {it.name}
                   </div>
-                  <div className="text-sm flex gap-2">
-                    <span>{formatBytes(it.size)}</span>
-                    <span className="text-gray-400 ">{it.progress}%</span>
+                  <div className="flex gap-2 font-mono">
+                    <span>
+                      {it.progress}% ({formatBytes(it.transmitted)} /{' '}
+                      {formatBytes(it.size)})
+                    </span>
+                    <span className="ml-1">
+                      [{formatBytes(it.rate)}/s] ETA: {formatSeconds(it.eta)}
+                    </span>
                   </div>
                 </div>
-                <div className="flex w-[10%] justify-end mx-2">
-                  <Button className="p-0" disabled>
-                    <XIcon className="w-4 h-4" />
-                  </Button>
+                <div className="flex justify-end mx-2">
+                  {it.progress === 100 ? (
+                    <CheckCircleIcon className="w-4 h-4" />
+                  ) : it.aborted ? (
+                    <AlertCircleIcon className="w-4 h-4 stroke-error-main" />
+                  ) : (
+                    <LoaderCircleIcon className="w-4 h-4 animate-spin" />
+                  )}
                 </div>
               </li>
             ))
@@ -869,21 +1035,21 @@ const parseACKPacket = (
 };
 const recvACKPacket = (
   conn: RTCImpl,
-  exceptedFileSeq: number,
-  exceptedPacketSeq: number,
-  timeout = 5000,
+  fileSeq: number,
+  packetSeq: number,
+  timeout = 5_000,
 ) => {
   return new Promise<boolean>((resolve) => {
     const timer = window.setTimeout(() => {
-      off();
+      release();
       resolve(false);
     }, timeout);
-    const off = conn.once(PacketFlag.ACK, (buf) => {
-      const [fileSeq, packetSeq] = parseACKPacket(buf);
-      if (fileSeq !== exceptedFileSeq || packetSeq !== exceptedPacketSeq)
-        return void 0;
+    const release = conn.on(PacketFlag.ACK, (buf) => {
+      const [_fileSeq, _packetSeq] = parseACKPacket(buf);
+      if (fileSeq !== _fileSeq) return void 0;
       window.clearTimeout(timer);
-      resolve(true);
+      resolve(packetSeq === _packetSeq);
+      release();
     });
   });
 };
@@ -899,6 +1065,7 @@ class PacketSequenceError extends Error {
     this.name = 'PacketSequenceError';
   }
 }
+
 class AckTimeoutError extends Error {
   constructor(
     readonly sequenceNumber: number,
@@ -908,6 +1075,18 @@ class AckTimeoutError extends Error {
       `ACK not received within ${timeout} ms for sequence number ${sequenceNumber}`,
     );
     this.name = 'AckTimeoutError';
+  }
+}
+
+class StreamAbnormalTerminationError extends Error {
+  constructor(
+    readonly expectedBytes: number,
+    readonly receivedBytes: number,
+  ) {
+    super(
+      `Stream terminated abnormally: expected ${expectedBytes} bytes, but received ${receivedBytes} bytes.`,
+    );
+    this.name = 'StreamAbnormalTerminationError';
   }
 }
 
@@ -952,4 +1131,35 @@ const createLimitedStream = (
       reader?.releaseLock();
     },
   });
+};
+
+const streamToBlob = async (
+  stream: ReadableStream<Uint8Array>,
+  type: string,
+): Promise<Blob> => {
+  // const reader = stream.getReader();
+  // const pumpedStream = new ReadableStream({
+  //   start(controller) {
+  //     return pump();
+  //     /**
+  //      * Recursively pumps data chunks out of the `ReadableStream`.
+  //      * @type { () => Promise<void> }
+  //      */
+  //     async function pump(): Promise<void> {
+  //       return reader.read().then(({ done, value }) => {
+  //         if (done) {
+  //           controller.close();
+  //           return;
+  //         }
+  //         controller.enqueue(value);
+  //         return pump();
+  //       });
+  //     }
+  //   },
+  // });
+
+  const res = new Response(stream);
+  const blob = await res.blob();
+  // reader.releaseLock();
+  return new Blob([blob], { type });
 };

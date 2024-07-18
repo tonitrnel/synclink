@@ -1,5 +1,6 @@
 import { sendP2PSignaling } from '~/endpoints';
 import { EventBus } from '~/utils/event-bus.ts';
+import { wait } from './wait';
 
 const PING = new Uint8Array([0x70, 0x69, 0x6e, 0x67]);
 const PONG = new Uint8Array([0x70, 0x6f, 0x6e, 0x67]);
@@ -34,12 +35,21 @@ export type RTCEvents = {
     source: Event;
     message: string;
   };
+  RTT_CHANGE: number;
 } & Record<PacketFlag, ArrayBuffer>;
 
 export interface RTCImpl extends EventBus<RTCEvents> {
+  protocol: 'webrtc' | 'websocket';
+  rtt: number;
+
   send(bytes: Uint8Array, flag?: PacketFlag): void;
+
+  waitForDrain(): Promise<void>;
+
   ping(): Promise<number>;
+
   recv(): AsyncGenerator<ArrayBuffer>;
+
   close(): void;
 }
 
@@ -47,6 +57,8 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
   readonly conn = new RTCPeerConnection();
   private channel: RTCDataChannel | undefined;
   private established = false;
+  public readonly protocol = 'webrtc';
+  public rtt = 0;
 
   public constructor(
     readonly requestId: string,
@@ -78,6 +90,7 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
         PacketFlag.SHAKEHAND,
       );
       this.emit('CONNECTION_READY');
+      this.runIntervalPing();
     });
     this.on(PacketFlag.PEER_CLOSE, () => {
       this.emit('CONNECTION_CLOSE', {
@@ -89,7 +102,10 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
   }
 
   public async createSender() {
-    const channel = this.conn.createDataChannel('default', {ordered: false});
+    const channel = this.conn.createDataChannel('default', {
+      ordered: false,
+      maxRetransmits: 0,
+    });
     await this.initSenderChannel(channel);
     const offer = await this.conn.createOffer();
     await this.sendSignaling([0, offer]);
@@ -105,6 +121,7 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
     await this.conn.setLocalDescription(answer);
     this.init();
   }
+
   private async init() {
     // this.conn.addEventListener('')
     // 处理 WebRTC 各种事件
@@ -204,6 +221,18 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
     }
   };
 
+  public async waitForDrain(): Promise<void> {
+    if (
+      !this.channel ||
+      this.channel.readyState !== 'open' ||
+      !this.established
+    )
+      return void 0;
+    while (this.channel && this.channel.bufferedAmount > 0) {
+      await wait(16);
+    }
+  }
+
   public send(bytes: Uint8Array, flag = PacketFlag.DATA) {
     if (!this.channel) {
       throw new Error('No established connection');
@@ -214,6 +243,25 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
     view.set(bytes, 1);
     this.channel.send(buffer);
   }
+
+  private runIntervalPing = async () => {
+    while (true) {
+      try {
+        if (
+          !this.channel ||
+          this.channel.readyState !== 'open' ||
+          !this.established
+        ) {
+          break;
+        }
+        await this.ping();
+        await wait(5000);
+      } catch {
+        this.close(false);
+        return void 0;
+      }
+    }
+  };
 
   public async ping(): Promise<number> {
     const start = Date.now();
@@ -240,7 +288,9 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
       };
       this.once(PacketFlag.PONG, handle);
     });
-    return Date.now() - start;
+    this.rtt = Math.ceil((Date.now() - start + this.rtt) / 2);
+    this.emit('RTT_CHANGE', this.rtt);
+    return this.rtt;
   }
 
   public async *recv(): AsyncGenerator<ArrayBuffer> {
@@ -253,36 +303,44 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
         receiver.addEventListener('open', () => resolve()),
       );
     }
-    const temps: ArrayBuffer[] = [];
-    let resolve: ((bytes: ArrayBuffer) => void) | undefined = undefined;
-    const clean = this.on(PacketFlag.DATA, (buf) => {
-      if (resolve) {
-        resolve(buf);
-        resolve = undefined;
+    const bufferQueue: ArrayBuffer[] = [];
+    let resolveNext: ((bytes: ArrayBuffer) => void) | undefined = undefined;
+    const release = this.on(PacketFlag.DATA, (buf) => {
+      if (resolveNext) {
+        resolveNext(buf);
+        resolveNext = undefined;
       } else {
-        if (temps.length > 16) throw new Error('excessive accumulation');
-        temps.push(buf);
+        if (bufferQueue.length >= 16) {
+          throw new Error('Excessive accumulation');
+        }
+        bufferQueue.push(buf);
       }
     });
-    const next = () =>
-      new Promise<ArrayBuffer>((_resolve) => {
-        if (temps.length > 0) {
-          _resolve(temps.shift()!);
+    const nextBuffer = () =>
+      new Promise<ArrayBuffer>((resolve) => {
+        if (bufferQueue.length > 0) {
+          resolve(bufferQueue.shift()!);
         } else {
-          resolve = _resolve;
+          resolveNext = resolve;
         }
       });
-    while (true) {
-      if (!this.channel || this.channel.readyState !== 'open') break;
-      yield await next();
+    try {
+      while (true) {
+        if (!this.channel || this.channel.readyState !== 'open') break;
+        yield await nextBuffer();
+      }
+    } catch {
+      console.log('receiver terminated');
+      release();
     }
-    clean();
   }
+
   public close(notifyPeer = true) {
     this.established = false;
     if (notifyPeer && this.channel && this.channel.readyState == 'open') {
       this.channel.send(new Uint8Array([PacketFlag.PEER_CLOSE]));
     }
+    this.channel?.close();
     this.conn.close();
     this.channel = undefined;
   }
@@ -291,6 +349,8 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
 export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
   readonly ws: WebSocket;
   private established = false;
+  public readonly protocol = 'websocket';
+  public rtt = 0;
 
   public constructor(
     readonly requestId: string,
@@ -354,6 +414,7 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
         PacketFlag.SHAKEHAND,
       );
       this.emit('CONNECTION_READY');
+      this.runIntervalPing();
     });
     this.on(PacketFlag.PEER_CLOSE, () => {
       this.emit('CONNECTION_CLOSE', {
@@ -391,6 +452,13 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
     // console.log('P2PSocket', PacketFlag[flag], payload);
   };
 
+  public async waitForDrain(): Promise<void> {
+    if (this.ws.readyState !== this.ws.OPEN || !this.established) return void 0;
+    while (this.ws.bufferedAmount > 0) {
+      await wait(16);
+    }
+  }
+
   public send(bytes: Uint8Array, flag = PacketFlag.DATA) {
     if (this.ws.readyState !== this.ws.OPEN) {
       throw new Error('No established connection');
@@ -400,8 +468,10 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
     view[0] = flag;
     view.set(bytes, 1);
     this.ws.send(buffer);
+    // this.ws.bufferedAmount
   }
-  public async *recv(): AsyncGenerator<ArrayBuffer> {
+
+  public async *recv(): AsyncGenerator<ArrayBuffer, void> {
     if (
       this.ws.readyState !== this.ws.OPEN &&
       this.ws.readyState !== this.ws.CONNECTING
@@ -413,31 +483,51 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
         this.once(PacketFlag.PROXY_CONNECTION_ESTABLISHED, () => resolve()),
       );
     }
-    const temps: ArrayBuffer[] = [];
-    let resolve: ((bytes: ArrayBuffer) => void) | undefined = undefined;
-    const clean = this.on(PacketFlag.DATA, (buf) => {
-      if (resolve) {
-        resolve(buf);
-        resolve = undefined;
+    const bufferQueue: ArrayBuffer[] = [];
+    let resolveNext: ((bytes: ArrayBuffer) => void) | undefined = undefined;
+    const release = this.on(PacketFlag.DATA, (buf) => {
+      if (resolveNext) {
+        resolveNext(buf);
+        resolveNext = undefined;
       } else {
-        if (temps.length > 16) throw new Error('excessive accumulation');
-        temps.push(buf);
+        if (bufferQueue.length >= 16) {
+          throw new Error(`Excessive accumulation`);
+        }
+        bufferQueue.push(buf);
       }
     });
-    const next = () =>
-      new Promise<ArrayBuffer>((_resolve) => {
-        if (temps.length > 0) {
-          _resolve(temps.shift()!);
+    const nextBuffer = () =>
+      new Promise<ArrayBuffer>((resolve) => {
+        if (bufferQueue.length > 0) {
+          resolve(bufferQueue.shift()!);
         } else {
-          resolve = _resolve;
+          resolveNext = resolve;
         }
       });
-    while (true) {
-      if (this.ws.readyState !== this.ws.OPEN || !this.established) break;
-      yield await next();
+    try {
+      while (true) {
+        if (this.ws.readyState !== this.ws.OPEN || !this.established) break;
+        yield await nextBuffer();
+      }
+    } finally {
+      release();
     }
-    clean();
   }
+
+  private runIntervalPing = async () => {
+    while (true) {
+      try {
+        if (this.ws.readyState !== this.ws.OPEN || !this.established) {
+          break;
+        }
+        await this.ping();
+        await wait(5000);
+      } catch {
+        this.close(false);
+        return void 0;
+      }
+    }
+  };
 
   public async ping(): Promise<number> {
     const start = Date.now();
@@ -465,8 +555,11 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
       this.once(PacketFlag.PONG, handle);
     });
     if (!valid) throw new Error('invalid');
-    return Date.now() - start;
+    this.rtt = Math.ceil((Date.now() - start + this.rtt) / 2);
+    this.emit('RTT_CHANGE', this.rtt);
+    return this.rtt;
   }
+
   public close(notifyPeer = true) {
     if (notifyPeer && this.ws.readyState == this.ws.OPEN) {
       this.ws.send(new Uint8Array([PacketFlag.PEER_CLOSE]));
@@ -502,7 +595,7 @@ const int2u8array = (int: number): Uint8Array => {
   view.setUint32(0, int, true);
   return new Uint8Array(buf);
 };
-const u8array2int = (buf: Uint8Array): number => {
-  const view = new DataView(buf.buffer);
-  return view.getInt32(0, true);
-};
+// const u8array2int = (buf: Uint8Array): number => {
+//   const view = new DataView(buf.buffer);
+//   return view.getInt32(0, true);
+// };

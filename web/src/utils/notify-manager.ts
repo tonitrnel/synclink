@@ -35,7 +35,7 @@ class NotifyManager extends EventBus<
   public clientId: string | undefined;
   private connecting = false;
   private visibilityTimer: number | undefined;
-  public disableAutoDisconnect = false;
+  public keepConnection = false;
 
   constructor() {
     super();
@@ -89,7 +89,7 @@ class NotifyManager extends EventBus<
     if (message.type === 'HEART') {
       return void 0;
     }
-    console.log('sse message:', message);
+    // console.log('sse message:', message);
     this.emit(message.type, message.payload);
   };
   private handleVisibility = async () => {
@@ -99,8 +99,9 @@ class NotifyManager extends EventBus<
       this.visibilityTimer = undefined;
     }
     if (visibility === 'visible') {
-      if (this.disableAutoDisconnect) return void 0;
+      if (this.keepConnection) return void 0;
       this.visibilityTimer = window.setTimeout(() => {
+        if (this.keepConnection) return void 0;
         console.debug('inactive for more than 60s');
         this.visibilityTimer = undefined;
         this.disconnect();

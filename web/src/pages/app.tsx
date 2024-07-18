@@ -1,11 +1,11 @@
 import { FC, PropsWithChildren, useEffect, useMemo, useState } from 'react';
-import { Layout } from '~/components/layout';
 import { dynamicActivate } from '~/locales';
 import { I18nProvider } from '@lingui/react';
 import { i18n } from '@lingui/core';
-import { SnackbarProvider } from '~/components/snackbar/snackbar-provider.tsx';
+import { SnackbarProvider } from '~/components/snackbar';
 import { createHttpClient, HttpClientProvider } from '@painted/http';
 import { type APIOptions, PrimeReactProvider } from 'primereact/api';
+import { Routes } from '~/routes';
 import dayjs from 'dayjs';
 import { dayjsLocales } from '~/locales/dayjs-shim.ts';
 import './app.css';
@@ -80,7 +80,7 @@ const CredentialLayer: FC<PropsWithChildren> = ({ children }) => {
 const PRIME_OPTIONS = {
   appendTo: () => document.querySelector('app#root')!,
   ripple: false,
-} satisfies APIOptions
+} satisfies APIOptions;
 
 function App() {
   return (
@@ -88,7 +88,7 @@ function App() {
       <CredentialLayer>
         <PrimeReactProvider value={PRIME_OPTIONS}>
           <SnackbarProvider>
-            <Layout />
+            <Routes />
           </SnackbarProvider>
         </PrimeReactProvider>
       </CredentialLayer>

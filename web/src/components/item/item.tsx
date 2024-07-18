@@ -312,7 +312,7 @@ const TextItem: FC = memo(() => {
 });
 const FigureItem: FC = memo(() => {
   const entity = useEntityConsumer();
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isMobile = useMediaQuery(useMediaQuery.MOBILE_QUERY);
   const [{ loaded, metadata }, setState] = useState(() => ({
     loaded: false,
     metadata: entity.metadata,

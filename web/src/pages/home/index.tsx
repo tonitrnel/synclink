@@ -1,14 +1,13 @@
-import { FC } from 'react';
 import { ReactComponent as LogoIcon } from '~/assets/logo.svg';
 import { Input } from '~/components/input';
 import { List } from '~/components/list';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
-import { Sidebar } from '~/components/sidebar';
 import { SCROLLBAR_WIDTH } from '~/utils/get-scrollbar-width.ts';
-import { P2PFileReceiver } from '../file-delivery-dialog';
+import { P2PFileReceiver } from '~/components/file-delivery-dialog';
+import { Sidebar } from './sidebar';
 
-export const Layout: FC = () => {
-  const isDesktop = useMediaQuery('(min-width: 1280px)');
+export default function HomePage() {
+  const isDesktop = useMediaQuery(useMediaQuery.DESKTOP_QUERY);
   return (
     <>
       {isDesktop && <Sidebar />}
@@ -34,7 +33,7 @@ export const Layout: FC = () => {
           <Input />
         </footer>
       </section>
-      <P2PFileReceiver/>
+      <P2PFileReceiver />
     </>
   );
-};
+}

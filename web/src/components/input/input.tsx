@@ -5,7 +5,6 @@ import {
   KeyboardEventHandler,
   memo,
   MouseEventHandler,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -20,7 +19,7 @@ import {
   FileUpIcon,
   FolderUpIcon,
 } from 'icons';
-import { DropZone } from '../dropzone';
+import { DropZone, FilesOrEntries } from '../dropzone';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { openFilePicker } from '~/utils/open-file-picker.ts';
 import {
@@ -40,6 +39,7 @@ import { InputTextarea } from 'primereact/inputtextarea';
 import type { TooltipOptions } from 'primereact/tooltip/tooltipoptions';
 import { Button } from 'primereact/button';
 import { P2pFileDeliveryDialog } from '~/components/file-delivery-dialog';
+import { FileUploadDialog } from '../file-upload-dialog';
 import { useDialog } from '~/utils/hooks/use-dialog.ts';
 import './input.less';
 
@@ -51,142 +51,135 @@ export const Input: FC = memo(() => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [sending, setSending] = useState(false);
   const snackbar = useSnackbar();
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  const handleSend = useMemo(
+  const isMobile = useMediaQuery(useMediaQuery.MOBILE_QUERY);
+  const fileUploadDialog = useDialog(FileUploadDialog);
+  const handler = useMemo(
     () =>
-      executeAsyncTask(async () => {
-        const value = textRef.current.trim();
-        if (value.length === 0) return void 0;
-        setSending(true);
-        try {
-          await upload(new File([value], '', { type: 'text/plain' }));
-          setText('');
-        } catch (e) {
-          logger.error('Seed Failed', e);
-          snackbar.enqueueSnackbar({
-            message: String(e),
-            variant: 'error',
-          });
-        } finally {
-          setSending(false);
-        }
-      }),
-    [snackbar],
-  );
-  const handleUpload = useMemo(
-    () =>
-      executeAsyncTask(async () => {
-        const files = await openFilePicker(['*']);
-        if (files.length === 0) return void 0;
-        const file = files[0];
-        try {
-          await upload(file);
-        } catch (e) {
-          logger.error('Upload Failed', e);
-        }
-      }),
-    [],
-  );
-  const handlePaste = useMemo(
-    () =>
-      executeAsyncTask(async () => {
-        try {
-          featureCheck('clipboard');
-        } catch (e) {
-          snackbar.enqueueSnackbar({
-            message: String(e),
-            variant: 'error',
-          });
-          return void 0;
-        }
-        try {
-          const data = await navigator.clipboard.read();
-          if (data.length === 0) {
+      new (class InputHandler {
+        send = executeAsyncTask(async () => {
+          const value = textRef.current.trim();
+          if (value.length === 0) return void 0;
+          setSending(true);
+          try {
+            await upload(new File([value], '', { type: 'text/plain' }));
+            setText('');
+          } catch (e) {
+            logger.error('Seed Failed', e);
             snackbar.enqueueSnackbar({
-              message: t`paste file is empty`,
-              variant: 'warning',
+              message: String(e),
+              variant: 'error',
+            });
+          } finally {
+            setSending(false);
+          }
+        });
+        uploadFile = executeAsyncTask(async () => {
+          const files = await openFilePicker(['*'], true);
+          if (files.length === 0) return void 0;
+          const file = files[0];
+          try {
+            await upload(file);
+          } catch (e) {
+            logger.error('Upload Failed', e);
+          }
+        });
+        uploadFolder = executeAsyncTask(async () => {
+          const files = await openFilePicker(['*'], false, true);
+          if (files.length === 0) return void 0;
+          const file = files[0];
+          try {
+            await upload(file);
+          } catch (e) {
+            logger.error('Upload Failed', e);
+          }
+        });
+        paste = executeAsyncTask(async () => {
+          try {
+            featureCheck('clipboard');
+          } catch (e) {
+            snackbar.enqueueSnackbar({
+              message: String(e),
+              variant: 'error',
             });
             return void 0;
           }
-          const items = await Promise.all(
-            data
-              .map((it) => {
-                const type = it.types
-                  .filter((type) => !IGNORE_FILE_TYPE.includes(type))
-                  .at(-1);
-                if (!type) return null;
-                return it.getType(type);
-              })
-              .filter((it): it is NonNullable<typeof it> => Boolean(it))
-              .reverse(),
-          );
-          const item = items[0];
-          if (item.type.startsWith('text/')) {
-            setText(await item.text().then((text) => text.trim()));
-            textareaRef.current?.focus();
-          } else {
-            await upload(new File([item], '', { type: item.type }));
-          }
-        } catch (e) {
-          if (e instanceof Error) {
-            if (e.message.includes('No valid data on clipboard')) {
-              logger.error('cannot to paste such files');
+          try {
+            const data = await navigator.clipboard.read();
+            if (data.length === 0) {
               snackbar.enqueueSnackbar({
-                message: t`cannot to paste such files`,
-                variant: 'error',
+                message: t`paste file is empty`,
+                variant: 'warning',
               });
-            } else {
-              snackbar.enqueueSnackbar({
-                message: e.message,
-                variant: 'error',
-              });
+              return void 0;
             }
-          } else {
-            logger.error('Pasted Failed', e);
+            const items = await Promise.all(
+              data
+                .map((it) => {
+                  const type = it.types
+                    .filter((type) => !IGNORE_FILE_TYPE.includes(type))
+                    .at(-1);
+                  if (!type) return null;
+                  return it.getType(type);
+                })
+                .filter((it): it is NonNullable<typeof it> => Boolean(it))
+                .reverse(),
+            );
+            const item = items[0];
+            if (item.type.startsWith('text/')) {
+              setText(await item.text().then((text) => text.trim()));
+              textareaRef.current?.focus();
+            } else {
+              await upload(new File([item], '', { type: item.type }));
+            }
+          } catch (e) {
+            if (e instanceof Error) {
+              if (e.message.includes('No valid data on clipboard')) {
+                logger.error('cannot to paste such files');
+                snackbar.enqueueSnackbar({
+                  message: t`cannot to paste such files`,
+                  variant: 'error',
+                });
+              } else {
+                snackbar.enqueueSnackbar({
+                  message: e.message,
+                  variant: 'error',
+                });
+              }
+            } else {
+              logger.error('Pasted Failed', e);
+            }
           }
-        }
-      }),
-    [snackbar],
-  );
-  const handleKeyUp = useMemo<KeyboardEventHandler>(
-    () =>
-      executeAsyncTask(async (evt) => {
-        if (evt.ctrlKey && evt.key === 'Enter') {
-          evt.preventDefault();
-          await handleSend();
-        }
-      }),
-    [handleSend],
-  );
-  const handleClear = useCallback(() => {
-    setText('');
-  }, []);
-  const handleChange = useCallback<ChangeEventHandler<HTMLTextAreaElement>>(
-    (evt) => {
-      setText(evt.target.value);
-    },
-    [],
-  );
-  const handleReceivedTransferData = useCallback<
-    NonNullable<ExtractProps<typeof DropZone>['onReceivedTransferData']>
-  >(
-    async (filesOrEntries) => {
-      try {
-        if (filesOrEntries.type == 'multi-file') {
-          for (const file of filesOrEntries.files) {
-            await upload(file);
-          }
-        } else {
-          await upload(filesOrEntries.entries);
-        }
-      } catch (e) {
-        logger.error('Upload Failed', e);
-        snackbar.enqueueSnackbar({
-          message: e instanceof Error ? e.message : String(e),
-          variant: 'error',
         });
-      }
-    },
+        keyup = executeAsyncTask<KeyboardEventHandler>(async (evt) => {
+          if (evt.ctrlKey && evt.key === 'Enter') {
+            evt.preventDefault();
+            await this.send();
+          }
+        });
+        clear = () => {
+          setText('');
+        };
+        change: ChangeEventHandler<HTMLTextAreaElement> = (evt) => {
+          setText(evt.target.value);
+        };
+        receivedTransferData = async (filesOrEntries: FilesOrEntries) => {
+          try {
+            if (filesOrEntries.type == 'multi-file') {
+              for (const file of filesOrEntries.files) {
+                await upload(file);
+              }
+            } else {
+              await upload(filesOrEntries.entries);
+            }
+          } catch (e) {
+            logger.error('Upload Failed', e);
+            snackbar.enqueueSnackbar({
+              message: e instanceof Error ? e.message : String(e),
+              variant: 'error',
+            });
+          }
+        };
+      })(),
     [snackbar],
   );
   // Dispatch the "measure-size" event and update text ref when the text change
@@ -283,7 +276,7 @@ export const Input: FC = memo(() => {
     const listener = async (evt: ClipboardEvent) => {
       const files = evt.clipboardData?.files;
       if (!files || files?.length == 0) return void 0;
-      await handleReceivedTransferData({
+      await handler.receivedTransferData({
         type: 'multi-file',
         files: [...files],
       });
@@ -292,35 +285,39 @@ export const Input: FC = memo(() => {
     return () => {
       document.removeEventListener('paste', listener);
     };
-  }, [handleReceivedTransferData]);
-  if (isMobile)
-    return (
-      <MobileInput
-        ref={textareaRef}
-        text={text}
-        sending={sending}
-        handleKeyUp={handleKeyUp}
-        handleChange={handleChange}
-        handleUpload={handleUpload}
-        handleSend={handleSend}
-      />
-    );
-  else {
-    return (
-      <NonMobileInput
-        ref={textareaRef}
-        text={text}
-        sending={sending}
-        handleKeyUp={handleKeyUp}
-        handleChange={handleChange}
-        handleUpload={handleUpload}
-        handleSend={handleSend}
-        handleClear={handleClear}
-        handlePaste={handlePaste}
-        handleReceivedTransferData={handleReceivedTransferData}
-      />
-    );
-  }
+  }, [handler]);
+  return (
+    <>
+      {isMobile ? (
+        <MobileInput
+          ref={textareaRef}
+          text={text}
+          sending={sending}
+          onKeyUp={handler.keyup}
+          onChange={handler.change}
+          onUploadFile={handler.uploadFile}
+          onSend={handler.uploadFolder}
+        />
+      ) : (
+        <DesktopInput
+          ref={textareaRef}
+          text={text}
+          sending={sending}
+          onKeyUp={handler.keyup}
+          onChange={handler.change}
+          onUploadFile={handler.uploadFile}
+          onUploadFolder={handler.uploadFolder}
+          onSend={handler.send}
+          onClear={handler.clear}
+          onPaste={handler.paste}
+          onReceivedTransferData={handler.receivedTransferData}
+        />
+      )}
+      {fileUploadDialog.visible && (
+        <FileUploadDialog {...fileUploadDialog.DialogProps} />
+      )}
+    </>
+  );
 });
 
 const MobileInput = forwardRef<
@@ -328,56 +325,52 @@ const MobileInput = forwardRef<
   {
     text: string;
     sending: boolean;
-    handleKeyUp: KeyboardEventHandler<HTMLTextAreaElement>;
-    handleChange: ChangeEventHandler<HTMLTextAreaElement>;
-    handleUpload: MouseEventHandler<HTMLButtonElement>;
-    handleSend: MouseEventHandler<HTMLButtonElement>;
+    onKeyUp: KeyboardEventHandler<HTMLTextAreaElement>;
+    onChange: ChangeEventHandler<HTMLTextAreaElement>;
+    onUploadFile: MouseEventHandler<HTMLButtonElement>;
+    onSend: MouseEventHandler<HTMLButtonElement>;
   }
->(
-  (
-    { text, sending, handleKeyUp, handleChange, handleUpload, handleSend },
-    ref,
-  ) => {
-    return (
-      <section className="relative flex items-end gap-1">
-        <button
-          title={t`upload`}
-          className="active:bg-gray-200 rounded-xl p-2 -ml-2"
-          onClick={handleUpload}
-        >
-          <HardDriveUploadIcon className="w-6 h-6 stroke-gray-600 " />
-        </button>
-        <textarea
-          ref={ref}
-          value={text}
-          onKeyUp={handleKeyUp}
-          onChange={handleChange}
-          className="sl-textarea w-auto flex-1 py-2 min-h-0 h-auto"
-          rows={1}
-        />
-        <button
-          disabled={sending}
-          className="bg-info-main text-white rounded px-3 py-2 ml-2 active:bg-info-dark active:bg-opacity-80 select-none mb-0.5"
-          onClick={handleSend}
-        >
-          {t`send`}
-        </button>
-      </section>
-    );
-  },
-);
-const NonMobileInput = forwardRef<
+>(({ text, sending, onKeyUp, onChange, onUploadFile, onSend }, ref) => {
+  return (
+    <section className="relative flex items-end gap-1">
+      <button
+        title={t`upload`}
+        className="active:bg-gray-200 rounded-xl p-2 -ml-2"
+        onClick={onUploadFile}
+      >
+        <HardDriveUploadIcon className="w-6 h-6 stroke-gray-600 " />
+      </button>
+      <textarea
+        ref={ref}
+        value={text}
+        onKeyUp={onKeyUp}
+        onChange={onChange}
+        className="sl-textarea w-auto flex-1 py-2 min-h-0 h-auto"
+        rows={1}
+      />
+      <button
+        disabled={sending}
+        className="bg-info-main text-white rounded px-3 py-2 ml-2 active:bg-info-dark active:bg-opacity-80 select-none mb-0.5"
+        onClick={onSend}
+      >
+        {t`send`}
+      </button>
+    </section>
+  );
+});
+const DesktopInput = forwardRef<
   HTMLTextAreaElement,
   {
     text: string;
     sending: boolean;
-    handleKeyUp: KeyboardEventHandler<HTMLTextAreaElement>;
-    handleChange: ChangeEventHandler<HTMLTextAreaElement>;
-    handleUpload: MouseEventHandler<HTMLButtonElement>;
-    handlePaste: MouseEventHandler<HTMLButtonElement>;
-    handleClear: MouseEventHandler<HTMLButtonElement>;
-    handleSend: MouseEventHandler<HTMLButtonElement>;
-    handleReceivedTransferData: ExtractProps<
+    onKeyUp: KeyboardEventHandler<HTMLTextAreaElement>;
+    onChange: ChangeEventHandler<HTMLTextAreaElement>;
+    onUploadFile: MouseEventHandler<HTMLButtonElement>;
+    onUploadFolder: MouseEventHandler<HTMLButtonElement>;
+    onPaste: MouseEventHandler<HTMLButtonElement>;
+    onClear: MouseEventHandler<HTMLButtonElement>;
+    onSend: MouseEventHandler<HTMLButtonElement>;
+    onReceivedTransferData: ExtractProps<
       typeof DropZone
     >['onReceivedTransferData'];
   }
@@ -386,13 +379,14 @@ const NonMobileInput = forwardRef<
     {
       text,
       sending,
-      handleKeyUp,
-      handleChange,
-      handleUpload,
-      handlePaste,
-      handleClear,
-      handleSend,
-      handleReceivedTransferData,
+      onKeyUp,
+      onChange,
+      onUploadFile,
+      onUploadFolder,
+      onPaste,
+      onClear,
+      onSend,
+      onReceivedTransferData,
     },
     ref,
   ) => {
@@ -405,8 +399,8 @@ const NonMobileInput = forwardRef<
         <InputTextarea
           ref={ref}
           value={text}
-          onKeyUp={handleKeyUp}
-          onChange={handleChange}
+          onKeyUp={onKeyUp}
+          onChange={onChange}
           className="w-full border-none shadow-none"
           placeholder="Enter your message here..."
           autoResize
@@ -418,7 +412,7 @@ const NonMobileInput = forwardRef<
               tooltip={t`upload file`}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
-              onClick={handleUpload}
+              onClick={onUploadFile}
               severity="secondary"
               text
             >
@@ -428,7 +422,7 @@ const NonMobileInput = forwardRef<
               tooltip={t`upload folder`}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
-              onClick={handleUpload}
+              onClick={onUploadFolder}
               severity="secondary"
               text
             >
@@ -438,7 +432,7 @@ const NonMobileInput = forwardRef<
               tooltip={t`paste`}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
-              onClick={handlePaste}
+              onClick={onPaste}
               severity="secondary"
               text
             >
@@ -449,7 +443,7 @@ const NonMobileInput = forwardRef<
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
               severity="secondary"
-              onClick={p2pFileDialog.open}
+              onClick={() => p2pFileDialog.open()}
               text
             >
               <ArrowLeftRightIcon className="w-5 h-5 stroke-grey-600" />
@@ -459,7 +453,7 @@ const NonMobileInput = forwardRef<
             <button
               title="Clear"
               hidden={text.length === 0}
-              onClick={handleClear}
+              onClick={onClear}
               className="text-gray-500 hover:text-gray-600 cursor-pointer"
             >
               <XIcon className="w-5 h-5 stroke-currentColor" />
@@ -467,7 +461,7 @@ const NonMobileInput = forwardRef<
             <Button
               severity="secondary"
               title="Send (Ctrl + Enter)"
-              onClick={handleSend}
+              onClick={onSend}
             >
               <span className="box-content text-white mr-2">
                 {sending ? (
@@ -483,14 +477,13 @@ const NonMobileInput = forwardRef<
             </Button>
           </div>
         </div>
-        <DropZone onReceivedTransferData={handleReceivedTransferData} />
+        <DropZone onReceivedTransferData={onReceivedTransferData} />
       </section>
     );
   },
 );
 
 const ButtonTooltipOptionsObj = {
-  appendTo: () => document.querySelector('app#root')!,
   position: 'bottom',
   showDelay: 1000,
   hideDelay: 300,
