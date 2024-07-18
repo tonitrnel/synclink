@@ -171,7 +171,7 @@ impl NotifyManager {
     pub fn add_client(&self, id: Uuid, conn: SSEConnection) {
         let mut guard = self.connections.lock().unwrap();
         guard.insert(id, conn);
-        println!("add_client, connection len {:?}", guard.len());
+        tracing::debug!("add_client, connection len {:?}", guard.len());
         if let Err(err) = self.send(SSEBroadcastEvent::UserConnected(id)) {
             tracing::error!(reason = ?err, "Failed to send sse client connected event");
         }
@@ -179,7 +179,7 @@ impl NotifyManager {
     pub fn remove_client(&self, id: &Uuid) {
         let mut guard = self.connections.lock().unwrap();
         guard.remove(id);
-        println!("remove_client, connection len {:?}", guard.len());
+        tracing::debug!("remove_client, connection len {:?}", guard.len());
         if let Err(err) = self.send(SSEBroadcastEvent::UserDisconnected(*id)) {
             tracing::error!(reason = ?err, "Failed to send sse client disconnected event");
         };
