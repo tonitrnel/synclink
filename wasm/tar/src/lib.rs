@@ -1,6 +1,7 @@
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use tar::{EntryType, Header, PaxExtensions};
@@ -224,17 +225,46 @@ impl Serialize for TarHeader {
     }
 }
 
-#[derive(Debug, Serialize)]
-#[serde(tag = "type", content = "payload", rename_all = "kebab-case")]
+#[derive(Debug)]
 pub enum PullResult {
     Further,
     Header(Box<TarHeader>),
     Data(Vec<u8>),
 }
+impl PullResult {
+    fn to_js_value(&self) -> JsValue {
+        let obj = js_sys::Object::new();
+        match self {
+            PullResult::Further => {
+                js_sys::Reflect::set(&obj, &"type".into(), &"further".into()).unwrap();
+            }
+            PullResult::Header(header) => {
+                js_sys::Reflect::set(&obj, &"type".into(), &"header".into()).unwrap();
+                js_sys::Reflect::set(
+                    &obj,
+                    &"payload".into(),
+                    &serde_wasm_bindgen::to_value(header).unwrap(),
+                )
+                .unwrap();
+            }
+            PullResult::Data(data) => {
+                js_sys::Reflect::set(&obj, &"type".into(), &"data".into()).unwrap();
+                let view = unsafe { js_sys::Uint8Array::view(data) };
+                js_sys::Reflect::set(
+                    &obj,
+                    &"payload".into(),
+                    &JsValue::from(js_sys::Uint8Array::new(view.as_ref())),
+                )
+                .unwrap();
+            }
+        }
+        JsValue::from(obj)
+    }
+}
 
 #[wasm_bindgen]
 pub struct TarExtractor {
-    buffer: Vec<u8>,
+    buffer: VecDeque<u8>,
     required_bytes: usize,
     state: ProcessState,
     ctx: ProcessContext,
@@ -244,7 +274,7 @@ impl TarExtractor {
     pub fn create(capacity: f64) -> Self {
         Self {
             required_bytes: 0,
-            buffer: Vec::with_capacity(capacity as usize),
+            buffer: VecDeque::with_capacity(capacity as usize),
             state: ProcessState::Start,
             ctx: ProcessContext::new(),
         }
@@ -254,9 +284,6 @@ impl TarExtractor {
     }
     pub fn push(&mut self, chunk: Vec<u8>) {
         self.buffer.extend(&chunk);
-    }
-    pub fn as_ptr(&self) -> *const u8 {
-        self.buffer.as_ptr()
     }
     fn pull(&mut self) -> PullResult {
         // | loop
@@ -276,9 +303,7 @@ impl TarExtractor {
     }
     #[wasm_bindgen(js_name = pull)]
     pub fn wasm_pull(&mut self) -> TPullResult {
-        serde_wasm_bindgen::to_value(&self.pull())
-            .unwrap()
-            .unchecked_into::<TPullResult>()
+        self.pull().to_js_value().unchecked_into::<TPullResult>()
     }
     fn next(&mut self) -> io::Result<PullResult> {
         match &mut self.state {
@@ -291,9 +316,9 @@ impl TarExtractor {
             ProcessState::ParseHeader(ref mut header) => {
                 // fill header
                 let size = {
-                    let bytes = self.buffer.drain(0..512);
+                    let bytes = self.buffer.drain(0..512).collect::<Vec<_>>();
                     // skip space block
-                    if bytes.as_ref().iter().all(|it| it == &0) {
+                    if bytes.iter().all(|it| it == &0) {
                         self.state = ProcessState::Start;
                         return Ok(PullResult::Further);
                     }
@@ -628,43 +653,53 @@ mod tests {
     use std::fs::File;
     use std::path::Path;
 
+    static DATA: [(&str, &str); 5] = [
+        ("test/a.txt", "001\r\n"),
+        ("test/b.txt", "002\r\n"),
+        ("test/c.txt", "003\r\n"),
+        (
+            "test/阿爸踩踩踩擦擦啊擦撒飞飞洒给飒旦撒大苏打撒撒哥飞洒发生飞洒在上大宫阙弱.txt",
+            "004\r\n",
+        ),
+        (
+            "test/阿爸踩踩踩擦擦啊擦撒飞飞洒给飒旦撒大苏打撒撒哥飞洒发生飞洒在上小宫阙弱.txt",
+            "005\r\n",
+        ),
+    ];
+
     #[test]
-    fn it_works() {
+    fn test_builder() {
         let root_dir = Path::new(r"./target/tmp");
         let mut file = File::create(root_dir.join("foo.tar")).unwrap();
         // 插入文件夹
         append_dir_header(&mut file, "test/", 1717676784).unwrap();
         // 插入文件
-        append_file_header(&mut file, "test/a.txt", 5, 1717676784).unwrap();
-        append_data_to_related(&mut file, &mut "001\r\n".as_bytes()).unwrap();
+        append_file_header(&mut file, DATA[0].0, 5, 1717676784).unwrap();
+        append_data_to_related(&mut file, &mut DATA[0].1.as_bytes()).unwrap();
         append_pad_to_related(&mut file, 5).unwrap();
         // 插入文件
-        append_file_header(&mut file, "test/b.txt", 5, 1717676784).unwrap();
-        append_data_to_related(&mut file, &mut "002\r\n".as_bytes()).unwrap();
+        append_file_header(&mut file, DATA[1].0, 5, 1717676784).unwrap();
+        append_data_to_related(&mut file, &mut DATA[1].1.as_bytes()).unwrap();
         append_pad_to_related(&mut file, 5).unwrap();
         // 插入文件
-        append_file_header(&mut file, "test/c.txt", 5, 1717676784).unwrap();
-        append_data_to_related(&mut file, &mut "003\r\n".as_bytes()).unwrap();
-        append_pad_to_related(&mut file, 5).unwrap();
-        // 插入文件
-        append_file_header(
-            &mut file,
-            "test/阿爸踩踩踩擦擦啊擦撒飞飞洒给飒旦撒大苏打撒撒哥飞洒发生飞洒在上大宫阙弱.txt", // 如果大于 100b 会增加 1kb 的尺寸
-            5,
-            1717676784,
-        )
-        .unwrap();
-        append_data_to_related(&mut file, &mut "004\r\n".as_bytes()).unwrap();
+        append_file_header(&mut file, DATA[2].0, 5, 1717676784).unwrap();
+        append_data_to_related(&mut file, &mut DATA[2].1.as_bytes()).unwrap();
         append_pad_to_related(&mut file, 5).unwrap();
         // 插入文件
         append_file_header(
-            &mut file,
-            "test/阿爸踩踩踩擦擦啊擦撒飞飞洒给飒旦撒大苏打撒撒哥飞洒发生飞洒在上小宫阙弱.txt", // 如果文件名大于 100b 会增加 1kb 的尺寸
-            5,
-            1717676784,
+            &mut file, DATA[3].0, // 如果大于 100b 会增加 1kb 的尺寸
+            5, 1717676784,
         )
         .unwrap();
-        append_data_to_related(&mut file, &mut "005\r\n".as_bytes()).unwrap();
+        append_data_to_related(&mut file, &mut DATA[3].1.as_bytes()).unwrap();
+        append_pad_to_related(&mut file, 5).unwrap();
+        // 插入文件
+        append_file_header(
+            &mut file, DATA[4].0, // 如果文件名大于 100b 会增加 1kb 的尺寸
+            5, 1717676784,
+        )
+        .unwrap();
+        append_data_to_related(&mut file, &mut DATA[4].1.as_bytes()).unwrap();
         append_pad_to_related(&mut file, 5).unwrap();
         // 完成
     }
@@ -675,7 +710,7 @@ mod tests {
         let mut extractor = TarExtractor::create(2048f64);
         let mut file = File::open(root_dir.join("foo.tar")).unwrap();
         let mut chunk = [0u8; 1000];
-        // let mut count = 1;
+        let mut count = 0;
         loop {
             match extractor.pull() {
                 PullResult::Further => {
@@ -693,16 +728,27 @@ mod tests {
                     continue;
                 }
                 PullResult::Header(header) => {
-                    // count = 1;
                     println!(
                         "[{}]: {:?} size: {:?} mtime: {:?}",
                         if header.is_dir() { "directory" } else { "file" },
                         header.path(),
                         header.size,
                         header.mtime()
-                    )
+                    );
+                    if header.is_file() {
+                        count += 1;
+                        let path = header.path();
+                        let path = path.to_str().unwrap();
+                        assert_eq!(DATA[count - 1].0, path)
+                    }
                 }
-                PullResult::Data(_chunk) => {
+                PullResult::Data(actual) => {
+                    if actual.is_empty() {
+                        continue;
+                    }
+                    println!("第 {count} 个文件, {:?}", actual);
+                    let excepted = DATA[count - 1].1.as_bytes();
+                    assert_eq!(excepted, &actual)
                     // println!(
                     //     "data: [{}]({:02X})+{count}",
                     //     if chunk.len() > 4 {
