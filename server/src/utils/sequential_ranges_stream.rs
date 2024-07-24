@@ -211,6 +211,7 @@ where
                     tracing::warn!(reason = err.to_string(), "end boundary is discarded")
                 };
             };
+            drop(tx)
         });
         ReceiverStream::new(rx)
     }

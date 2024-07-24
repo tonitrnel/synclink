@@ -29,9 +29,12 @@ image = "0.24.7"
 simdutf8 = "0.1.4"
 tar = "0.4.41"
 pin-project-lite = "0.2.14"
+rand = "0.8.5"
+jsonwebtoken = "9.3.0"
 
 [profile.release]
-strip = true
-opt-level = "z"
-lto = true
-panic = "abort"
+#strip = true
+#opt-level = "z"
+#lto = true
+#panic = "abort"
+debug = true

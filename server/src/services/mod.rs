@@ -1,4 +1,4 @@
-pub(crate) mod authorize;
+mod authorize;
 mod beacon;
 mod delete;
 mod get;
@@ -10,6 +10,7 @@ mod upload;
 pub mod upload_part;
 mod upload_preflight;
 
+pub use authorize::{authorize, Claims};
 pub use beacon::beacon;
 pub use delete::delete;
 pub use get::{get, get_virtual_directory, get_virtual_file};

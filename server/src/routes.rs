@@ -49,9 +49,10 @@ pub fn build() -> Router<AppState> {
         .route("/api/p2p/discard", delete(services::discard_request))
         .route("/api/p2p/signaling", post(services::signaling))
         .route("/api/p2p/socket", get(services::socket))
+        .route("/api/authorize", post(services::authorize))
         .route("/api/:uuid", get(services::get_metadata))
         .route("/api", get(services::list))
-        .layer(middleware::from_extractor::<services::authorize::Claims>())
+        .layer(middleware::from_extractor::<services::Claims>())
         .fallback_service(static_files_service)
         .layer(
             tower_http::trace::TraceLayer::new_for_http()
@@ -63,7 +64,7 @@ pub fn build() -> Router<AppState> {
                     )
                 })
                 .on_request(|req: &Request<Body>, _span: &Span| {
-                    tracing::debug!(
+                    tracing::trace!(
                         method = %req.method(),
                         uri = %req.uri(),
                         version = %format!("{:?}", req.version()),
@@ -71,7 +72,7 @@ pub fn build() -> Router<AppState> {
                     );
                 })
                 .on_response(|res: &Response, latency: Duration, _span: &Span| {
-                    tracing::debug!(
+                    tracing::trace!(
                         status = ?res.status(),
                         latency = %format!("{}ms", latency.as_millis()),
                         "finished processing request"

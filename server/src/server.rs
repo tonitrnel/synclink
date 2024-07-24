@@ -1,12 +1,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use tokio::{net::TcpListener, signal, task::JoinSet};
-use tokio_util::sync::CancellationToken;
-
 use crate::config::Config;
 use crate::logs::LogWriter;
+use crate::utils::{Observable, Observer};
 use crate::{models, routes, state};
+use tokio::{net::TcpListener, signal, task::JoinSet};
+use tokio_util::sync::CancellationToken;
 
 pub struct ServerArgs<'a> {
     pub logs: Arc<LogWriter>,
@@ -22,10 +22,15 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
         let dir = args.config.file_storage.parse_dir()?;
         join_set.spawn(async move {
             let indexing = Arc::new(models::file_indexing::FileIndexing::new(dir).await);
+            let mut notify_manager = crate::services::NotifyManager::new();
+            let socket_manager = Arc::new(crate::services::P2PSocketManager::new());
+            notify_manager.register(Arc::downgrade(
+                &(Arc::clone(&socket_manager) as Arc<dyn Observer<uuid::Uuid>>),
+            ));
             let state = state::AppState {
                 indexing,
-                notify_manager: Arc::new(crate::services::NotifyManager::new()),
-                socket_manager: Arc::new(crate::services::P2PSocketManager::new()),
+                notify_manager: Arc::new(notify_manager),
+                socket_manager,
                 shutdown_signal: shutdown_signal.clone(),
             };
             let routes = routes::build().with_state(state);

@@ -21,6 +21,15 @@ impl StorageConfig {
         path.canonicalize()
             .with_context(|| "Failed to parse storage directory.".to_string())
     }
+
+    #[inline]
+    pub fn get_quota(&self) -> usize {
+        self.quota.unwrap_or(1073741824) // 1gb
+    }
+    #[inline]
+    pub fn get_default_reserved(&self) -> usize {
+        10485760 // 10mb
+    }
 }
 
 fn size_deserialize<'de, D>(deserializer: D) -> Result<Option<usize>, D::Error>
@@ -33,14 +42,21 @@ where
     } else {
         return Ok(None);
     };
-    let (number, unit) = s.split_at(s.len() - 2);
+    let (number, unit) = s.split_at(s.len() - 1);
     let number = number
         .parse::<usize>()
         .map_err(|_| serde::de::Error::custom(format!("Invalid digest: {}", number)))?;
-    match unit {
-        "kb" => Ok(Some(number * 1024)),
-        "mb" => Ok(Some(number * 1024 * 1024)),
-        "gb" => Ok(Some(number * 1024 * 1024 * 1024)),
-        _ => Err(serde::de::Error::custom(format!("Invalid unit: {}", unit))),
+    let value = match unit {
+        "k" => number * 1024,
+        "m" => number * 1024 * 1024,
+        "g" => number * 1024 * 1024 * 1024,
+        _ => return Err(serde::de::Error::custom(format!("Invalid unit: {}", unit))),
+    };
+    if value < 52428800 {
+        return Err(serde::de::Error::custom(format!(
+            "Allocated storage space does not fulfill minimum requirements, expected more than {}b but got {}b",
+            52428800, value
+        )));
     }
+    Ok(Some(value))
 }

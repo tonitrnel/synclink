@@ -64,12 +64,24 @@ where
     pub fn guard(&self) -> MutexGuard<HashMap<K, Entry<V>>> {
         self.sessions.lock().unwrap()
     }
+
     async fn run_cleanup_task(&self) {
         loop {
             tokio::time::sleep(self.ttl).await;
             let mut sessions = self.sessions.lock().unwrap();
+            let previous_len = sessions.len();
+            if previous_len == 0 {
+                continue;
+            };
             let now = Instant::now();
             sessions.retain(|_, Entry(instant, _)| now.duration_since(*instant) < self.ttl);
+            let current_len = sessions.len();
+            tracing::debug!(
+                "Session cleanup: before = {}, after = {}, removed = {}",
+                previous_len,
+                current_len,
+                previous_len - current_len
+            )
         }
     }
 }

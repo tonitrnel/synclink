@@ -6,7 +6,7 @@ port = 8080
 # File storage
 [file_storage]
 storage_path = "storage"
-#quota = "10gb"
+#quota = "10g" # default "1g"
 
 # logger
 [logs]

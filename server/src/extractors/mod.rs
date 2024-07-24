@@ -1,5 +1,5 @@
 mod client_ip;
-mod headers;
+mod header;
 
 pub use client_ip::ClientIp;
-pub use headers::Headers;
+pub use header::Header;

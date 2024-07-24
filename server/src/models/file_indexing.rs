@@ -337,21 +337,20 @@ impl FileIndexing {
     //     }
     // }
     pub fn check_storage_quota_exceeded(&self, file_size: u64) -> anyhow::Result<()> {
-        if let Some(quota) = config::load().file_storage.quota {
-            let current_storage = self
-                .index
-                .lock()
-                .unwrap()
-                .items
-                .iter()
-                .fold(0, |a, b| a + *b.get_size());
-            if ((current_storage + file_size) as usize) < quota {
-                Ok(())
-            } else {
-                anyhow::bail!("Adding this file exceeds the storage quota. Current storage usage is ${current_storage} bytes plus the file size of ${file_size} bytes exceeds the quota of ${quota} bytes.")
-            }
-        } else {
+        let c = &config::load().file_storage;
+        let quota = c.get_quota();
+        let default_reserved = c.get_default_reserved();
+        let current_storage = self
+            .index
+            .lock()
+            .unwrap()
+            .items
+            .iter()
+            .fold(0, |a, b| a + *b.get_size());
+        if ((current_storage + file_size) as usize) < quota - default_reserved {
             Ok(())
+        } else {
+            anyhow::bail!("Adding this file exceeds the storage quota. Current storage usage is ${current_storage} bytes plus the file size of ${file_size} bytes exceeds the quota of ${quota} bytes.")
         }
     }
 }

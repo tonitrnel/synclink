@@ -1,4 +1,4 @@
-use crate::errors::{ApiResponse, ErrorKind};
+use crate::common::{ApiError, ApiResult};
 use crate::models::entity::{Entity, EntityMetadata};
 use crate::state::AppState;
 use axum::extract::Path;
@@ -95,7 +95,7 @@ where
 pub async fn list(
     State(state): State<AppState>,
     query: Query<QueryParams>,
-) -> ApiResponse<Json<PaginationDto<serde_json::Value>>> {
+) -> ApiResult<Json<PaginationDto<serde_json::Value>>> {
     let per_page = query.per_page as usize;
     let page = query.page as usize;
     let keywords = query.keywords();
@@ -218,10 +218,10 @@ fn sorter((a, b): (&Entity, &Entity), sort_by: &str, order_by: &str) -> std::cmp
 pub async fn get_metadata(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> ApiResponse<impl IntoResponse> {
+) -> ApiResult<impl IntoResponse> {
     if let Some(item) = &state.indexing.get(&id) {
         Ok(Json(ResponseDto::from(item)))
     } else {
-        Err(ErrorKind::ResourceNotFound)
+        Err(ApiError::ResourceNotFound)
     }
 }

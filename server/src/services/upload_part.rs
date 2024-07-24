@@ -1,5 +1,5 @@
-use crate::errors::{ApiResponse, ErrorKind, InternalError};
-use crate::extractors::{ClientIp, Headers};
+use crate::common::{ApiError, ApiResult, InternalError};
+use crate::extractors::{ClientIp, Header};
 use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
 use crate::utils::{decode_uri, SessionManager};
@@ -28,33 +28,12 @@ struct Session {
 }
 
 static SHARED_SESSIONS: OnceLock<Arc<SessionManager<Uuid, Session>>> = OnceLock::new();
-#[derive(Deserialize, Debug)]
-pub struct QueryParams {
-    id: Option<Uuid>,
-    pos: Option<u64>,
-    size: Option<u64>,
-}
 
 #[derive(Deserialize, Debug)]
 pub struct ConcatenateQueryParams {
     id: Uuid,
     tags: Option<String>,
     caption: Option<String>,
-}
-
-impl QueryParams {
-    fn id(&self) -> Result<Uuid, ErrorKind> {
-        self.id
-            .ok_or_else(|| ErrorKind::QueryFieldMissing("id".to_string()))
-    }
-    fn pos(&self) -> Result<u64, ErrorKind> {
-        self.pos
-            .ok_or_else(|| ErrorKind::QueryFieldMissing("pos".to_string()))
-    }
-    fn size(&self) -> Result<u64, ErrorKind> {
-        self.size
-            .ok_or_else(|| ErrorKind::QueryFieldMissing("size".to_string()))
-    }
 }
 
 fn access_shared_sessions() -> Arc<SessionManager<Uuid, Session>> {
@@ -273,16 +252,23 @@ async fn exec_cleanup(uid: &Uuid) -> anyhow::Result<()> {
     access_shared_sessions().remove(uid);
     Ok(())
 }
+#[derive(Deserialize, Debug)]
+pub struct AllocateQueryDto {
+    size: u64,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct AllocateHeaderDto {
+    x_content_sha256: String,
+}
 
 pub async fn allocate(
     State(state): State<AppState>,
-    headers: Headers,
-    query: Query<QueryParams>,
-) -> ApiResponse<impl IntoResponse> {
-    let content_hash = headers
-        .get("x-content-sha256")
-        .try_as_string()?
-        .to_lowercase();
+    header: Header<AllocateHeaderDto>,
+    query: Query<AllocateQueryDto>,
+) -> ApiResult<impl IntoResponse> {
+    let content_hash = header.x_content_sha256.to_lowercase();
     if let Some(uuid) = state.indexing.has_hash(&content_hash) {
         return Ok((
             StatusCode::CONFLICT,
@@ -290,17 +276,21 @@ pub async fn allocate(
         )
             .into_response());
     }
-    let size = query.size()?;
+    let size = query.size;
     let (uid, start) = exec_allocate(size, content_hash).await?;
     Ok((StatusCode::CREATED, format!("{uid};{start}")).into_response())
 }
 
+#[derive(Deserialize, Debug)]
+pub struct AppendQueryDto {
+    pos: u64,
+}
 pub async fn append(
     axum::extract::Path(id): axum::extract::Path<Uuid>,
-    query: Query<QueryParams>,
+    query: Query<AppendQueryDto>,
     request: Request,
-) -> ApiResponse<impl IntoResponse> {
-    let pos = query.pos()?;
+) -> ApiResult<impl IntoResponse> {
+    let pos = query.pos;
     let current_start_position = {
         // Reduce the scope of the lock
         access_shared_sessions().get(&id).map(|it| it.start)
@@ -315,12 +305,21 @@ pub async fn append(
     Ok(Json("ok!"))
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct ConcatenateHeaderDto {
+    content_type: Option<String>,
+    user_agent: String,
+    x_content_sha256: String,
+    x_raw_filename: Option<String>,
+}
+
 pub async fn concatenate(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
-    headers: Headers,
+    header: Header<ConcatenateHeaderDto>,
     query: Query<ConcatenateQueryParams>,
-) -> ApiResponse<impl IntoResponse> {
+) -> ApiResult<impl IntoResponse> {
     let id = query.id;
     let tags = query
         .tags
@@ -335,18 +334,14 @@ pub async fn concatenate(
     if !access_shared_sessions().contains_key(&id) {
         return Ok(Json("ok!"));
     }
-    let content_type = headers.get("content-type").try_as_string().ok();
-    let content_hash = headers
-        .get("x-content-sha256")
-        .try_as_string()?
-        .to_lowercase();
-    let filename = headers
-        .get("x-raw-filename")
-        .try_as_string()
-        .ok()
-        .map(|it| decode_uri(&it).map_err(ErrorKind::from))
+    let content_type = header.content_type.clone();
+    let content_hash = header.x_content_sha256.to_lowercase();
+    let filename = header
+        .x_raw_filename
+        .as_ref()
+        .map(|it| decode_uri(it).map_err(ApiError::from))
         .transpose()?;
-    let user_agent = headers.get("user-agent").try_as_string().ok();
+    let user_agent = &header.user_agent;
     let (path, size, hash) = exec_concatenate(
         state.indexing.get_storage_dir(),
         &id,
@@ -361,13 +356,13 @@ pub async fn concatenate(
         fs::remove_file(&path)
             .await
             .with_context(|| InternalError::DeleteFileError { path })?;
-        return Err(ErrorKind::HashMismatch);
+        return Err(ApiError::HashMismatch);
     }
     state
         .indexing
         .write(WriteIndexArgs {
             uid: id,
-            user_agent,
+            user_agent: Some(user_agent.to_owned()),
             filename,
             content_type,
             hash,
@@ -386,8 +381,11 @@ pub async fn concatenate(
     Ok(Json("ok!"))
 }
 
-pub async fn abort(query: Query<QueryParams>) -> ApiResponse<impl IntoResponse> {
-    let id = query.id()?;
-    exec_cleanup(&id).await?;
+#[derive(Deserialize, Debug)]
+pub struct AbortQueryDto {
+    id: Uuid,
+}
+pub async fn abort(query: Query<AbortQueryDto>) -> ApiResult<impl IntoResponse> {
+    exec_cleanup(&query.id).await?;
     Ok(Json("ok!"))
 }

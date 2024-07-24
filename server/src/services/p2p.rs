@@ -1,7 +1,7 @@
-use crate::errors::{ApiResponse, ErrorKind};
+use crate::common::{ApiError, ApiResult};
 use crate::services::notify::SSEBroadcastEvent;
 use crate::state::AppState;
-use crate::utils::SessionManager;
+use crate::utils::{Observer, SessionManager};
 use anyhow::Context;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{ConnectInfo, Json, State, WebSocketUpgrade};
@@ -35,17 +35,40 @@ fn access_shared_sessions() -> Arc<SessionManager<Uuid, P2PSession>> {
 pub struct CreateP2PRequestDto {
     client_id: Uuid,
     target_id: Uuid,
+    target_pin: Option<String>,
     supports_rtc: bool,
 }
 pub async fn create_request(
     State(state): State<AppState>,
     Json(form): Json<CreateP2PRequestDto>,
-) -> ApiResponse<Json<serde_json::Value>> {
+) -> ApiResult<Json<serde_json::Value>> {
     let request_id = Uuid::new_v4();
+    let sessions = access_shared_sessions();
+    // 确认接收端处于空闲状态（无其他 P2P 连接）
+    if sessions.guard().iter().any(|(_, session)| {
+        session.sender_id == form.target_id || session.receiver_id == form.target_id
+    }) {
+        return Err(ApiError::BadRequest(anyhow::format_err!(
+            "P2P request creation failed due to receiver is currently busy."
+        )));
+    }
+    let pins_match = match (
+        form.target_pin,
+        state.notify_manager.get_client_pin(&form.target_id),
+    ) {
+        (Some(sender_pin), Some(receiver_pin)) => sender_pin == receiver_pin,
+        (None, None) => true,
+        _ => false,
+    };
+    if !pins_match {
+        return Err(ApiError::BadRequest(anyhow::format_err!(
+            "P2P request creation failed due to PIN mismatch."
+        )));
+    }
     state
         .notify_manager
         .send_with_client(SSEBroadcastEvent::P2PRequest(request_id), &form.target_id)?;
-    access_shared_sessions().insert(
+    sessions.insert(
         request_id,
         P2PSession {
             supports_rtc: form.supports_rtc,
@@ -74,7 +97,7 @@ pub struct AcceptP2PRequestDto {
 pub async fn accept_request(
     State(state): State<AppState>,
     Json(form): Json<AcceptP2PRequestDto>,
-) -> ApiResponse<Json<serde_json::Value>> {
+) -> ApiResult<Json<serde_json::Value>> {
     tracing::info!(
         "accepted p2p request, rtc: {}, request_id: {}",
         form.supports_rtc,
@@ -86,13 +109,19 @@ pub async fn accept_request(
         let session = if let Some(value) = guard.get_mut(&form.request_id) {
             value
         } else {
-            return Err(ErrorKind::BadRequest(anyhow::format_err!(
+            return Err(ApiError::BadRequest(anyhow::format_err!(
                 "Failed to accept p2p request, the request has expired."
             )));
         };
         if session.receiver_id != form.client_id {
-            return Err(ErrorKind::BadRequest(anyhow::format_err!(
+            return Err(ApiError::BadRequest(anyhow::format_err!(
                 "Failed to accept p2p request, the request is invalid."
+            )));
+        }
+        if !state.notify_manager.contains_client(&session.sender_id) {
+            guard.remove(&form.request_id);
+            return Err(ApiError::BadRequest(anyhow::format_err!(
+                "Failed to accept p2p request, sender closed."
             )));
         }
         session.established = true;
@@ -127,7 +156,7 @@ pub struct CreateSignalingDto {
 pub async fn signaling(
     State(state): State<AppState>,
     Json(form): Json<CreateSignalingDto>,
-) -> ApiResponse<Json<serde_json::Value>> {
+) -> ApiResult<Json<serde_json::Value>> {
     let sessions = access_shared_sessions();
     let session = sessions
         .get(&form.request_id)
@@ -149,7 +178,7 @@ pub struct DiscardRequestDto {
 pub async fn discard_request(
     State(state): State<AppState>,
     Json(form): Json<DiscardRequestDto>,
-) -> ApiResponse<Json<serde_json::Value>> {
+) -> ApiResult<Json<serde_json::Value>> {
     if let Some(session) = access_shared_sessions().remove(&form.request_id) {
         state.notify_manager.send_with_client(
             SSEBroadcastEvent::P2PReject(form.request_id),
@@ -358,6 +387,13 @@ impl SocketManager {
     }
     pub fn subscribe(&self) -> Receiver<(Vec<u8>, Uuid)> {
         self.tx.subscribe()
+    }
+}
+
+impl Observer<Uuid> for SocketManager {
+    fn notify(&self, value: Uuid) {
+        let sessions = access_shared_sessions();
+        sessions.remove(&value);
     }
 }
 

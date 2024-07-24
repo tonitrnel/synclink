@@ -1,5 +1,5 @@
+mod common;
 mod config;
-mod errors;
 mod extractors;
 mod logs;
 mod middlewares;

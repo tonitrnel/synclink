@@ -1,5 +1,5 @@
+use crate::common::ApiResult;
 use crate::config;
-use crate::errors::ApiResponse;
 use crate::state::AppState;
 use anyhow::Context;
 use axum::extract::State;
@@ -7,7 +7,7 @@ use axum::Json;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
-pub async fn stats(State(state): State<AppState>) -> ApiResponse<Json<Value>> {
+pub async fn stats(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let now = tokio::time::Instant::now();
     let disk_usage = {
         state
@@ -21,14 +21,16 @@ pub async fn stats(State(state): State<AppState>) -> ApiResponse<Json<Value>> {
     });
     let version = env!("CARGO_PKG_VERSION");
     let uptime = config::uptime();
-    let storage_quota = config::load().file_storage.quota.unwrap_or(0);
-
+    let c = &config::load().file_storage;
+    let storage_quota = c.get_quota();
+    let default_reserved = c.get_default_reserved();
     Ok(Json(json!({
         "version": version,
         "disk_usage": disk_usage,
         "memory_usage": memory_usage,
         "query_elapsed": now.elapsed().as_millis() as u64,
         "storage_quota": storage_quota,
+        "default_reserved": default_reserved,
         "uptime": uptime
     })))
 }
@@ -79,7 +81,7 @@ async fn load_memory_usage(_: u32) -> anyhow::Result<u64> {
     Ok(0)
 }
 
-pub async fn clean_dump(State(state): State<AppState>) -> ApiResponse<Json<Value>> {
+pub async fn clean_dump(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let tmp_dir = std::env::temp_dir().join("synclink");
     let storage_dir = state.indexing.get_storage_dir();
     let exists_ids = state.indexing.map_clone(|items| {

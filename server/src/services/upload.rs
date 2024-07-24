@@ -1,5 +1,5 @@
-use crate::errors::{ApiResponse, ErrorKind};
-use crate::extractors::{ClientIp, Headers};
+use crate::common::{ApiError, ApiResult};
+use crate::extractors::{ClientIp, Header};
 use crate::models::file_indexing::{IndexChangeAction, PreallocationFile, WriteIndexArgs};
 use crate::state::AppState;
 use crate::utils::decode_uri;
@@ -27,7 +27,7 @@ pub struct UploadQueryParams {
 async fn handle_file(
     mut stream: BodyDataStream,
     mut preallocation: PreallocationFile,
-) -> Result<(PreallocationFile, String, usize), ErrorKind> {
+) -> Result<(PreallocationFile, String, usize), ApiError> {
     let mut hasher = Sha256::new();
     let mut size = 0;
     while let Some(chunk) = stream.next().await {
@@ -35,7 +35,7 @@ async fn handle_file(
             Ok(v) => v,
             Err(err) => {
                 preallocation.cleanup().await;
-                return Err(ErrorKind::from(err));
+                return Err(ApiError::from(err));
             }
         };
         hasher.update(chunk.as_ref());
@@ -43,7 +43,7 @@ async fn handle_file(
             Ok(_) => (),
             Err(err) => {
                 preallocation.cleanup().await;
-                return Err(ErrorKind::from(err));
+                return Err(ApiError::from(err));
             }
         }
         size += chunk.len()
@@ -55,21 +55,21 @@ async fn handle_file(
 async fn handle_archive(
     mut stream: BodyDataStream,
     mut preallocation: PreallocationFile,
-) -> Result<(PreallocationFile, String, usize), ErrorKind> {
+) -> Result<(PreallocationFile, String, usize), ApiError> {
     let mut size = 0;
     while let Some(chunk) = stream.next().await {
         let chunk = match chunk {
             Ok(v) => v,
             Err(err) => {
                 preallocation.cleanup().await;
-                return Err(ErrorKind::from(err));
+                return Err(ApiError::from(err));
             }
         };
         match preallocation.file.write_all(chunk.as_ref()).await {
             Ok(_) => (),
             Err(err) => {
                 preallocation.cleanup().await;
-                return Err(ErrorKind::from(err));
+                return Err(ApiError::from(err));
             }
         }
         size += chunk.len()
@@ -88,11 +88,11 @@ async fn handle_archive(
         };
         for entry in archive.entries().map_err(|err| {
             clean();
-            ErrorKind::from(err)
+            ApiError::from(err)
         })? {
             let mut entry = entry.map_err(|err| {
                 clean();
-                ErrorKind::from(err)
+                ApiError::from(err)
             })?;
             hasher.update(entry.path_bytes());
             if entry.header().entry_type() == EntryType::Directory {
@@ -112,13 +112,23 @@ async fn handle_archive(
     Ok((preallocation, hash, size))
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct UploadHeaderDto {
+    content_type: Option<String>,
+    content_length: u64,
+    user_agent: String,
+    x_content_sha256: String,
+    x_raw_filename: Option<String>,
+}
+
 pub async fn upload(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     query: Query<UploadQueryParams>,
-    headers: Headers,
+    header: Header<UploadHeaderDto>,
     request: Request,
-) -> ApiResponse<impl IntoResponse> {
+) -> ApiResult<impl IntoResponse> {
     let tags = query
         .tags
         .as_ref()
@@ -129,24 +139,20 @@ pub async fn upload(
         })
         .unwrap_or_default();
     let caption = query.caption.clone().unwrap_or_default();
-    let content_length = headers.get("content-length").try_as_u64()?;
-    let content_type = headers.get("content-type").try_as_string().ok();
-    let content_hash = headers
-        .get("x-content-sha256")
-        .try_as_string()?
-        .to_lowercase();
-    let filename = headers
-        .get("x-raw-filename")
-        .try_as_string()
-        .ok()
-        .map(|it| decode_uri(&it).map_err(ErrorKind::from))
+    let content_length = header.content_length;
+    let content_type = header.content_type.clone();
+    let content_hash = header.x_content_sha256.to_lowercase();
+    let filename = header
+        .x_raw_filename
+        .clone()
+        .map(|it| decode_uri(&it).map_err(ApiError::from))
         .transpose()?;
 
-    let user_agent = headers.get("user-agent").try_as_string().ok();
+    let user_agent = header.user_agent.clone();
 
     // Check hash exists, if it exists, then cancel upload and return uuid
     if let Some(uuid) = state.indexing.has_hash(&content_hash) {
-        return Err(ErrorKind::DuplicateFile(uuid));
+        return Err(ApiError::DuplicateFile(uuid));
     }
     let (uid, size, hash) = {
         // Preallocate disk space, uuid
@@ -166,7 +172,7 @@ pub async fn upload(
         };
         if hash.as_str() != content_hash {
             preallocation.cleanup().await;
-            return Err(ErrorKind::HashMismatch);
+            return Err(ApiError::HashMismatch);
         }
         (preallocation.uid, size, hash)
     };
@@ -175,7 +181,7 @@ pub async fn upload(
         .indexing
         .write(WriteIndexArgs {
             uid,
-            user_agent,
+            user_agent: Some(user_agent),
             filename,
             content_type,
             hash,
