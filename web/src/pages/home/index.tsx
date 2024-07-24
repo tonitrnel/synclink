@@ -3,7 +3,7 @@ import { Input } from '~/components/input';
 import { List } from '~/components/list';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
 import { SCROLLBAR_WIDTH } from '~/utils/get-scrollbar-width.ts';
-import { P2PFileReceiver } from '~/components/file-delivery-dialog';
+import { P2PFileReceiver } from '~/components/file-transfer-dialog';
 import { Sidebar } from './sidebar';
 
 export default function HomePage() {

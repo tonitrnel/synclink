@@ -4,9 +4,10 @@ import { toHex } from './to-hex.ts';
 import { wait } from './wait.ts';
 import { featureCheck } from '~/utils/feature-check.ts';
 import { type DirEntry } from '~/constants/types.ts';
+import { TarExtractor, TarHeader } from 'tar-binding';
 
 type TransferData = ['result', string] | ['ready' | 'done'];
-export const calculateHash = async (
+export const calculateHashFromArrayBuffer = async (
   buffer: Promise<ArrayBuffer>,
   algorithm: 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512',
 ): Promise<string> => {
@@ -101,7 +102,7 @@ const finalize = (worker: Worker): Promise<string> => {
   });
 };
 
-const calculateFileHash = async (
+const calculateNormalFileHash = async (
   worker: Worker,
   options: CalculateHashOptions,
   reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -129,10 +130,80 @@ const calculateFileHash = async (
       worker.postMessage(['update', view.buffer], [view.buffer]);
     });
   }
+  reader.releaseLock();
+};
+
+const calculateTarFileHash = async (
+  worker: Worker,
+  options: CalculateHashOptions,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  progressTracker: ProgressTracker,
+) => {
+  const extractor = TarExtractor.create(2048);
+  let header: TarHeader | undefined = undefined;
+  while (true) {
+    const result = extractor.pull();
+    let terminated = false;
+    switch (result.type) {
+      case 'further': {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (extractor.pullable()) {
+            continue;
+          } else {
+            terminated = true;
+          }
+          break;
+        }
+        if (!value) continue;
+        // console.log('fill data');
+        extractor.push(value);
+        break;
+      }
+      case 'header': {
+        header = result.payload;
+        break;
+      }
+      case 'data': {
+        if (!header) throw new Error('missing header');
+        await runTask({ worker, options }, () => {
+          const nameBytes = new TextEncoder().encode(header!.path);
+          progressTracker.loaded += nameBytes.length;
+          worker.postMessage(['update', nameBytes.buffer], [nameBytes.buffer]);
+        });
+        if (header!.type == 'file') {
+          const view = result.payload;
+          // update progress tracker
+          {
+            const now = Date.now();
+            progressTracker.interval += now - progressTracker.previous;
+            if (progressTracker.interval > 1000) {
+              options.onSpeedChange?.(
+                (view.length / (now - progressTracker.previous)) * 1000,
+              );
+              progressTracker.interval = 0;
+            }
+            progressTracker.previous = now;
+          }
+          await runTask({ worker, options }, () => {
+            progressTracker.loaded += view.buffer.byteLength;
+            options.onProgressChange?.(progressTracker.loaded);
+            worker.postMessage(['update', view.buffer], [view.buffer]);
+          });
+        }
+        break;
+      }
+    }
+    if (terminated) {
+      break;
+    }
+  }
+  reader.releaseLock();
 };
 
 export const calculateHashFromStream = async (
   stream: ReadableStream<Uint8Array>,
+  type: string,
   options: CalculateHashOptions = {},
 ): Promise<string> => {
   const worker = await requestHashWorker(options);
@@ -142,7 +213,11 @@ export const calculateHashFromStream = async (
     interval: 0,
     loaded: 0,
   };
-  await calculateFileHash(worker, options, reader, progressTracker);
+  if (type == 'application/x-tar') {
+    await calculateTarFileHash(worker, options, reader, progressTracker);
+  } else {
+    await calculateNormalFileHash(worker, options, reader, progressTracker);
+  }
   logger.debug('Wait HASH result');
   return finalize(worker);
 };
@@ -169,7 +244,7 @@ export const calculateHashFromDirectory = async (
       stack.push(...entry.children.toReversed());
     } else {
       const reader = entry.file.stream().getReader();
-      await calculateFileHash(worker, options, reader, progressTracker);
+      await calculateNormalFileHash(worker, options, reader, progressTracker);
     }
   }
   return finalize(worker);

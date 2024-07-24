@@ -19,5 +19,13 @@ export type DirEntry =
       readonly file: File;
       readonly mtime: number;
     };
-
+export type FilesOrEntries =
+  | {
+      readonly type: 'multi-file';
+      readonly files: readonly File[];
+    }
+  | {
+      readonly type: 'dir-entries';
+      readonly entries: readonly DirEntry[];
+    };
 export type ExtractProps<C> = C extends FC<infer P> ? P : never;

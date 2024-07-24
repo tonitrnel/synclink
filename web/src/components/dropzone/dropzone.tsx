@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { ReactComponent as SendIcon } from '~/assets/send.svg';
 import { IGNORE_FILE_TYPE } from '~/constants';
-import type { DirEntry } from '~/constants/types.ts';
+import type { DirEntry, FilesOrEntries } from '~/constants/types.ts';
 import './dropzone.less';
 
 type SettledDirEntry = Exclude<DirEntry, { type: 'file' }>;
@@ -83,16 +83,6 @@ const scanFiles = async (items: FileSystemEntry[]): Promise<DirEntry[]> => {
   }
   return tree;
 };
-
-export type FilesOrEntries =
-  | {
-      readonly type: 'multi-file';
-      readonly files: readonly File[];
-    }
-  | {
-      readonly type: 'dir-entries';
-      readonly entries: readonly DirEntry[];
-    };
 
 export const DropZone: FC<{
   onReceivedTransferData?(

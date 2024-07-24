@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="./constants/wicg-file-system-access" />
 
 declare module '*.svg' {
   import * as React from 'react';

@@ -80,7 +80,7 @@ export const Snackbar: FC<
           message={message}
           action={actionElement}
           className={clsx(
-            'flex items-center shadow-xl text-white gap-2 leading-none rounded-lg border border-solid border-gray-300',
+            'flex items-center shadow-xl text-white gap-2 leading-none rounded-lg border border-solid border-[#00000046]',
             {
               sm: 'p-3',
               md: 'p-4',
@@ -198,7 +198,7 @@ export const SnackbarContainer: FC<
   }>
 > = ({ children, onExit }) => {
   return (
-    <ul className="fixed left-[50%] translate-x-[-50%] top-8 box-border max-h-full max-w-full h-auto z-10 flex items-center flex-col pointer-events-none gap-2 w-[80vw] pad:w-auto">
+    <ul className="fixed left-[50%] translate-x-[-50%] top-8 box-border max-h-full max-w-full h-auto flex items-center flex-col pointer-events-none gap-2 w-[80vw] pad:w-auto z-[9999]">
       <AnimatePresence onExitComplete={onExit}>{children}</AnimatePresence>
     </ul>
   );

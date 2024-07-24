@@ -33,6 +33,7 @@ class NotifyManager extends EventBus<
 > {
   private eventSource: EventSource | undefined;
   public clientId: string | undefined;
+  public clientPin: string | undefined;
   private connecting = false;
   private visibilityTimer: number | undefined;
   public keepConnection = false;
@@ -52,8 +53,10 @@ class NotifyManager extends EventBus<
         const eventSource = new EventSource(`${__ENDPOINT__}/api/notify`);
         eventSource.onmessage = this.handleMessage;
         eventSource.onopen = () => {
-          this.once('CLIENT_ID', (id) => {
+          this.once('CLIENT_ID', (value) => {
+            const [id, pin] = value.split(';');
             this.clientId = id;
+            this.clientPin = pin;
             this.emit('CONNECTED');
             resolve(id);
           });

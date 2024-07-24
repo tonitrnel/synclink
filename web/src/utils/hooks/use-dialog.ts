@@ -28,13 +28,14 @@ export type OpenFn<
 
 export type CloseFn<
   Props extends { onClose?: Fn },
+  R,
   CloseFunc extends Fn = NonNullable<Props['onClose']>,
 > = CloseFunc extends Fn
-  ? (...args: Parameters<CloseFunc>) => ReturnType<CloseFunc>
+  ? (...args: Parameters<CloseFunc>) => R
   : Fn;
 
-export interface DialogOptions<Props extends {}> {
-  onClose?: CloseFn<Props>;
+export interface DialogOptions<Props extends {}, R> {
+  onClose?: CloseFn<Props, R>;
 }
 interface MetadataRef {
   unmounted: boolean;
@@ -53,9 +54,10 @@ interface MetadataRef {
 export const useDialog = <
   C extends FC<any>,
   P extends ExtractProps<C> = ExtractProps<C>,
+  R = void
 >(
   Component: C,
-  options?: DialogOptions<P>,
+  options?: DialogOptions<P, R>,
 ) => {
   const metadataRef = useRef<MetadataRef>({
     unmounted: false,
@@ -103,7 +105,7 @@ export const useDialog = <
   const awaitCloseHandler = useCallback(() => {
     const metadata = metadataRef.current;
     if (!metadata.opened) throw new Error('Dialog is not opened');
-    return new Promise<ReturnType<CloseFn<P>>>((resolve, reject) => {
+    return new Promise<R>((resolve, reject) => {
       metadata.awaitQueue.push({ resolve, reject });
     });
   }, []);

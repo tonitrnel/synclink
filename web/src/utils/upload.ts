@@ -1,17 +1,17 @@
 import {
-  calculateHash,
+  calculateHashFromArrayBuffer,
   calculateHashFromDirectory,
   calculateHashFromStream,
 } from './calculate-hash.ts';
 import { UploadManager } from '~/components/upload-manager';
 import { Logger } from '~/utils/logger.ts';
 import { t } from '@lingui/macro';
-import { DirEntry } from '~/constants/types.ts';
+import { DirEntry, FilesOrEntries } from '~/constants/types.ts';
 import { calculateTarSize } from '~/utils/calculate-tarsize.ts';
 import { toTarStream } from '~/utils/to-tar-stream.ts';
 import { progressStream } from '~/utils/progress-stream.ts';
-import { TarExtractor } from '../../../wasm/tar/pkg';
 import { createTransmissionRateCalculator } from './transmission-rate-calculator.ts';
+import dayjs from 'dayjs';
 
 const logger = new Logger('upload');
 
@@ -30,12 +30,28 @@ const preflight = async (hash: string, size: number): Promise<boolean> => {
   );
 };
 
+const buildParams = (
+  caption: string | undefined,
+  tags: string[] | undefined,
+) => {
+  const params = new URLSearchParams();
+  if (caption) params.set('caption', caption);
+  if (tags && tags.length > 0) params.set('tags', tags.join(','));
+  return params.size > 0 ? `?${params.toString()}` : '';
+};
 /**
  * Fast upload
  * @param file
  */
-const fastPerform = async (file: File) => {
-  const hash = await calculateHash(file.arrayBuffer(), 'SHA-256');
+const fastPerform = async (
+  file: File,
+  caption: string | undefined,
+  tags: string[] | undefined,
+) => {
+  const hash = await calculateHashFromArrayBuffer(
+    file.arrayBuffer(),
+    'SHA-256',
+  );
   const alreadyExists = await preflight(hash, file.size);
   if (alreadyExists) {
     throw new Error(t`resource already exists`);
@@ -46,7 +62,7 @@ const fastPerform = async (file: File) => {
   if (file.name.length > 0) {
     headers['x-raw-filename'] = encodeURI(file.name);
   }
-  await fetch(`${__ENDPOINT__}/api/upload`, {
+  await fetch(`${__ENDPOINT__}/api/upload${buildParams(caption, tags)}`, {
     method: 'POST',
     body: file,
     headers,
@@ -58,7 +74,11 @@ const fastPerform = async (file: File) => {
     return responseText;
   });
 };
-const slowPerform = async (file: File) => {
+const slowPerform = async (
+  file: File,
+  caption: string | undefined,
+  tags: string[] | undefined,
+) => {
   const abort = new AbortController();
   const manager = await UploadManager.oneshot.fire({
     filename: file.name,
@@ -71,7 +91,7 @@ const slowPerform = async (file: File) => {
   });
   manager.scrollIntoView();
   try {
-    const hash = await calculateHashFromStream(file.stream(), {
+    const hash = await calculateHashFromStream(file.stream(), file.type, {
       signal: abort.signal,
       onReady: () => {
         manager.entryHashCalculatingStage();
@@ -85,7 +105,10 @@ const slowPerform = async (file: File) => {
     });
     const setupTime = Date.now();
     const alreadyExists = await preflight(hash, file.size);
-    if (alreadyExists) return manager.entryCompleteStage();
+    if (alreadyExists) {
+      manager.entryCompleteStage();
+      throw new Error(t`resource already exists`);
+    }
     // 100 MB
     const uid = await (file.size > 104_857_600 ? uploadByParts : uploadByWhole)(
       file,
@@ -95,6 +118,8 @@ const slowPerform = async (file: File) => {
         signal: abort.signal,
         chunkSize: 104_857_600,
         manager,
+        caption,
+        tags,
         onReady: () => manager.ready(),
         onProgress: (loaded, speed) => manager.setLoaded(loaded, speed),
         onAllSent: () => {
@@ -110,11 +135,15 @@ const slowPerform = async (file: File) => {
     manager.failed(String(e));
   }
 };
-const dirPerform = async (entries: readonly DirEntry[]) => {
-  if (entries.length !== 1) throw new Error('only one directory');
+const dirPerform = async (
+  entries: readonly DirEntry[],
+  caption: string | undefined,
+  tags: string[] | undefined,
+) => {
+  if (entries.length == 0) throw new Error('Must exists one entry');
   const abort = new AbortController();
   const size = calculateTarSize(entries);
-  const filename = entries[0].name;
+  const filename = entries.length > 0 ? `collection_${dayjs().format("YYYY-MM-DD")}` :entries[0].name;
   const mimetype = 'application/x-tar';
   const setupTime = Date.now();
   const manager = await UploadManager.oneshot.fire({
@@ -172,6 +201,8 @@ const dirPerform = async (entries: readonly DirEntry[]) => {
         signal: abort.signal,
         chunkSize: 104_857_600,
         manager,
+        caption,
+        tags,
         onReady: () => manager.ready(),
         onProgress: (loaded, speed) => manager.setLoaded(loaded, speed),
         onAllSent: () => {
@@ -346,52 +377,31 @@ const uploadByParts = async (
   return uid;
 };
 
-export const upload = async (fileOrEntries: File | readonly DirEntry[]) => {
-  if (fileOrEntries instanceof File) {
-    if (fileOrEntries.type == 'application/x-tar') {
-      const extractor = TarExtractor.create(4096);
-      const reader = fileOrEntries.stream().getReader();
-      while (true) {
-        const result = extractor.pull();
-        let flow: 'continue' | 'break' = 'continue';
-        switch (result.type) {
-          case 'further': {
-            const { done, value } = await reader.read();
-            if (done) {
-              if (extractor.pullable()) {
-                flow = 'continue';
-              } else {
-                flow = 'break';
-              }
-              break;
-            }
-            extractor.push(value!);
-            break;
-          }
-          case 'header': {
-            console.log(result.payload);
-            break;
-          }
-          case 'data': {
-            break;
-          }
-        }
-        if (flow === 'continue') {
-          continue;
-        }
-        if (flow === 'break') {
-          break;
-        }
+export const upload = async (
+  fileOrEntries: FilesOrEntries,
+  caption?: string | undefined,
+  tags?: string[] | undefined,
+) => {
+  if (fileOrEntries.type == 'multi-file') {
+    if (fileOrEntries.files.length == 1) {
+      const file = fileOrEntries.files[0];
+      // 2 MB
+      if (file.size < 2_097_152 && file.type !== 'application/x-tar') {
+        return fastPerform(file, caption, tags);
+      } else {
+        return slowPerform(file, caption, tags);
       }
-    }
-    // 2 MB
-    if (fileOrEntries.size < 2_097_152) {
-      return fastPerform(fileOrEntries);
     } else {
-      return slowPerform(fileOrEntries);
+      const entries = fileOrEntries.files.map<DirEntry>((it) => ({
+        name: it.name,
+        path: it.name,
+        type: 'file',
+        file: it,
+        mtime: it.lastModified,
+      }));
+      return dirPerform(entries, caption, tags);
     }
-  }
-  if (Array.isArray(fileOrEntries)) {
-    return dirPerform(fileOrEntries);
+  } else if (fileOrEntries.type == 'dir-entries') {
+    return dirPerform(fileOrEntries.entries, caption, tags);
   }
 };

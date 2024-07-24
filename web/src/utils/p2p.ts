@@ -59,6 +59,7 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
   private established = false;
   public readonly protocol = 'webrtc';
   public rtt = 0;
+  public MAC_PACKET_SIZE = 16 * 1024;
 
   public constructor(
     readonly requestId: string,
@@ -90,6 +91,12 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
         PacketFlag.SHAKEHAND,
       );
       this.emit('CONNECTION_READY');
+      if (this.conn.sctp?.maxMessageSize) {
+        console.log(
+          `maxMessageSize: ${this.conn.sctp.maxMessageSize / 1024}kb maxChannels:${this.conn.sctp.maxChannels}`,
+        );
+        this.MAC_PACKET_SIZE = this.conn.sctp.maxMessageSize - 16; // 预留 16 bytes 的元数据空间
+      }
       this.runIntervalPing();
     });
     this.on(PacketFlag.PEER_CLOSE, () => {

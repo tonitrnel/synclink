@@ -1,0 +1,12 @@
+.upload-dialog__file-tags {
+  ul {
+    padding: 4px 9px;
+    @apply w-full rounded-lg;
+  }
+  li[role='option'] {
+    line-height: 1;
+    padding: 4px 6px;
+    background: initial;
+    @apply rounded-lg border border-gray-300 my-1;
+  }
+}

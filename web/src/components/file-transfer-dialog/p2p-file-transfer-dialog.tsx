@@ -19,10 +19,12 @@ import { notifyManager } from '~/utils/notify-manager.ts';
 import { P2PRtc, P2PSocket, PacketFlag, RTCImpl } from '~/utils/p2p.ts';
 import { Dialog } from 'primereact/dialog';
 import { Divider } from 'primereact/divider';
+import { InputOtp, InputOtpChangeEvent } from 'primereact/inputotp';
 import { getBrowserInfo, getDeviceType } from '~/utils/get-device-type.ts';
 import {
   AlertCircleIcon,
   CheckCircleIcon,
+  KeyIcon,
   LaptopIcon,
   LoaderCircleIcon,
   PcCaseIcon,
@@ -34,18 +36,18 @@ import {
 import { Button } from 'primereact/button';
 import { Loading } from '~/components/loading';
 import { t } from '@lingui/macro';
-import { InputSwitch, InputSwitchChangeEvent } from 'primereact/inputswitch';
-import { InputOtp, InputOtpChangeEvent } from 'primereact/inputotp';
 import { withProduce } from '~/utils/with-produce';
 import { clsx } from '~/utils/clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { formatBytes } from '~/utils/format-bytes';
-import { useLatestRef } from '@painted/shared';
+import { useConstant, useLatestRef } from '@painted/shared';
 import {
   createRemainingTimeCalculator,
   createTransmissionRateCalculator,
 } from '~/utils/transmission-rate-calculator';
 import { formatSeconds } from '~/utils/format-time';
+import { Dropdown } from 'primereact/dropdown';
+import { useSnackbar } from '../snackbar';
 
 type Panel =
   | {
@@ -65,7 +67,7 @@ type Panel =
       element: ReactElement;
     };
 
-export const P2pFileDeliveryDialog: FC<{
+export const P2pFileTransferDialog: FC<{
   mode?: 'sender' | 'receiver';
   id?: string;
   onClose(): void;
@@ -74,10 +76,12 @@ export const P2pFileDeliveryDialog: FC<{
     receiverId: string | undefined;
     senderId: string | undefined;
     connection: RTCImpl | undefined;
+    protocol?: ProtocolPriority;
   }>(() => ({
     receiverId: undefined,
     senderId: mode == 'receiver' ? id : undefined,
     connection: undefined,
+    protocol: undefined,
   }));
   const participantsRef = useLatestRef([state.senderId, state.receiverId]);
   const { data: connections = [], refresh } = useGetSseConnections({
@@ -91,12 +95,16 @@ export const P2pFileDeliveryDialog: FC<{
     ],
     [connections],
   );
-  const handleConnect = useCallback((id: string) => {
-    withProduce(setState, (draft) => {
-      draft.receiverId = id;
-      draft.senderId = notifyManager.clientId!;
-    });
-  }, []);
+  const handleConnect = useCallback(
+    (id: string, protocol?: ProtocolPriority) => {
+      withProduce(setState, (draft) => {
+        draft.receiverId = id;
+        draft.senderId = notifyManager.clientId!;
+        draft.protocol = protocol;
+      });
+    },
+    [],
+  );
   const handleSuccess = useCallback((conn: RTCImpl) => {
     withProduce(setState, (draft) => {
       draft.connection = conn;
@@ -155,16 +163,17 @@ export const P2pFileDeliveryDialog: FC<{
       return {
         key: 'third',
         element: (
-          <P2PFileDelivery conn={state.connection} onClose={handleConnClose} />
+          <FileSelection conn={state.connection} onClose={handleConnClose} />
         ),
       };
     else if (mode == 'receiver' || state.receiverId)
       return {
         key: 'second',
         element: (
-          <P2PConnectControl
+          <ConnectionStatus
             receiverId={state.receiverId}
             mode={mode}
+            protocol={state.protocol}
             onSuccess={handleSuccess}
             onCancel={handleCancel}
           />
@@ -174,7 +183,7 @@ export const P2pFileDeliveryDialog: FC<{
       return {
         key: 'first',
         element: (
-          <Invitations
+          <ClientSetup
             currentConnection={currentConnection}
             otherConnections={otherConnections}
             onConnect={handleConnect}
@@ -193,10 +202,11 @@ export const P2pFileDeliveryDialog: FC<{
   })();
   return (
     <Dialog
-      header="Peer to peer file delivery"
+      header={`Peer to peer file transfer`}
       visible={true}
       onHide={onClose}
       className="w-[500px]"
+      id="p2p-file-transfer-dialog"
     >
       <AnimatePresence mode="wait">
         <motion.section
@@ -228,13 +238,15 @@ const ConnectionItem: FC<{
         <UserAgent value={conn.user_agent} className="w-[360px] mt-2" />
       </div>
       {!isCurrent && (
-        <Button link onClick={() => onClick(conn.id)} size="small">
-          {t`connect`}
+        <Button link onClick={() => onClick(conn.id)} className="px-3 py-2 m-1">
+          {t`Connect`}
         </Button>
       )}
     </li>
   );
 };
+
+type ProtocolPriority = 'webrtc' | 'websocket';
 
 const UserAgent: FC<{
   value: string;
@@ -272,33 +284,37 @@ const UserAgent: FC<{
   );
 });
 
-const Invitations: FC<{
+const ClientSetup: FC<{
   currentConnection: InferResponse<typeof useGetSseConnections>[number];
   otherConnections: InferResponse<typeof useGetSseConnections>;
-  onConnect(targetId: string): void;
+  onConnect(targetId: string, protocol?: ProtocolPriority): void;
 }> = ({ currentConnection, otherConnections, onConnect }) => {
-  const [pin, setPin] = useState<{
-    enabled: boolean;
-    value: string | undefined;
+  const [state, setState] = useState<{
+    pin: string[] | undefined;
+    protocol: 'auto' | ProtocolPriority;
   }>(() => ({
-    enabled: false,
-    value: undefined,
+    pin: notifyManager.clientPin?.split(''),
+    protocol: 'auto',
   }));
-  const onTogglePin = useCallback((evt: InputSwitchChangeEvent) => {
-    setPin({
-      enabled: evt.value,
-      value: undefined,
-    });
-  }, []);
-  const onPinChange = useCallback((evt: InputOtpChangeEvent) => {
-    withProduce(
-      setPin,
-      (draft) => void (draft.value = evt.value ? String(evt.value) : undefined),
-    );
-  }, []);
+  const protocolRef = useLatestRef(state.protocol);
+  const protocolOptions = useMemo(
+    () => [
+      { label: t`Auto`, value: 'auto' },
+      { label: 'WebRTC', value: 'webrtc' },
+      { label: 'WebSocket', value: 'websocket' },
+    ],
+    [],
+  );
+  const handleConnect = useCallback(
+    (id: string) => {
+      const protocol = protocolRef.current;
+      onConnect(id, protocol == 'auto' ? undefined : protocol);
+    },
+    [onConnect, protocolRef],
+  );
   return (
     <section className="w-full">
-      <form className="flex flex-col gap-8 w-full">
+      <form className="flex flex-col gap-6 w-full">
         <div className="flex items-center justify-between gap-8 w-full">
           <div className="flex-1">
             <label className="font-bold">ID</label>
@@ -307,49 +323,57 @@ const Invitations: FC<{
         </div>
         <div className="flex items-center justify-between gap-8 w-full">
           <div className="flex-1">
-            <label className="font-bold">User agent</label>
+            <label className="font-bold">{t`User agent`}</label>
           </div>
           <UserAgent value={currentConnection.user_agent} />
+        </div>
+        <div className="flex items-center justify-between gap-8 w-full">
+          <div className="flex-1">
+            <label className="font-bold">{t`Protocol`}</label>
+          </div>
+          <Dropdown
+            value={state.protocol}
+            onChange={(evt) =>
+              withProduce(
+                setState,
+                (draft) => void (draft.protocol = evt.value),
+              )
+            }
+            options={protocolOptions}
+            optionLabel="label"
+          />
         </div>
         <div className="w-full">
           <div className="flex items-center justify-between gap-8">
             <div className="flex-1">
-              <label className="font-bold">Peer PIN</label>
-              <p className="text-gray-300 mt-1">
-                Enabling PIN ensures you won't connect to unknown client. If the
-                other party has enabled PIN, you also need to enable it to
-                connect.
-              </p>
+              <label className="font-bold">{t`Peer PIN`}</label>
             </div>
-            <InputSwitch
-              id="pin-switch"
-              checked={pin.enabled}
-              onChange={onTogglePin}
-            />
+            <div className="font-mono">
+              {state.pin?.map((it, i) => (
+                <span key={`${i}${it}`} className="text-gray-500">
+                  {it}
+                </span>
+              )) ?? <span className="text-gray-400">{'<unset>'}</span>}
+            </div>
           </div>
-          {pin.enabled && (
-            <div className="mt-4">
-              <InputOtp value={pin.value} onChange={onPinChange} />
-            </div>
-          )}
         </div>
       </form>
       <Divider align="center">
-        <span>Client</span>
+        <span>{t`Client`}</span>
       </Divider>
       <section>
-        <ul className="my-2">
+        <ul className="my-2 max-h-[120px] overflow-y-auto">
           {otherConnections.length > 0 ? (
             otherConnections.map((it) => (
               <ConnectionItem
                 key={it.id}
                 isCurrent={false}
                 conn={it}
-                onClick={onConnect}
+                onClick={handleConnect}
               />
             ))
           ) : (
-            <li className="text-gray-300 py-3 select-none">{t`no data`}</li>
+            <li className="text-gray-300 py-3 select-none">{t`No data`}</li>
           )}
         </ul>
       </section>
@@ -365,30 +389,47 @@ enum ConnectStatus {
   Accepted,
   RejectedByPeer,
   ConnectionTimeout,
+  WaitingForKeyInput,
 }
 
-const P2PConnectControl: FC<{
+const ConnectionStatus: FC<{
   receiverId?: string;
   mode: 'sender' | 'receiver';
+  protocol?: ProtocolPriority;
   onCancel(): void;
   onSuccess(conn: RTCImpl, delay: number): void;
-}> = ({ mode, receiverId, onSuccess, onCancel }) => {
+}> = ({ mode, protocol, receiverId, onSuccess, onCancel }) => {
   const [state, setState] = useState<{
     error: Error | undefined;
     status: ConnectStatus;
     protocol: string;
     delay: number;
+    requirePin: boolean;
+    pin: string;
   }>(() => ({
     error: undefined,
     status:
       mode == 'sender'
-        ? ConnectStatus.WaitingForAcceptance
+        ? notifyManager.clientPin !== undefined
+          ? ConnectStatus.WaitingForKeyInput
+          : ConnectStatus.WaitingForAcceptance
         : ConnectStatus.Accepted,
     protocol: 'webrtc',
     delay: 0,
+    requirePin: notifyManager.clientPin !== undefined,
+    pin: '',
   }));
-  const { execute: createP2PRequest } = usePostCreateP2PRequest();
+  const metadata = useConstant<{
+    requestId: string | undefined;
+    clientId: string | undefined;
+  }>(() => ({
+    requestId: undefined,
+    clientId: undefined,
+  }));
+  const { execute: createP2PRequest, pending: creating } =
+    usePostCreateP2PRequest();
   const { execute: discardP2PRequest } = useDeleteDiscardP2PRequest();
+  const snackbar = useSnackbar();
 
   const statusTexts = useMemo(
     () => ({
@@ -399,25 +440,50 @@ const P2PConnectControl: FC<{
       [ConnectStatus.Accepted]: '已接受，等待建立连接',
       [ConnectStatus.RejectedByPeer]: '对方已拒绝',
       [ConnectStatus.ConnectionTimeout]: '连接超时',
+      [ConnectStatus.WaitingForKeyInput]: '请输入连接密钥',
     }),
     [state.protocol, state.delay],
   );
-  useEffect(() => {
-    let conn: RTCImpl | undefined = undefined;
-    let clientId: string | undefined = undefined;
-    let requestId: string | undefined = undefined;
-    const createRequest = async (id: string) => {
+
+  const createRequest = useCallback(
+    async (id: string, target_pin?: string): Promise<boolean> => {
       try {
         const res = await createP2PRequest({
           client_id: notifyManager.clientId!,
           target_id: id,
           supports_rtc: Reflect.has(window, 'RTCPeerConnection'),
+          target_pin,
         });
-        requestId = res.request_id;
+        metadata.requestId = res.request_id;
+        return true;
       } catch (e) {
         console.error('Failed to create request', e);
+        if (e instanceof Error) {
+          snackbar.enqueueSnackbar({
+            variant: 'error',
+            message: e.message,
+          });
+        }
+        return false;
       }
-    };
+    },
+    [createP2PRequest, metadata, snackbar],
+  );
+
+  const discardRequest = useCallback(
+    (requestId: string) => {
+      discardP2PRequest({ request_id: requestId }).catch(console.warn);
+    },
+    [discardP2PRequest],
+  );
+  const handleChangePin = useCallback((evt: InputOtpChangeEvent) => {
+    withProduce(setState, (draft) => {
+      draft.pin = evt.value?.toString() || '';
+    });
+  }, []);
+  useEffect(() => {
+    let conn: RTCImpl | undefined = undefined;
+
     const testAvailability = async () => {
       if (!conn) return void 0;
       try {
@@ -448,23 +514,30 @@ const P2PConnectControl: FC<{
         }
       }
     };
-    if (mode == 'sender') {
+    if (mode == 'sender' && !state.requirePin) {
       createRequest(receiverId!).catch(console.error);
+    }
+    if (mode == 'sender' && state.requirePin) {
+      const input = document.querySelector<HTMLInputElement>(
+        'div#pin-input input',
+      );
+      if (input) setTimeout(() => input.focus());
     }
     return notifyManager.batch(
       notifyManager.on('P2P_EXCHANGE', async (value) => {
         // console.log('exchange', value);
-        clientId = notifyManager.clientId;
-        requestId = value.request_id;
-        if (!requestId) throw new Error('Unexpected error, missing requestId');
+        metadata.clientId = notifyManager.clientId;
+        metadata.requestId = value.request_id;
+        if (!metadata.requestId)
+          throw new Error('Unexpected error, missing requestId');
         withProduce(setState, (draft) => {
           draft.status = ConnectStatus.Connecting;
           draft.protocol = value.protocol;
         });
-        switch (value.protocol) {
+        switch (protocol || value.protocol) {
           case 'webrtc': {
-            if (value.participants[0] == clientId) {
-              const webrtc = new P2PRtc(requestId, clientId);
+            if (value.participants[0] == metadata.clientId) {
+              const webrtc = new P2PRtc(metadata.requestId, metadata.clientId);
               await webrtc.createSender();
               // console.log(webrtc);
               conn = webrtc;
@@ -472,7 +545,10 @@ const P2PConnectControl: FC<{
             break;
           }
           case 'websocket': {
-            const websocket = new P2PSocket(requestId, clientId!);
+            const websocket = new P2PSocket(
+              metadata.requestId,
+              metadata.clientId!,
+            );
             // console.log(websocket);
             conn = websocket;
           }
@@ -485,8 +561,8 @@ const P2PConnectControl: FC<{
       notifyManager.on('P2P_SIGNALING', async (value) => {
         if (value[0] == 0) {
           if (value[1].type === 'offer') {
-            if (!requestId || !clientId) return void 0;
-            const webrtc = new P2PRtc(requestId, clientId);
+            if (!metadata.requestId || !metadata.clientId) return void 0;
+            const webrtc = new P2PRtc(metadata.requestId, metadata.clientId);
             await webrtc.createReceiver(value[1]);
             conn = webrtc;
             conn.once('CONNECTION_READY', () => {
@@ -503,23 +579,45 @@ const P2PConnectControl: FC<{
         }
       }),
       notifyManager.on('P2P_REJECT', (id) => {
-        console.log('id', id, 'requestId', requestId);
-        if (id !== requestId) return void 0;
+        console.log('id', id, 'requestId', metadata.requestId);
+        if (id !== metadata.requestId) return void 0;
         withProduce(setState, (draft) => {
           draft.status = ConnectStatus.RejectedByPeer;
         });
       }),
       () => {
         conn?.close();
-        // if (requestId && mode == 'sender')
-        //   discardP2PRequest({ request_id: requestId }).catch(console.warn);
+        if (metadata.requestId && mode == 'sender' && !conn)
+          discardRequest(metadata.requestId);
       },
     );
-  }, [createP2PRequest, discardP2PRequest, mode, onSuccess, receiverId]);
+  }, [
+    createRequest,
+    discardRequest,
+    metadata,
+    mode,
+    onSuccess,
+    protocol,
+    receiverId,
+    snackbar,
+    state.requirePin,
+  ]);
+  useEffect(() => {
+    if (state.pin.length != 6 || !receiverId) return void 0;
+    createRequest(receiverId, state.pin).then((success) => {
+      if (success) {
+        withProduce(setState, (draft) => {
+          draft.status = ConnectStatus.WaitingForAcceptance;
+        });
+      }
+    });
+  }, [createRequest, receiverId, state.pin]);
   const icon = (() => {
     switch (state.status) {
       case ConnectStatus.RejectedByPeer:
         return <XCircleIcon className="w-[32px] h-[32px] stroke-error-main" />;
+      case ConnectStatus.WaitingForKeyInput:
+        return <KeyIcon className="w-[24px] h-[24px] -mt-4" />;
       default:
         return (
           <svg
@@ -571,10 +669,20 @@ const P2PConnectControl: FC<{
           <div className="relative text-center mt-10">
             {statusTexts[state.status]}
           </div>
+          {state.status == ConnectStatus.WaitingForKeyInput && (
+            <div id="pin-input" className="mt-6">
+              <InputOtp
+                length={6}
+                disabled={creating}
+                value={state.pin}
+                onChange={handleChangePin}
+              />
+            </div>
+          )}
         </div>
       )}
       <Button severity="danger" onClick={onCancel} className="px-3 py-2">
-        Cancel
+        {t`cancel`}
       </Button>
     </section>
   );
@@ -597,7 +705,7 @@ interface DeliveryFile extends FileMetadata {
   aborted: boolean;
 }
 
-const P2PFileDelivery: FC<{
+const FileSelection: FC<{
   conn: RTCImpl;
   onClose(code: number, reason: string): void;
 }> = ({ conn, onClose }) => {
@@ -641,16 +749,20 @@ const P2PFileDelivery: FC<{
         let transmitted = 0;
         let packetSeq = 0;
         let previousUpdateTime = Date.now();
-        const reader = createLimitedStream(
-          file.stream(),
-          16 * 1024,
-        ).getReader();
+        const reader =
+          conn.protocol === 'webrtc'
+            ? createLimitedStream(
+                file.stream(),
+                (conn as P2PRtc).MAC_PACKET_SIZE,
+              ).getReader()
+            : file.stream().getReader();
         const getTransmissionRate = createTransmissionRateCalculator(
           fileMetadata.date,
         );
         const getRemainingTime = createRemainingTimeCalculator(
           fileMetadata.size,
         );
+        const enableAck = conn.protocol === 'webrtc';
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
@@ -670,33 +782,38 @@ const P2PFileDelivery: FC<{
           createACKPacket(fileSeq, packetSeq, buf);
           new Uint8Array(buf, ACK_PACKET_LENGTH, value.length).set(value);
           const bytes = new Uint8Array(buf);
-          let ackReceived = false;
-          for (let i = 0; i <= 3; i++) {
-            await conn.waitForDrain();
-            if (i > 0) {
-              console.log(
-                `发送 packet #${fileSeq}_${packetSeq} 失败，Attempt ${i}th retransmit`,
+          if (enableAck) {
+            let ackReceived = false;
+            for (let i = 0; i <= 3; i++) {
+              await conn.waitForDrain();
+              if (i > 0) {
+                console.log(
+                  `发送 packet #${fileSeq}_${packetSeq} 失败，Attempt ${i}th retransmit`,
+                );
+              }
+              conn.send(bytes);
+              if (!(await recvACKPacket(conn, fileSeq, packetSeq, 5_000))) {
+                continue;
+              }
+              // console.log(`发送 PACKET #${fileSeq}_${packetSeq} success!`);
+              ackReceived = true;
+              break;
+            }
+            if (!ackReceived) {
+              console.warn(
+                `Failed to send packet #${fileSeq}_${packetSeq}; exited!`,
               );
+              withProduce(setDeliveryItems, (draft) => {
+                const target = draft.find((it) => it.seq == fileSeq);
+                if (!target) return void 0;
+                target.aborted = true;
+              });
+              // console.error(new AckTimeoutError(packetSeq, 5_000));
+              break;
             }
+          } else {
+            await conn.waitForDrain();
             conn.send(bytes);
-            if (!(await recvACKPacket(conn, fileSeq, packetSeq, 5_000))) {
-              continue;
-            }
-            console.log(`发送 PACKET #${fileSeq}_${packetSeq} success!`);
-            ackReceived = true;
-            break;
-          }
-          if (!ackReceived) {
-            console.warn(
-              `Failed to send packet #${fileSeq}_${packetSeq}; exited!`,
-            );
-            withProduce(setDeliveryItems, (draft) => {
-              const target = draft.find((it) => it.seq == fileSeq);
-              if (!target) return void 0;
-              target.aborted = true;
-            });
-            // console.error(new AckTimeoutError(packetSeq, 5_000));
-            break;
           }
           const packetLength = value.length;
           transmitted += packetLength;
@@ -840,6 +957,8 @@ const P2PFileDelivery: FC<{
 
             receiver!.return();
           };
+          const enableAck = conn.protocol === 'webrtc';
+
           // 表示已收到 Metadata Packet 数据, packetSeq 为 0
           // console.log('fileSeq', fileSeq, 'packetSeq', packetSeq);
           conn.send(createACKPacket(fileSeq, packetSeq), PacketFlag.ACK);
@@ -901,9 +1020,14 @@ const P2PFileDelivery: FC<{
                 // 发送 ACK
                 const packetLength = packet.byteLength - 8;
                 received += packetLength;
-                // await conn.waitForDrain();
-                conn.send(createACKPacket(fileSeq, _packetSeq), PacketFlag.ACK);
-                // console.log('发送 ACK', fileSeq, _packetSeq);
+                if (enableAck) {
+                  // await conn.waitForDrain();
+                  conn.send(
+                    createACKPacket(fileSeq, _packetSeq),
+                    PacketFlag.ACK,
+                  );
+                  // console.log('发送 ACK', fileSeq, _packetSeq);
+                }
 
                 // 刷新 UI
                 if (received >= total) {
@@ -934,8 +1058,12 @@ const P2PFileDelivery: FC<{
   return (
     <section className="flex flex-col w-full items-center gap-2">
       <p className="w-full flex text-left gap-1">
-        <span>Protocol: {conn.protocol}</span>
-        <span>RTT: {rtt}ms</span>
+        <span>
+          {t`Protocol`}: {conn.protocol}
+        </span>
+        <span>
+          {t`RTT`}: {rtt}ms
+        </span>
       </p>
       <div
         ref={containerRef}
@@ -943,13 +1071,13 @@ const P2PFileDelivery: FC<{
       >
         <UploadIcon className="w-10 h-10" />
         <p className="flex items-center gap-1 mt-6">
-          <span className="leading-none">Drag and Drop file here or</span>
+          <span className="leading-none">{t`Drag and Drop file here or`}</span>
           <Button
             text
             className="p-0 leading-none underline rounded-none"
             onClick={onClickChoose}
           >
-            Choose file
+            {t`Choose file`}
           </Button>
         </p>
         <input
@@ -961,10 +1089,10 @@ const P2PFileDelivery: FC<{
         />
       </div>
       <div className="w-full mt-4">
-        <span className="font-bold ml-1">History:</span>
-        <ul className="w-full mt-2">
+        <span className="font-bold ml-1">{t`History:`}</span>
+        <ul className="w-full mt-2  max-h-[120px] overflow-y-auto">
           {deliveryItems.length == 0 ? (
-            <li>no history</li>
+            <li className="text-gray-300 mt-2 ml-1">{t`No data`}</li>
           ) : (
             deliveryItems.map((it) => (
               <li

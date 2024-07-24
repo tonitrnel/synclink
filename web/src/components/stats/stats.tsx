@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect } from 'react';
+import { FC, useCallback, useEffect, useMemo } from 'react';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { clsx } from '~/utils/clsx.ts';
 import { RefreshCwIcon } from 'icons';
@@ -13,6 +13,9 @@ export const Stats: FC<{
     refresh: _refresh,
   } = useGetStats({
     keepDirtyOnPending: true,
+    cache: {
+      key: 'stats'
+    }
   });
   const refresh = useCallback(() => _refresh(), [_refresh]);
   useEffect(() => {
@@ -23,16 +26,30 @@ export const Stats: FC<{
       window.removeEventListener('focus', refresh);
     };
   }, [refresh]);
+  const stats = useMemo(() => {
+    if (!data) return undefined;
+    return {
+      storage_quota: formatBytes(data.storage_quota),
+      disk_usage: formatBytes(data.disk_usage),
+      percentage: `(${Math.floor(
+        (data.disk_usage / (data.storage_quota - data.default_reserved)) * 100,
+      )})%`,
+      memory_usage: formatBytes(data.memory_usage),
+      uptime: formatDur(data?.uptime ?? 0),
+    };
+  }, [data]);
   return (
     <div className={className}>
-      <span>disk: {formatBytes(data?.disk_usage ?? 0)}</span>
-      <span>mem: {formatBytes(data?.memory_usage ?? 0)}</span>
-      <span>uptime: {formatDur(data?.uptime ?? 0)}</span>
+      <span title={`${stats?.disk_usage}/${stats?.storage_quota}${stats?.percentage}`}>
+        disk: {stats?.disk_usage || '-'}
+      </span>
+      <span>mem: {stats?.memory_usage || '-'}</span>
+      <span>uptime: {stats?.uptime || '-'}</span>
       <RefreshCwIcon
         onClick={refresh}
         className={clsx(
           'w-4 h-4 cursor-pointer',
-          data && pending && 'animate-spin'
+          data && pending && 'animate-spin',
         )}
       />
     </div>

@@ -19,7 +19,7 @@ import {
   FileUpIcon,
   FolderUpIcon,
 } from 'icons';
-import { DropZone, FilesOrEntries } from '../dropzone';
+import { DropZone } from '../dropzone';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { openFilePicker } from '~/utils/open-file-picker.ts';
 import {
@@ -34,11 +34,11 @@ import { t } from '@lingui/macro';
 import { useSnackbar } from '~/components/snackbar';
 import { featureCheck } from '~/utils/feature-check.ts';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
-import { ExtractProps } from '~/constants/types.ts';
+import { ExtractProps, FilesOrEntries } from '~/constants/types.ts';
 import { InputTextarea } from 'primereact/inputtextarea';
 import type { TooltipOptions } from 'primereact/tooltip/tooltipoptions';
 import { Button } from 'primereact/button';
-import { P2pFileDeliveryDialog } from '~/components/file-delivery-dialog';
+import { P2pFileTransferDialog } from '~/components/file-transfer-dialog';
 import { FileUploadDialog } from '../file-upload-dialog';
 import { useDialog } from '~/utils/hooks/use-dialog.ts';
 import './input.less';
@@ -52,7 +52,9 @@ export const Input: FC = memo(() => {
   const [sending, setSending] = useState(false);
   const snackbar = useSnackbar();
   const isMobile = useMediaQuery(useMediaQuery.MOBILE_QUERY);
-  const fileUploadDialog = useDialog(FileUploadDialog);
+  const fileUploadDialog = useDialog(FileUploadDialog, {
+    onClose: (values) => values,
+  });
   const handler = useMemo(
     () =>
       new (class InputHandler {
@@ -61,7 +63,10 @@ export const Input: FC = memo(() => {
           if (value.length === 0) return void 0;
           setSending(true);
           try {
-            await upload(new File([value], '', { type: 'text/plain' }));
+            await upload({
+              type: 'multi-file',
+              files: [new File([value], '', { type: 'text/plain' })],
+            });
             setText('');
           } catch (e) {
             logger.error('Seed Failed', e);
@@ -76,21 +81,45 @@ export const Input: FC = memo(() => {
         uploadFile = executeAsyncTask(async () => {
           const files = await openFilePicker(['*'], true);
           if (files.length === 0) return void 0;
-          const file = files[0];
+          fileUploadDialog.open({
+            mode: 'file',
+            filesOrEntries: {
+              type: 'multi-file',
+              files,
+            },
+          });
+          const value = await fileUploadDialog.awaitClose();
+          if (!value) return void 0;
           try {
-            await upload(file);
+            await upload(value.entries, value.caption, value.tags);
           } catch (e) {
             logger.error('Upload Failed', e);
+            snackbar.enqueueSnackbar({
+              message: String(e),
+              variant: 'error',
+            });
           }
         });
         uploadFolder = executeAsyncTask(async () => {
           const files = await openFilePicker(['*'], false, true);
           if (files.length === 0) return void 0;
-          const file = files[0];
+          fileUploadDialog.open({
+            mode: 'directory',
+            filesOrEntries: {
+              type: 'multi-file',
+              files,
+            },
+          });
+          const value = await fileUploadDialog.awaitClose();
+          if (!value) return void 0;
           try {
-            await upload(file);
+            await upload(value.entries, value.caption, value.tags);
           } catch (e) {
             logger.error('Upload Failed', e);
+            snackbar.enqueueSnackbar({
+              message: String(e),
+              variant: 'error',
+            });
           }
         });
         paste = executeAsyncTask(async () => {
@@ -129,7 +158,10 @@ export const Input: FC = memo(() => {
               setText(await item.text().then((text) => text.trim()));
               textareaRef.current?.focus();
             } else {
-              await upload(new File([item], '', { type: item.type }));
+              await upload({
+                type: 'multi-file',
+                files: [new File([item], '', { type: item.type })],
+              });
             }
           } catch (e) {
             if (e instanceof Error) {
@@ -163,14 +195,14 @@ export const Input: FC = memo(() => {
           setText(evt.target.value);
         };
         receivedTransferData = async (filesOrEntries: FilesOrEntries) => {
+          fileUploadDialog.open({
+            mode: filesOrEntries.type == 'multi-file' ? 'file' : 'directory',
+            filesOrEntries,
+          });
+          const value = await fileUploadDialog.awaitClose();
+          if (!value) return void 0;
           try {
-            if (filesOrEntries.type == 'multi-file') {
-              for (const file of filesOrEntries.files) {
-                await upload(file);
-              }
-            } else {
-              await upload(filesOrEntries.entries);
-            }
+            await upload(value.entries, value.caption, value.tags);
           } catch (e) {
             logger.error('Upload Failed', e);
             snackbar.enqueueSnackbar({
@@ -180,7 +212,7 @@ export const Input: FC = memo(() => {
           }
         };
       })(),
-    [snackbar],
+    [fileUploadDialog, snackbar],
   );
   // Dispatch the "measure-size" event and update text ref when the text change
   useEffect(() => {
@@ -226,7 +258,7 @@ export const Input: FC = memo(() => {
             response.headers.get('last-modified') || Date.now(),
           ).getTime(),
         });
-        await upload(file);
+        await upload({ type: 'multi-file', files: [file] });
         await cache.delete(request);
         logger.debug(`Deleted cache`);
       }
@@ -390,7 +422,7 @@ const DesktopInput = forwardRef<
     },
     ref,
   ) => {
-    const p2pFileDialog = useDialog(P2pFileDeliveryDialog);
+    const p2pFileDialog = useDialog(P2pFileTransferDialog);
     return (
       <section className="relative border border-gray-200 rounded-xl p-2">
         {p2pFileDialog.visible && (
@@ -402,7 +434,7 @@ const DesktopInput = forwardRef<
           onKeyUp={onKeyUp}
           onChange={onChange}
           className="w-full border-none shadow-none"
-          placeholder="Enter your message here..."
+          placeholder={t`Enter your message here...`}
           autoResize
           rows={2}
         />

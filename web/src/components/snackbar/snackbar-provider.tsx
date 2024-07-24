@@ -13,7 +13,9 @@ export const SnackbarProvider: FC<
     maxSnack?: number;
   }>
 > = ({ children, maxSnack = 3 }) => {
-  const [stack, setStack] = useState<SnackbarProps[]>([]);
+  const [stack, setStack] = useState<
+    { key: string; originalProps: Omit<SnackbarProps, 'key'> }[]
+  >([]);
   const stackRef = useLatestRef(stack);
   const maxSnackRef = useLatestRef(maxSnack);
   const [exited, setExited] = useState(true);
@@ -25,7 +27,7 @@ export const SnackbarProvider: FC<
           throw new Error(`Duplicate snackbar key "${key}"`);
         }
         if (stackRef.current.length >= maxSnackRef.current) {
-          stackRef.current[0].onClose?.();
+          stackRef.current[0].originalProps.onClose?.();
         }
         const onClose = () => {
           withProduce(setStack, (draft) => {
@@ -36,9 +38,14 @@ export const SnackbarProvider: FC<
         };
         setExited(false);
         withProduce(setStack, (draft) => {
-          draft.push({
+          const originalProps = {
             ...props,
+            key: undefined,
             onClose,
+          };
+          Reflect.deleteProperty(originalProps, 'key');
+          draft.push({
+            originalProps,
             key,
           });
         });
@@ -47,10 +54,10 @@ export const SnackbarProvider: FC<
       closeSnackbar(id: string) {
         const target = stackRef.current.find((it) => it.key == id);
         if (!target) return void 0;
-        target.onClose?.();
+        target.originalProps.onClose?.();
       },
     }),
-    [maxSnackRef, stackRef]
+    [maxSnackRef, stackRef],
   );
   const onExit = useCallback(() => {
     setExited(stackRef.current.length == 0 && true);
@@ -61,7 +68,7 @@ export const SnackbarProvider: FC<
       {(stack.length > 0 || !exited) && (
         <SnackbarContainer onExit={onExit}>
           {stack.slice(0, maxSnack).map((it) => (
-            <Snackbar key={it.key} id={it.key!} {...it} />
+            <Snackbar key={it.key} id={it.key!} {...it.originalProps} />
           ))}
         </SnackbarContainer>
       )}
