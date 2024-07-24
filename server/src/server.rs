@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use crate::config::Config;
-use crate::logs::LogWriter;
+use crate::logging::LogWriter;
 use crate::utils::{Observable, Observer};
 use crate::{models, routes, state};
 use tokio::{net::TcpListener, signal, task::JoinSet};

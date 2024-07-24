@@ -1,7 +1,7 @@
 mod common;
 mod config;
 mod extractors;
-mod logs;
+mod logging;
 mod middlewares;
 mod models;
 mod pidfile;
@@ -11,7 +11,7 @@ mod services;
 mod state;
 mod utils;
 
-use crate::logs::registry_logs;
+use crate::logging::{registry_logs, LogWriter};
 use crate::server::ServerArgs;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     let _pid = pidfile::Pidfile::new()?;
     let config = config::load();
-    let (mut log_writer, log_handle) = logs::LogWriter::new()?;
+    let (mut log_writer, log_handle) = LogWriter::new()?;
     let listener = {
         // Initialize logger tracing
         registry_logs(
