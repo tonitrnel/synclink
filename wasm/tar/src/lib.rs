@@ -155,7 +155,7 @@ impl TarHeader {
         } else {
             path.rsplit_once('/')
                 .map(|(_, it)| it.to_string())
-                .unwrap_or_default()
+                .unwrap_or_else(|| path)
         }
     }
     pub fn path(&self) -> Cow<Path> {
