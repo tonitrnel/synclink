@@ -9,6 +9,8 @@ pub struct LogsConfig {
     #[serde(deserialize_with = "level_deserialize")]
     pub level: Level,
     pub storage_path: Option<String>,
+    #[serde(default)]
+    pub enable_file_logging: bool,
 }
 
 impl LogsConfig {

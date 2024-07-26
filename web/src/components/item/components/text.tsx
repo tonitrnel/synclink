@@ -8,10 +8,13 @@ import { useEntityConsumer } from '../entity-provider';
 import { CustomMenuSlot, Menu } from './menu';
 import { Metadata } from './metadata';
 import { clsx } from '~/utils/clsx';
+import { useLingui } from '@lingui/react';
+import { openViewer } from 'src/components/viewer-dialog';
 
 export const TextItem: FC = memo(() => {
   const entity = useEntityConsumer();
-  const [unconfirmed, setUnconfirmed] = useState(() => entity.size > 4096);
+  const i18n = useLingui();
+  const unconfirmed = entity.size > 4096;
   const {
     data: content,
     pending: loading,
@@ -50,11 +53,11 @@ export const TextItem: FC = memo(() => {
       component: (
         <>
           <CopyIcon className="w-5 h-5" />
-          <span className="capitalize">{t`copy`}</span>
+          <span className="capitalize">{i18n._('Copy')}</span>
         </>
       ),
     }),
-    [content],
+    [content, i18n],
   );
   const html = useMemo(() => {
     if (!content) return '';
@@ -79,20 +82,32 @@ export const TextItem: FC = memo(() => {
   const onContinue = useCallback(() => {
     withProduce(setExpanded, (draft) => void (draft.expanded = true));
   }, []);
-
+  const onLoadContentInViewer = useCallback(() => {
+    openViewer({
+      resourceId: entity.uid,
+      filename: entity.name,
+      mimetype: entity.type,
+      extname: 'txt'
+    });
+  }, [entity.name, entity.type, entity.uid]);
   return (
     <>
       {unconfirmed || (loading && !error) ? (
         <p className="mt-0 text-gray-600 italic">
           <span>
-            The content of this text is a bit large, so it will not be actively
-            load.
+            {i18n._(
+              'The content of this text is a bit large, so it will not be actively load.',
+            )}
           </span>
           <button
-            onClick={() => setUnconfirmed(false)}
+            onClick={onLoadContentInViewer}
             className="block p-0 m-0 mt-2 leading-none bg-transparent italic outline-0 border-0 text-gray-600 underline cursor-pointer"
           >
-            {loading ? <span>loading</span> : <span>load content</span>}
+            {loading ? (
+              <span>loading</span>
+            ) : (
+              <span>{i18n._('Load content in viewer')}</span>
+            )}
             {loading && <span className="ani_dot">...</span>}
           </button>
         </p>
@@ -110,7 +125,9 @@ export const TextItem: FC = memo(() => {
         <button
           className="border-none bg-transparent underline italic p-0 text-gray-600 cursor-pointer"
           onClick={onContinue}
-        >{t`continue read`}</button>
+        >
+          {i18n._('Continue read')}
+        </button>
       )}
 
       <div className="mt-4 flex justify-between items-center">

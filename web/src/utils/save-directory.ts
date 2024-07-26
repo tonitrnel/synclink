@@ -75,7 +75,7 @@ export const saveDirectoryFromTarStream = async (
         await writer?.write({
           data: new File([result.payload], header!.name, {
             lastModified: header!.mtime * 1e3,
-            type: 'application/octet-stream'
+            type: 'application/octet-stream',
           }),
           type: 'write',
         });

@@ -215,6 +215,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
 
 [[package]]
+name = "cedasync"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "futures",
+ "image",
+ "infer",
+ "jsonwebtoken",
+ "pin-project-lite",
+ "rand",
+ "serde",
+ "serde_json",
+ "sha2",
+ "simdutf8",
+ "tar",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-error",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1512,37 +1543,6 @@ name = "sync_wrapper"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
-
-[[package]]
-name = "synclink"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "futures",
- "image",
- "infer",
- "jsonwebtoken",
- "pin-project-lite",
- "rand",
- "serde",
- "serde_json",
- "sha2",
- "simdutf8",
- "tar",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "toml",
- "tower",
- "tower-http",
- "tracing",
- "tracing-error",
- "tracing-subscriber",
- "uuid",
-]
 
 [[package]]
 name = "tar"

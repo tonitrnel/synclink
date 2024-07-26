@@ -117,21 +117,21 @@ export const Menu: FC<{
           .map((it) => (
             <button
               key={it.key}
-              className="synclink-item-link"
+              className="cedasync-item-link"
               onClick={it.event}
             >
               {it.component}
             </button>
           ))}
         {features.includes('downloadable') && (
-          <button className="synclink-item-link" onClick={onDownload}>
+          <button className="cedasync-item-link" onClick={onDownload}>
             <DownloadCloudIcon className="w-4 h-4" />
             <span className="capitalize">{t`download`}</span>
           </button>
         )}
         {features.includes('shareable') && SUPPORTED_SHARE && (
           <button
-            className="synclink-item-link"
+            className="cedasync-item-link"
             onClick={() => onShare(entity)}
           >
             <Share2Icon className="w-4 h-4" />
@@ -140,7 +140,7 @@ export const Menu: FC<{
         )}
         {features.includes('deletable') && (
           <button
-            className="synclink-item-link"
+            className="cedasync-item-link"
             onClick={() => onDelete(entity.uid)}
           >
             <EraserIcon className="w-4 h-4" />

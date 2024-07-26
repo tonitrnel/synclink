@@ -310,6 +310,7 @@ async fn handle_socket(
                     break;
                 }
             }
+            drop(rx)
         });
         // 接收 socket 数据
         let mut recv_task = tokio::spawn(async move {

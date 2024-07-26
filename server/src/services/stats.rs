@@ -53,6 +53,31 @@ async fn load_memory_usage(pid: u32) -> anyhow::Result<u64> {
         .map(|it| it * 4096)
         .unwrap_or(0))
 }
+#[cfg(target_os = "macos")]
+async fn load_memory_usage(pid: u32) -> anyhow::Result<u64> {
+    let output = tokio::process::Command::new("ps")
+        .arg("-p")
+        .arg(pid.to_string())
+        .arg("-o rss")
+        .output()
+        .await?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "Failed to exec Get-Process command, reason: {}",
+            String::from_utf8(output.stderr).unwrap_or_default()
+        )
+    }
+    let output = String::from_utf8(output.stdout.clone())
+        .with_context(|| "Failed to parse bytes to utf8")?;
+    let value = output
+        .trim()
+        .split('\n')
+        .last()
+        .unwrap_or_default()
+        .trim()
+        .parse::<u64>()?;
+    Ok(value * 1024 / 4)
+}
 
 #[cfg(target_os = "windows")]
 async fn load_memory_usage(pid: u32) -> anyhow::Result<u64> {
@@ -76,13 +101,17 @@ async fn load_memory_usage(pid: u32) -> anyhow::Result<u64> {
     Ok(value)
 }
 
-#[cfg(all(not(target_os = "linux"), not(target_os = "windows")))]
+#[cfg(all(
+    not(target_os = "linux"),
+    not(target_os = "windows"),
+    not(target_os = "macos")
+))]
 async fn load_memory_usage(_: u32) -> anyhow::Result<u64> {
     Ok(0)
 }
 
 pub async fn clean_dump(State(state): State<AppState>) -> ApiResult<Json<Value>> {
-    let tmp_dir = std::env::temp_dir().join("synclink");
+    let tmp_dir = std::env::temp_dir().join("cedasync");
     let storage_dir = state.indexing.get_storage_dir();
     let exists_ids = state.indexing.map_clone(|items| {
         items

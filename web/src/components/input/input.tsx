@@ -41,6 +41,7 @@ import { Button } from 'primereact/button';
 import { P2pFileTransferDialog } from '~/components/file-transfer-dialog';
 import { FileUploadDialog } from '../file-upload-dialog';
 import { useDialog } from '~/utils/hooks/use-dialog.ts';
+import { useLingui } from '@lingui/react';
 import './input.less';
 
 const logger = new Logger('Input');
@@ -422,6 +423,7 @@ const DesktopInput = forwardRef<
     },
     ref,
   ) => {
+    const i18n = useLingui();
     const p2pFileDialog = useDialog(P2pFileTransferDialog);
     return (
       <section className="relative border border-gray-200 rounded-xl p-2">
@@ -434,14 +436,14 @@ const DesktopInput = forwardRef<
           onKeyUp={onKeyUp}
           onChange={onChange}
           className="w-full border-none shadow-none"
-          placeholder={t`Enter your message here...`}
+          placeholder={i18n._("Enter your message here...")}
           autoResize
           rows={2}
         />
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
             <Button
-              tooltip={t`upload file`}
+              tooltip={i18n._("Upload file")}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
               onClick={onUploadFile}
@@ -451,7 +453,7 @@ const DesktopInput = forwardRef<
               <FileUpIcon className="w-5 h-5 stroke-grey-600" />
             </Button>
             <Button
-              tooltip={t`upload folder`}
+              tooltip={i18n._("Upload folder")}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
               onClick={onUploadFolder}
@@ -461,7 +463,7 @@ const DesktopInput = forwardRef<
               <FolderUpIcon className="w-5 h-5 stroke-grey-600" />
             </Button>
             <Button
-              tooltip={t`paste`}
+              tooltip={i18n._("Paste")}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
               onClick={onPaste}
@@ -471,7 +473,7 @@ const DesktopInput = forwardRef<
               <PasteIcon className="w-5 h-5 stroke-grey-600" />
             </Button>
             <Button
-              tooltip={t`peer to peer file delivery`}
+              tooltip={i18n._("Peer to peer file transfer")}
               tooltipOptions={ButtonTooltipOptionsObj}
               className="p-2 rounded-lg"
               severity="secondary"
@@ -483,7 +485,7 @@ const DesktopInput = forwardRef<
           </div>
           <div className="flex gap-2">
             <button
-              title="Clear"
+              title={i18n._("Clear")}
               hidden={text.length === 0}
               onClick={onClear}
               className="text-gray-500 hover:text-gray-600 cursor-pointer"
@@ -492,17 +494,17 @@ const DesktopInput = forwardRef<
             </button>
             <Button
               severity="secondary"
-              title="Send (Ctrl + Enter)"
+              title={i18n._("Send (Ctrl + Enter)")}
               onClick={onSend}
             >
               <span className="box-content text-white mr-2">
                 {sending ? (
                   <>
-                    <span>{t`sending`}</span>
+                    <span>{i18n._("Sending")}</span>
                     <span className="ani_dot">...</span>
                   </>
                 ) : (
-                  <span>{t`send`}</span>
+                  <span>{i18n._("Send")}</span>
                 )}
               </span>
               <SendIcon className="box-content w-5 h-5 stroke-white" />

@@ -155,7 +155,7 @@ impl LogWriter {
         {
             tracing::error!("{}", err)
         } else {
-            println!("log terminating...");
+            // println!("log terminating...");
         }
     }
 }

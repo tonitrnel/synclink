@@ -1,6 +1,6 @@
-# SyncLink
+# Cedasync
 
-SyncLink 是一个设计用于运行在 NAS、软路由等类似设备上的程序，目的是在局域网内提供存储文本、图像、视频等文件来方便局域网其他设备访问。
+Cedasync 是一个设计用于运行在 NAS、软路由等类似设备上的程序，目的是⽤于多个设备间的⽂本、图像和⽂件临时存储和共享。
 
 ![screenshot1](./docs/screenshot1.png)
 
@@ -27,20 +27,20 @@ mv CUSTOM_DIR
 mkdir data
 mkdir config
 mkdir logs
-echo "" > ./config/synclink.conf
+echo "" > ./config/cedasync.conf
 ```
 
-配置文件参考 [synclink-config.toml](./config/synclink-config.toml)
+配置文件参考 [cedasync-config.toml](./config/cedasync-config.toml)
 
 ```shell
 docker run -d \
-        --name synclink \
+        --name cedasync \
         --network ptdg-network \
         --restart always \
         -v /<CUSTOM_DIR>/data:/app/storage \
-        -v /<CUSTOM_DIR>/config/synclink.conf:/etc/synclink/config.toml \
-        -v /<CUSTOM_DIR>/logs:/var/log/synclink \
-        ghcr.io/tonitrnel/synclink:0.3.0
+        -v /<CUSTOM_DIR>/config/cedasync.conf:/etc/cedasync/config.toml \
+        -v /<CUSTOM_DIR>/logs:/var/log/cedasync \
+        ghcr.io/tonitrnel/cedasync:0.3.0
 ```
 
 ### Nginx 配置参考
@@ -105,7 +105,7 @@ server {
 1. 克隆项目代码
 
 ```bash
-git clone https://github.com/tonitrnel/synclink
+git clone https://github.com/tonitrnel/cedasync
 ```
 
 2. 安装依赖
@@ -139,7 +139,7 @@ cargo run
 
 ## 配置
 
-应用程序的配置位于 `config/synclink-config.toml` 文件中。您可以根据需要修改其参数
+应用程序的配置位于 `config/cedasync-config.toml` 文件中。您可以根据需要修改其参数
 
 ## 贡献
 

@@ -1,4 +1,4 @@
-/var/log/synclink/*.log {
+/var/log/cedasync/*.log {
         hourly
         missingok
         rotate 12
@@ -8,8 +8,8 @@
         create 644 root root
         sharedscripts
         postrotate
-                if [ -f /var/run/synclink.pid ]; then
-                        kill -USR1 `cat /var/run/synclink.pid`
+                if [ -f /var/run/cedasync.pid ]; then
+                        kill -USR1 `cat /var/run/cedasync.pid`
                 fi
         endscript
 }

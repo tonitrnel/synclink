@@ -4,6 +4,7 @@ import { List } from '~/components/list';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
 import { SCROLLBAR_WIDTH } from '~/utils/get-scrollbar-width.ts';
 import { P2PFileReceiver } from '~/components/file-transfer-dialog';
+import { ViewerProvider } from '~/components/viewer-dialog';
 import { Sidebar } from './sidebar';
 
 export default function HomePage() {
@@ -15,7 +16,7 @@ export default function HomePage() {
         {!isDesktop && (
           <header className="relative z-10 flex items-center gap-2 p-4 border-b border-b-gray-200 shadow">
             <LogoIcon className="w-8 h-8" />
-            <h1 className="ml-2 text-xl">SyncLink</h1>
+            <h1 className="ml-2 text-xl">Cedasync</h1>
           </header>
         )}
         <main className="flex-1 h-full overflow-hidden">
@@ -33,6 +34,7 @@ export default function HomePage() {
           <Input />
         </footer>
       </section>
+      <ViewerProvider />
       <P2PFileReceiver />
     </>
   );

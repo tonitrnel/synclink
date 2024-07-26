@@ -81,9 +81,9 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
     }
     while let Some(r) = join_set.join_next().await {
         if shutdown_signal.is_cancelled() {
-            println!("shutdown_signal is_cancelled, shutdown all set");
+            // println!("shutdown_signal is_cancelled, shutdown all set");
             join_set.shutdown().await;
-            println!("start terminal log");
+            // println!("start terminal log");
             args.logs.terminal();
             break;
         }

@@ -1,8 +1,4 @@
-import {
-  FC,
-  memo,
-  useMemo,
-} from 'react';
+import { FC, memo, useMemo } from 'react';
 import { EntityProvider } from './entity-provider.ts';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { IEntity } from '~/constants/types.ts';
@@ -19,7 +15,7 @@ import './item.less';
 
 dayjs.extend(relativeTime);
 
-export const SynclinkItem: FC<{
+export const Item: FC<{
   it: IEntity;
   className?: string;
 }> = memo(({ it, className }) => {
@@ -84,7 +80,7 @@ export const SynclinkItem: FC<{
   return (
     <EntityProvider value={it}>
       <li
-        className={clsx('synclink-item', className)}
+        className={clsx('cedasync-item', className)}
         data-uid={it.uid}
         key={it.uid}
       >

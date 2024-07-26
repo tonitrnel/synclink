@@ -1,6 +1,6 @@
 {
-  "short_name": "SyncLink",
-  "name": "SyncLink",
+  "short_name": "Cedasync",
+  "name": "Cedasync",
   "description": "Quickly sync text, images and files across devices",
   "icons": [
     {
@@ -37,7 +37,9 @@
       "files": [
         {
           "name": "media",
-          "accept": ["*/*"]
+          "accept": [
+            "*/*"
+          ]
         }
       ]
     }

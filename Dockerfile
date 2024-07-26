@@ -14,7 +14,7 @@ ENV COMMIT_ID=$COMMIT_ID
 ENV BUILD_DATE=$BUILD_DATE
 ENV RUSTC_VERSION=$RUSTC_VERSION
 ENV DOCKER_VERSION=$DOCKER_VERSION
-ENV SYSTEM_VERSION=alpine3.18
+ENV SYSTEM_VERSION=alpine3.20
 
 RUN apk update && apk add --no-cache -U musl-dev
 
@@ -67,21 +67,21 @@ FROM alpine:latest
 
 WORKDIR /app
 
-RUN mkdir "/etc/synclink"
-RUN mkdir "/var/log/synclink"
+RUN mkdir "/etc/cedasync"
+RUN mkdir "/var/log/cedasync"
 
-COPY --from=ServerBuilder /app/target/release/synclink .
+COPY --from=ServerBuilder /app/target/release/cedasync .
 
 COPY --from=WebBuilder /app/web/dist /app/public
 
-COPY config/synclink-config.toml /etc/synclink/config.toml
+COPY config/cedasync-config.toml /etc/cedasync/config.toml
 
-COPY ./debian/etc/logrotate.d/synclink /etc/logrotate.d/synclink
+COPY debian/etc/logrotate.d/cedasync /etc/logrotate.d/cedasync
 
 EXPOSE 8080
 
-RUN chmod +x ./synclink
+RUN chmod +x ./cedasync
 
-ENTRYPOINT ["./synclink"]
+ENTRYPOINT ["./cedasync"]
 
-CMD ["-c", "/etc/synclink/config.toml"]
+CMD ["-c", "/etc/cedasync/config.toml"]

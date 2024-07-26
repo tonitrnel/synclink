@@ -10,8 +10,9 @@ storage_path = "storage"
 
 # logger
 [logs]
-level = "debug"
+level = "info"
 #storage_path = "logs"
+#enable_file_logging = true # default false
 
 # Authorize
 #[authorize]

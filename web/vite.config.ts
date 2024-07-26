@@ -47,7 +47,7 @@ export default defineConfig(async ({ command }) => {
   const project = await parseProject();
   return {
     define: {
-      __ENDPOINT__: command == 'build' ? '""' : '"http://localhost:8080"',
+      __ENDPOINT__: command == 'build' ? '""' : '"http://localhost:8081"',
       __VERSION__: JSON.stringify(project.version),
       __BUILD_TIMESTAMP__: Date.now(),
     },

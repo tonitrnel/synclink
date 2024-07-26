@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo } from 'react';
+import { FC, memo, useEffect, useMemo } from 'react';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { clsx } from '~/utils/clsx.ts';
 import { RefreshCwIcon } from 'icons';
@@ -6,24 +6,36 @@ import { useGetStats } from '~/endpoints';
 
 export const Stats: FC<{
   className?: string;
-}> = ({ className }) => {
-  const {
-    data,
-    pending,
-    refresh: _refresh,
-  } = useGetStats({
+}> = memo(({ className }) => {
+  const { data, pending, refresh } = useGetStats({
     keepDirtyOnPending: true,
     cache: {
-      key: 'stats'
-    }
+      key: 'stats',
+    },
   });
-  const refresh = useCallback(() => _refresh(), [_refresh]);
   useEffect(() => {
-    window.addEventListener('focus', refresh);
-    document.body.addEventListener('refresh-stats', refresh);
+    let lastRefreshTime = 0;
+
+    const refreshData = () => {
+      refresh().catch(console.error);
+    };
+
+    const refreshDataOnFocus = () => {
+      const now = Date.now();
+      if (now < lastRefreshTime + 300_000) {
+        // 300,000 milliseconds = 5 minutes
+        return void 0;
+      }
+      lastRefreshTime = now;
+      refresh().catch(console.error);
+    };
+
+    window.addEventListener('focus', refreshDataOnFocus);
+    document.body.addEventListener('refresh-stats', refreshData);
+
     return () => {
-      document.body.removeEventListener('refresh-stats', refresh);
-      window.removeEventListener('focus', refresh);
+      document.body.removeEventListener('refresh-stats', refreshData);
+      window.removeEventListener('focus', refreshDataOnFocus);
     };
   }, [refresh]);
   const stats = useMemo(() => {
@@ -40,13 +52,15 @@ export const Stats: FC<{
   }, [data]);
   return (
     <div className={className}>
-      <span title={`${stats?.disk_usage}/${stats?.storage_quota}${stats?.percentage}`}>
+      <span
+        title={`${stats?.disk_usage}/${stats?.storage_quota}${stats?.percentage}`}
+      >
         disk: {stats?.disk_usage || '-'}
       </span>
       <span>mem: {stats?.memory_usage || '-'}</span>
       <span>uptime: {stats?.uptime || '-'}</span>
       <RefreshCwIcon
-        onClick={refresh}
+        onClick={() => refresh()}
         className={clsx(
           'w-4 h-4 cursor-pointer',
           data && pending && 'animate-spin',
@@ -54,7 +68,7 @@ export const Stats: FC<{
       />
     </div>
   );
-};
+});
 
 const formatDur = (dur: number) => {
   if (dur === 0) return '0';

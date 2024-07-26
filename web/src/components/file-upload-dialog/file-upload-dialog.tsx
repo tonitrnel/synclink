@@ -166,6 +166,10 @@ export const FileUploadDialog: FC<{
       state.entries.length == 0
     );
   }, [data, state.entries.length, total]);
+  const onlyFile = useMemo(
+    () => nodes.every((it) => !it.children || it.children.length == 0),
+    [nodes],
+  );
   return (
     <Dialog
       visible={visible}
@@ -220,7 +224,7 @@ export const FileUploadDialog: FC<{
               <Column
                 field="name"
                 header={i18n._('Name')}
-                expander
+                expander={!onlyFile}
                 className="truncate max-w-[120px]"
                 body={NameColumn}
               />

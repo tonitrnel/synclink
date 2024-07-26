@@ -1,19 +1,46 @@
-import { FC } from "react";
-import { useEntityConsumer } from "../entity-provider";
-import { Metadata } from "./metadata";
-import { Menu } from "./menu";
+import { FC, useMemo } from 'react';
+import { useEntityConsumer } from '../entity-provider';
+import { Metadata } from './metadata';
+import { CustomMenuSlot, Menu } from './menu';
+import { openViewer, supportsFileViewer } from 'src/components/viewer-dialog';
+import { EyeIcon } from 'icons';
+import { useLingui } from '@lingui/react';
 
 export const UnknownItem: FC = () => {
-    const entity = useEntityConsumer();
-    return (
-      <>
-        <div className="synclink-item-header">
-          <p className="synclink-item-title">{entity.name}</p>
-        </div>
-        <div className="mt-4 flex justify-between">
-          <Metadata entity={entity} />
-          <Menu entity={entity} />
-        </div>
-      </>
-    );
-  };
+  const entity = useEntityConsumer();
+  const i18n = useLingui();
+  const previewButton = useMemo<CustomMenuSlot>(
+    () => ({
+      key: 'viewer',
+      component: (
+        <>
+          <EyeIcon className="w-4 h-4" />
+          <span>{i18n._('Preview')}</span>
+        </>
+      ),
+      event: () =>
+        openViewer({
+          resourceId: entity.uid,
+          filename: entity.name,
+          mimetype: entity.type,
+        }),
+    }),
+    [entity.name, entity.type, entity.uid, i18n],
+  );
+  return (
+    <>
+      <div className="cedasync-item-header">
+        <p className="cedasync-item-title">{entity.name}</p>
+      </div>
+      <div className="mt-4 flex justify-between">
+        <Metadata entity={entity} />
+        <Menu
+          entity={entity}
+          slots={[
+            supportsFileViewer(entity.name, entity.type) && previewButton,
+          ]}
+        />
+      </div>
+    </>
+  );
+};

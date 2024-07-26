@@ -18,14 +18,14 @@ use std::sync::Arc;
 
 fn print_banner() {
     tracing::info!("");
-    tracing::info!(r#"       _____                       _  _         _     "#);
-    tracing::info!(r#"      / ____|                     | |(_)       | |    "#);
-    tracing::info!(r#"     | (___   _   _  _ __    ___  | | _  _ __  | | __ "#);
-    tracing::info!(r#"      \___ \ | | | || '_ \  / __| | || || '_ \ | |/ / "#);
-    tracing::info!(r#"      ____) || |_| || | | || (__  | || || | | ||   <  "#);
-    tracing::info!(r#"     |_____/  \__, ||_| |_| \___| |_||_||_| |_||_|\_\ "#);
-    tracing::info!(r#"               __/ |                                  "#);
-    tracing::info!(r#"              |___/                                   "#);
+    tracing::info!(r#"        _____           _          _____                     "#);
+    tracing::info!(r#"       / ____|         | |        / ____|                    "#);
+    tracing::info!(r#"      | |      ___   __| |  __ _ | (___   _   _  _ __    ___ "#);
+    tracing::info!(r#"      | |     / _ \ / _` | / _` | \___ \ | | | || '_ \  / __|"#);
+    tracing::info!(r#"      | |____|  __/| (_| || (_| | ____) || |_| || | | || (__ "#);
+    tracing::info!(r#"       \_____|\___| \__,_| \__,_||_____/  \__, ||_| |_| \___|"#);
+    tracing::info!(r#"                                           __/ |             "#);
+    tracing::info!(r#"                                          |___/              "#);
     tracing::info!("");
 }
 
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     print_banner();
     #[cfg(not(debug_assertions))]
     tracing::info!(
-        "Synclink {version} ({commit_id} {build_date}) built with docker{docker_version}, {system_version}, rustc{rustc_version}",
+        "cedasync {version} ({commit_id} {build_date}) built with docker{docker_version}, {system_version}, rustc{rustc_version}",
         build_date = env!("BUILD_DATE"),
         version = env!("CARGO_PKG_VERSION"),
         commit_id = env!("COMMIT_ID"),
@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         rustc_version = env!("RUSTC_VERSION"),
         system_version = env!("SYSTEM_VERSION"),
     );
-    tracing::info!("Listening on http://{}", listener.local_addr().unwrap());
+    tracing::info!("listening on http://{}", listener.local_addr().unwrap());
     match server::run_until_done(
         ServerArgs {
             config,
@@ -69,10 +69,10 @@ async fn main() -> anyhow::Result<()> {
     .await
     {
         Ok(()) => {
-            println!("Synclink stopping...")
+            println!("cedasync stopping...")
         }
         Err(err) => {
-            eprintln!("Synclink has encountered an error: {}", err);
+            eprintln!("cedasync has encountered an error: {}", err);
             return Err(err);
         }
     }

@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { AlertTriangleIcon, BirdIcon } from 'icons';
 import { UploadManager } from '~/components/upload-manager';
-import { SynclinkItem } from '~/components/item';
+import { Item } from '~/components/item';
 import { IEntity } from '~/constants/types.ts';
 import { Logger } from '~/utils/logger.ts';
 import { Loading } from '~/components/loading';
@@ -21,7 +21,7 @@ import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
 import { notifyManager } from '~/utils/notify-manager.ts';
 
-const logger = new Logger('synclink');
+const logger = new Logger('cedasync');
 
 interface Pagination {
   page: number;
@@ -251,7 +251,7 @@ export const List: FC<{
                 )}
               >
                 {reversedList.map((it) => (
-                  <SynclinkItem key={it.uid} it={it} />
+                  <Item key={it.uid} it={it} />
                 ))}
               </ul>
               <UploadManager scrollToBottom={scrollToBottom} />

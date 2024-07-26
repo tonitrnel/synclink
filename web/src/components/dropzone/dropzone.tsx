@@ -10,6 +10,7 @@ import {
 import { ReactComponent as SendIcon } from '~/assets/send.svg';
 import { IGNORE_FILE_TYPE } from '~/constants';
 import type { DirEntry, FilesOrEntries } from '~/constants/types.ts';
+import { useLingui } from '@lingui/react';
 import './dropzone.less';
 
 type SettledDirEntry = Exclude<DirEntry, { type: 'file' }>;
@@ -91,6 +92,7 @@ export const DropZone: FC<{
   ): void;
 }> = memo(({ onReceivedTransferData }) => {
   const [drop, setDrop] = useState(false);
+  const i18n = useLingui();
   const triedRef = useRef(0);
   const handleDrop = useCallback<DragEventHandler>(
     async (evt) => {
@@ -197,7 +199,7 @@ export const DropZone: FC<{
     >
       <div className="dropzone-wrapper">
         <SendIcon />
-        <span>Drag and Drop file here</span>
+        <span>{i18n._("Drag and Drop file here")}</span>
       </div>
     </section>
   );

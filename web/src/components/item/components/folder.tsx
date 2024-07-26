@@ -1,4 +1,4 @@
-import { FC, useMemo } from 'react';
+import { FC, useMemo, MouseEvent } from 'react';
 import { useEntityConsumer } from '../entity-provider';
 import { InferResponse, useGetDirectory } from '~/endpoints';
 import { TreeNode } from 'primereact/treenode';
@@ -6,7 +6,13 @@ import { toTreeByPath } from '~/utils/to-tree-by-path';
 import { formatBytes } from '~/utils/format-bytes';
 import { Column } from 'primereact/column';
 import { TreeTable } from 'primereact/treetable';
-import { DownloadCloudIcon, FileIcon, FolderDownIcon, FolderIcon } from 'icons';
+import {
+  DownloadCloudIcon,
+  EyeIcon,
+  FileIcon,
+  FolderDownIcon,
+  FolderIcon,
+} from 'icons';
 import { t } from '@lingui/macro';
 import { Metadata } from './metadata';
 import { CustomMenuSlot, Menu } from './menu';
@@ -14,6 +20,8 @@ import { downloadFromURL } from '~/utils/save-as';
 import { saveDirectoryFromTarStream } from '~/utils/save-directory';
 import dayjs from 'dayjs';
 import { useLingui } from '@lingui/react';
+import { useSnackbar } from '~/components/snackbar';
+import { openViewer, supportsFileViewer } from 'src/components/viewer-dialog';
 
 type RecordData = {
   name: string;
@@ -26,6 +34,7 @@ type RecordData = {
 export const FolderItem: FC = () => {
   const entity = useEntityConsumer();
   const i18n = useLingui();
+  const snackbar = useSnackbar();
   const { data: list, pending } = useGetDirectory({
     path: {
       id: entity.uid,
@@ -66,8 +75,18 @@ export const FolderItem: FC = () => {
         }
         try {
           await saveDirectoryFromTarStream(res.body);
+          snackbar.enqueueSnackbar({
+            variant: 'success',
+            message: i18n._('Download success'),
+          });
         } catch (e) {
           console.error(e);
+          if (e instanceof Error) {
+            snackbar.enqueueSnackbar({
+              variant: 'error',
+              message: e.message,
+            });
+          }
         }
       },
       component: (
@@ -77,13 +96,36 @@ export const FolderItem: FC = () => {
         </>
       ),
     }),
-    [],
+    [entity.uid, i18n, snackbar],
   );
-  const onlyFile = useMemo(() => nodes.every(it => !it.children || it.children.length == 0), [nodes])
+  const onlyFile = useMemo(
+    () => nodes.every((it) => !it.children || it.children.length == 0),
+    [nodes],
+  );
+  const handler = useMemo(
+    () => ({
+      download: (data: RecordData, evt: MouseEvent<HTMLAnchorElement>) => {
+        evt.preventDefault();
+        downloadFromURL(
+          `${__ENDPOINT__}/api/directory/${entity.uid}/${data.__raw.hash}?raw`,
+          data.name,
+        );
+      },
+      preview: (data: RecordData) => {
+        openViewer({
+          resourceId: entity.uid,
+          subResourceId: data.__raw.hash || data.__raw.path,
+          filename: data.name,
+          mimetype: data.type,
+        });
+      },
+    }),
+    [entity.uid],
+  );
   return (
     <>
-      <div className="synclink-item-header">
-        {/*<p className="synclink-item-title">{entity.uid}</p>*/}
+      <div className="cedasync-item-header">
+        {/*<p className="cedasync-item-title">{entity.uid}</p>*/}
         {/*<pre>{JSON.stringify(toTreeByPath(list || []), null, 2)}</pre>*/}
         <TreeTable
           id="path"
@@ -107,9 +149,14 @@ export const FolderItem: FC = () => {
           />
           <Column
             body={({ data, options }) => (
-              <ActionColumn id={entity.uid} data={data} options={options} />
+              <ActionColumn
+                id={entity.uid}
+                data={data}
+                options={options}
+                onDownload={handler.download}
+                onPreview={handler.preview}
+              />
             )}
-            align="right"
           />
         </TreeTable>
       </div>
@@ -136,28 +183,35 @@ const NameColumn: FC<{ data: RecordData; options: unknown }> = ({ data }) => {
     </>
   );
 };
-const ActionColumn: FC<{ id: string; data: RecordData; options: unknown }> = ({
-  id,
-  data,
-}) => {
-  const href = `${__ENDPOINT__}/api/directory/${id}/${data.__raw.hash}?raw`;
-  const handler = useMemo(
-    () => ({
-      download: (evt: MouseEvent) => {
-        evt.preventDefault();
-        downloadFromURL(href, data.name);
-      },
-    }),
-    [data.name, href],
-  );
+const ActionColumn: FC<{
+  id: string;
+  data: RecordData;
+  options: unknown;
+  onDownload(data: RecordData, evt: MouseEvent<HTMLAnchorElement>): void;
+  onPreview(data: RecordData, evt: MouseEvent<HTMLButtonElement>): void;
+}> = ({ id, data, onPreview, onDownload }) => {
+  const i18n = useLingui();
   if (!data.__raw.is_file) return null;
   return (
-    <>
-      <a className="synclink-item-link" onClick={handler.download} href={href}>
+    <div className="flex gap-2 justify-end">
+      {supportsFileViewer(data.name, data.type) && (
+        <button
+          className="cedasync-item-link"
+          onClick={(evt) => onPreview(data, evt)}
+        >
+          <EyeIcon className="w-4 h-4" />
+          <span>{i18n._('Preview')}</span>
+        </button>
+      )}
+      <a
+        className="cedasync-item-link"
+        onClick={(evt) => onDownload(data, evt)}
+        href={`${__ENDPOINT__}/api/directory/${id}/${data.__raw.hash}?raw`}
+      >
         <DownloadCloudIcon className="w-4 h-4" />
-        <span className="capitalize">{t`download`}</span>
+        <span>{i18n._('Download')}</span>
       </a>
-    </>
+    </div>
   );
 };
 
