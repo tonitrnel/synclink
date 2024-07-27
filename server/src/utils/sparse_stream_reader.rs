@@ -1,11 +1,9 @@
-use futures::Stream;
-use pin_project_lite::pin_project;
-use std::future::Future;
+use anyhow::Context;
+use futures::{Stream, StreamExt};
 use std::io::SeekFrom;
 use std::ops::{Index, Range};
 use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Result};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -43,6 +41,26 @@ impl Boundaries {
         }
         buf[0..boundary_length].copy_from_slice(boundary);
         boundary_length
+    }
+    pub fn from_ranges(
+        ranges: &[Range<usize>],
+        total: u64,
+        content_length: &mut usize,
+        content_type: &mut String,
+    ) -> Option<Boundaries> {
+        if ranges.len() > 1 {
+            let mut builder = BoundaryBuilder::new(content_type.to_string());
+            let mut boundaries = Boundaries::with_capacity(ranges.len());
+            for range in ranges {
+                boundaries.push(builder.format_to_bytes(range, total));
+            }
+            boundaries.push(builder.end_to_bytes());
+            *content_type = format!("multipart/byteranges; boundary={}", builder.id());
+            *content_length += boundaries.len();
+            Some(boundaries)
+        } else {
+            None
+        }
     }
 }
 impl Index<usize> for Boundaries {
@@ -117,14 +135,22 @@ pub struct SparseStreamReader<R> {
     transmitted: usize,
     boundaries: Option<Boundaries>,
 }
-
+impl<R> SparseStreamReader<R> {
+    /// 获取当前的范围
+    fn range(&self) -> &Range<usize> {
+        &self.ranges[self.range_pos]
+    }
+    pub fn capacity(&self) -> usize {
+        self.buffer.capacity()
+    }
+}
 impl<R> SparseStreamReader<R>
 where
     R: AsyncSeek + AsyncRead + Unpin + Send + 'static,
 {
     pub fn new(reader: R, ranges: Vec<Range<usize>>, boundaries: Option<Boundaries>) -> Self {
         // println!("ranges = {:?}", ranges);
-        Self::new_with_chunk_size(reader, ranges, boundaries, 4 * 1024 * 1024)
+        Self::new_with_chunk_size(reader, ranges, boundaries, 4096) // 4kb
     }
     pub fn new_with_chunk_size(
         reader: R,
@@ -150,17 +176,13 @@ where
             boundaries,
         }
     }
-    /// 获取当前的范围
-    fn range(&self) -> &Range<usize> {
-        &self.ranges[self.range_pos]
-    }
     /// 读取下一个 chunk
-    async fn next_chunk(&mut self) -> Result<Option<Vec<u8>>> {
+    async fn next_chunk(&mut self) -> anyhow::Result<Option<Vec<u8>>> {
         // 所以数据已经传输完毕
         if self.transmitted == self.total {
             return Ok(None);
         }
-        let buffer_size = self.buffer.capacity();
+        let buffer_size = self.capacity();
         let mut written_bytes = 0;
         if self.offset == 0 {
             if let Some(boundaries) = &self.boundaries {
@@ -179,6 +201,7 @@ where
         let available_buffer_space = buffer_size - written_bytes;
         // 计算总共还剩多少未传输，最大为当前 buffer 容量
         let remaining_total = (self.total - self.transmitted).min(available_buffer_space);
+        // println!("喵喵喵");
         // 计算当前范围还是多少未传输，最大为当前 buffer 容量
         let remaining_in_range = (self.range().len() - self.offset).min(available_buffer_space);
 
@@ -227,7 +250,13 @@ where
                         .read_exact(
                             &mut self.buffer[written_bytes..written_bytes + available_buffer_space],
                         )
-                        .await?;
+                        .await
+                        .with_context(|| {
+                            format!(
+                                "Failed to read exactly {} bytes into buffer at position {}",
+                                available_buffer_space, written_bytes
+                            )
+                        })?;
                     written_bytes += content_length;
                     remaining -= content_length;
                     self.offset = content_length;
@@ -240,7 +269,13 @@ where
             written_bytes += self
                 .source
                 .read_exact(&mut self.buffer[written_bytes..written_bytes + remaining_total])
-                .await?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to read exactly {} bytes into buffer at position {}",
+                        remaining_total, written_bytes
+                    )
+                })?;
             self.offset += remaining_total;
         };
         self.transmitted += written_bytes;
@@ -251,59 +286,30 @@ where
         // println!("transmitted = {}/{}", self.transmitted, self.total);
         Ok(Some(self.buffer[0..written_bytes].to_vec()))
     }
-    pub fn into_stream(self) -> SparseStream<R> {
-        SparseStream {
-            inner: self,
-            is_terminated: false,
-        }
-    }
-}
-
-pin_project! {
-    #[derive(Debug)]
-    pub struct SparseStream<R> {
-        #[pin]
-        inner: SparseStreamReader<R>,
-        is_terminated: bool
-    }
-}
-impl<R> Stream for SparseStream<R>
-where
-    R: AsyncSeek + AsyncRead + Unpin + Send + 'static,
-{
-    type Item = Result<Vec<u8>>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
-        if *this.is_terminated {
-            return Poll::Ready(None);
-        }
-        let fut = this.inner.next_chunk();
-        futures::pin_mut!(fut);
-        match fut.poll(cx) {
-            Poll::Ready(Ok(Some(value))) => Poll::Ready(Some(Ok(value))),
-            Poll::Ready(Ok(None)) => {
-                *this.is_terminated = true;
-                Poll::Ready(None)
+    pub fn into_stream(
+        self,
+    ) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<u8>>> + Send + 'static>> {
+        futures::stream::unfold(self, |mut this| async move {
+            match this.next_chunk().await {
+                Ok(Some(v)) => Some((Ok(v), this)),
+                Ok(None) => None,
+                Err(e) => Some((Err(e), this)),
             }
-            Poll::Ready(Err(e)) => {
-                *this.is_terminated = true;
-                Poll::Ready(Some(Err(e)))
-            }
-            Poll::Pending => Poll::Pending,
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.inner.transmitted, Some(self.inner.total))
+        })
+            .boxed()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::ops::Range;
-    use tokio_stream::StreamExt;
+
+    use axum::http::{header, HeaderName};
+    use futures::StreamExt;
+    use sha2::{Digest, Sha256};
+    use tokio::fs;
+
+    use super::*;
 
     /// 测试点：
     ///
@@ -325,7 +331,7 @@ mod tests {
             None,
             7,
         )
-        .into_stream();
+            .into_stream();
         let mut chunks = Vec::new();
         while let Some(chunk) = stream.next().await {
             chunks.push(chunk.unwrap());
@@ -352,7 +358,7 @@ mod tests {
             None,
             6,
         )
-        .into_stream();
+            .into_stream();
         let mut chunks = Vec::new();
         while let Some(chunk) = stream.next().await {
             chunks.push(chunk.unwrap());
@@ -432,9 +438,9 @@ mod tests {
             None,
             6,
         )
-        .into_stream();
+            .into_stream();
         while let Some(chunk) = stream.next().await {
-            assert!(matches!(chunk, Err(tokio::io::Error { .. })))
+            assert!(matches!(chunk, Err(anyhow::Error { .. })))
         }
     }
 
@@ -445,5 +451,50 @@ mod tests {
             "{:?}",
             String::from_utf8_lossy(b.format_to_bytes(&Range { start: 0, end: 50 }, 1270))
         );
+    }
+    #[tokio::test]
+    async fn test_single_range() -> anyhow::Result<()> {
+        let file = fs::File::open("../storage/80ad1f62-7c29-40c6-a35a-da0278b3dd33.mp4").await?;
+        let raw_hash = "21e24ecda313fcdc82623a21a77ccbd8561e1116838ca109c354eb60c8044ba3";
+        let total = 206033873usize;
+        let ranges = vec![Range {
+            start: 0,
+            end: total,
+        }];
+        let mut response_header: Vec<(HeaderName, String)> =
+            vec![(header::CONTENT_TYPE, "video/mp4".to_string())];
+        let mut content_length = 0;
+        let boundaries = Boundaries::from_ranges(
+            &ranges,
+            total as u64,
+            &mut content_length,
+            &mut response_header[0].1,
+        );
+        assert!(boundaries.is_none());
+        assert_eq!(0, content_length);
+        assert_eq!(response_header[0].1, "video/mp4");
+        let reader = SparseStreamReader::new(file, ranges, boundaries);
+        let capacity = reader.capacity();
+        let mut transmitted = 0;
+        let mut stream = reader.into_stream();
+        let mut count = 0;
+        let mut hasher = Sha256::new();
+        while let Some(chunk) = stream.next().await {
+            assert!(chunk.is_ok(), "{chunk:?}");
+            let chunk = chunk.unwrap();
+            assert_eq!(
+                chunk.len(),
+                capacity.min(total - transmitted),
+                "期望 chunk 大小小于等于 buffer 的大小"
+            );
+            transmitted += chunk.len();
+            count += 1;
+            hasher.update(&chunk);
+        }
+        let hash = format!("{:x}", hasher.finalize());
+        assert_eq!(transmitted, total, "期望全部字节已经传输");
+        println!("传输 {count} 次，每次 {capacity} bytes");
+        assert_eq!(hash, raw_hash, "期望 HASH 相同即没有漏传数据");
+        Ok(())
     }
 }
