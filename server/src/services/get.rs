@@ -20,8 +20,8 @@ use crate::extractors::Header;
 use crate::state::AppState;
 use crate::utils::{
     format_last_modified_from_metadata, format_last_modified_from_u64, format_ranges,
-    guess_mimetype_from_bytes, parse_range_from_str, ByteRangeBoundaryBuilder,
-    SequentialRangesReader,
+    guess_mimetype_from_bytes, parse_range_from_str, Boundaries, BoundaryBuilder,
+    SparseStreamReader,
 };
 
 #[derive(Deserialize)]
@@ -380,13 +380,13 @@ where
     {
         let mut content_length = ranges.iter().fold(0, |a, b| a + b.len());
         if args.method != Method::HEAD {
-            let boundaries = parse_boundaries_from_ranges(
+            let boundaries = generate_boundaries_from_ranges(
                 &ranges,
                 args.total,
                 &mut content_length,
                 &mut args.response_header[0].1,
             );
-            let stream = SequentialRangesReader::new(args.reader, ranges, boundaries).into_stream();
+            let stream = SparseStreamReader::new(args.reader, ranges, boundaries).into_stream();
             body = Some(Body::from_stream(stream));
         }
         args.response_header
@@ -446,21 +446,21 @@ fn parse_range(range: &str, total: u64) -> Result<(ParsedRanges, RawRanges), Api
     }
     Ok((parsed_ranges, raw_ranges))
 }
-fn parse_boundaries_from_ranges(
+fn generate_boundaries_from_ranges(
     ranges: &[Range<usize>],
     total: u64,
     content_length: &mut usize,
     content_type: &mut String,
-) -> Option<Vec<Vec<u8>>> {
+) -> Option<Boundaries> {
     if ranges.len() > 1 {
-        let builder = ByteRangeBoundaryBuilder::new(content_type.to_string());
-        let mut boundaries = ranges
-            .iter()
-            .map(|it| builder.format_to_bytes(it, total))
-            .collect::<Vec<_>>();
+        let mut builder = BoundaryBuilder::new(content_type.to_string());
+        let mut boundaries = Boundaries::with_capacity(ranges.len());
+        for range in ranges {
+            boundaries.push(builder.format_to_bytes(range, total));
+        }
         boundaries.push(builder.end_to_bytes());
         *content_type = format!("multipart/byteranges; boundary={}", builder.id());
-        *content_length += boundaries.iter().fold(0, |a, b| a + b.len());
+        *content_length += boundaries.len();
         Some(boundaries)
     } else {
         None
