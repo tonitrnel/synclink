@@ -1,4 +1,3 @@
-import { t } from '@lingui/macro';
 import { CopyIcon } from 'icons';
 import { FC, memo, useState, useMemo, useCallback } from 'react';
 import { useGetFileContent } from '~/endpoints';
@@ -9,7 +8,7 @@ import { CustomMenuSlot, Menu } from './menu';
 import { Metadata } from './metadata';
 import { clsx } from '~/utils/clsx';
 import { useLingui } from '@lingui/react';
-import { openViewer } from 'src/components/viewer-dialog';
+import { openViewer } from '~/components/viewer-dialog';
 
 export const TextItem: FC = memo(() => {
   const entity = useEntityConsumer();

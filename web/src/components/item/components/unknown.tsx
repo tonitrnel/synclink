@@ -2,7 +2,7 @@ import { FC, useMemo } from 'react';
 import { useEntityConsumer } from '../entity-provider';
 import { Metadata } from './metadata';
 import { CustomMenuSlot, Menu } from './menu';
-import { openViewer, supportsFileViewer } from 'src/components/viewer-dialog';
+import { openViewer, supportsFileViewer } from '~/components/viewer-dialog';
 import { EyeIcon } from 'icons';
 import { useLingui } from '@lingui/react';
 

@@ -75,13 +75,13 @@ pub fn registry_logs(
             .with_file(true)
             .with_line_number(true)
             .with_timer(ChronoLocal::new("%F %X%.3f".to_string()))
-            .with_filter(filter::LevelFilter::from(level))
+            // .with_filter(filter::LevelFilter::from(level));
             .with_filter(filter::filter_fn(move |metadata| {
-                &level <= metadata.level()
+                metadata.level() <= &level
                     && metadata
-                        .module_path()
-                        .map(|it| it.starts_with("cedasync::") || it == "cedasync")
-                        .unwrap_or(false)
+                    .module_path()
+                    .map(|it| it.starts_with("cedasync::") || it == "cedasync")
+                    .unwrap_or(false)
             }));
         layers.push(generic_layer.boxed());
     }

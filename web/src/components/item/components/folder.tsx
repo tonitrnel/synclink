@@ -21,7 +21,7 @@ import { saveDirectoryFromTarStream } from '~/utils/save-directory';
 import dayjs from 'dayjs';
 import { useLingui } from '@lingui/react';
 import { useSnackbar } from '~/components/snackbar';
-import { openViewer, supportsFileViewer } from 'src/components/viewer-dialog';
+import { openViewer, supportsFileViewer } from '~/components/viewer-dialog';
 
 type RecordData = {
   name: string;
