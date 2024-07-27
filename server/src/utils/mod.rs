@@ -1,16 +1,16 @@
 mod decode_uri;
 mod mimetype;
 mod observer;
-mod sequential_ranges_stream;
 mod session_manager;
+mod sparse_stream_reader;
 mod utc_to_i64;
 
 use chrono::TimeZone;
 pub use decode_uri::*;
 pub use mimetype::*;
 pub use observer::*;
-pub use sequential_ranges_stream::*;
 pub use session_manager::*;
+pub use sparse_stream_reader::*;
 pub use utc_to_i64::*;
 
 /// read last_modified from file metadata
