@@ -337,7 +337,7 @@ impl FileIndexing {
     //     }
     // }
     pub fn check_storage_quota_exceeded(&self, file_size: u64) -> anyhow::Result<()> {
-        let c = &config::load().file_storage;
+        let c = &config::CONFIG.file_storage;
         let quota = c.get_quota();
         let default_reserved = c.get_default_reserved();
         let current_storage = self

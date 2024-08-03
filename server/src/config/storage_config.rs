@@ -1,7 +1,7 @@
-use crate::config::root_dir;
 use anyhow::Context;
 use serde::{Deserialize, Deserializer};
 use std::path::PathBuf;
+use crate::config::ROOT_DIR;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct StorageConfig {
@@ -16,7 +16,7 @@ impl StorageConfig {
         let path = if path.is_absolute() {
             path
         } else {
-            root_dir().join(path)
+            ROOT_DIR.join(path)
         };
         path.canonicalize()
             .with_context(|| "Failed to parse storage directory.".to_string())

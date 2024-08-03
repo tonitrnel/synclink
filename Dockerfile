@@ -1,5 +1,5 @@
 # Server
-FROM rust:1.79-alpine3.20 as ServerBuilder
+FROM rust:1.80-alpine3.20 as ServerBuilder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ COPY server /app
 RUN cargo build --release
 
 # Wasm dependencies
-FROM rust:1.79 as WasmBuilder
+FROM rust:1.80 as WasmBuilder
 # It is not compiled for the Linux platform, and using Alpine will cause the download of `wasm-opt` dependencies' binary files to fail.
 
 WORKDIR /app

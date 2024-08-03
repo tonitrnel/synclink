@@ -1,7 +1,7 @@
-use crate::common::{ApiError, ApiResult};
-use crate::services::notify::SSEBroadcastEvent;
-use crate::state::AppState;
-use crate::utils::{Observer, SessionManager};
+use std::net::SocketAddr;
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
+
 use anyhow::Context;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{ConnectInfo, Json, State, WebSocketUpgrade};
@@ -9,12 +9,14 @@ use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
-use std::net::SocketAddr;
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Receiver;
 use uuid::Uuid;
+
+use crate::common::{ApiError, ApiResult};
+use crate::services::notify::SSEBroadcastEvent;
+use crate::state::AppState;
+use crate::utils::{Observer, SessionManager};
 
 struct P2PSession {
     supports_rtc: bool,
@@ -24,12 +26,7 @@ struct P2PSession {
     alive: u8,
 }
 
-static SHARED_SESSIONS: OnceLock<Arc<SessionManager<Uuid, P2PSession>>> = OnceLock::new();
-fn access_shared_sessions() -> Arc<SessionManager<Uuid, P2PSession>> {
-    SHARED_SESSIONS
-        .get_or_init(|| SessionManager::new(Duration::from_secs(300)))
-        .clone()
-}
+static SHARED_SESSIONS: LazyLock<Arc<SessionManager<Uuid, P2PSession>>> = LazyLock::new(|| SessionManager::new(Duration::from_secs(300)));
 
 #[derive(Debug, Deserialize)]
 pub struct CreateP2PRequestDto {
@@ -43,7 +40,7 @@ pub async fn create_request(
     Json(form): Json<CreateP2PRequestDto>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let request_id = Uuid::new_v4();
-    let sessions = access_shared_sessions();
+    let sessions = SHARED_SESSIONS.clone();
     // 确认接收端处于空闲状态（无其他 P2P 连接）
     if sessions.guard().iter().any(|(_, session)| {
         session.sender_id == form.target_id || session.receiver_id == form.target_id
@@ -104,8 +101,7 @@ pub async fn accept_request(
         form.request_id
     );
     let (protocol, sender_id, receiver_id) = {
-        let sessions = access_shared_sessions();
-        let mut guard = sessions.guard();
+        let mut guard = SHARED_SESSIONS.guard();
         let session = if let Some(value) = guard.get_mut(&form.request_id) {
             value
         } else {
@@ -157,7 +153,7 @@ pub async fn signaling(
     State(state): State<AppState>,
     Json(form): Json<CreateSignalingDto>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let sessions = access_shared_sessions();
+    let sessions = SHARED_SESSIONS.clone();
     let session = sessions
         .get(&form.request_id)
         .with_context(|| "Failed to send signal: invalid request_id")?;
@@ -179,7 +175,7 @@ pub async fn discard_request(
     State(state): State<AppState>,
     Json(form): Json<DiscardRequestDto>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    if let Some(session) = access_shared_sessions().remove(&form.request_id) {
+    if let Some(session) = SHARED_SESSIONS.remove(&form.request_id) {
         state.notify_manager.send_with_client(
             SSEBroadcastEvent::P2PReject(form.request_id),
             &session.sender_id,
@@ -261,8 +257,7 @@ async fn handle_socket(
         anyhow::bail!("client {addr} abruptly disconnected");
     };
     let (receiver_id, alive) = {
-        let sessions = access_shared_sessions();
-        let mut guard = sessions.guard();
+        let mut guard = SHARED_SESSIONS.guard();
         let session = guard
             .get_mut(&request_id)
             .filter(|it| it.established)
@@ -304,8 +299,23 @@ async fn handle_socket(
         let mut send_task = tokio::spawn(async move {
             while let Ok((packet, target)) = rx.recv().await {
                 if target != sender_id {
+                    drop(packet);
                     continue;
                 }
+                let packet = Arc::unwrap_or_clone(packet);
+                // let packet = if packet[0] >= 0xF0 || packet.len() < 8196 {
+                //     packet.as_ref().clone()
+                // } else {
+                //     match packet.into_inner() {
+                //         Some(packet) => {
+                //             packet
+                //         },
+                //         None => {
+                //             tracing::error!("Unexpected error, packet has been used");
+                //             continue;
+                //         }
+                //     }
+                // };
                 if sender.send(Message::Binary(packet)).await.is_err() {
                     break;
                 }
@@ -330,8 +340,7 @@ async fn handle_socket(
     }
     // 如果 session 还存在则更新 alive 字段
     {
-        let sessions = access_shared_sessions();
-        let mut guard = sessions.guard();
+        let mut guard = SHARED_SESSIONS.guard();
         if let Some(value) = guard.get_mut(&request_id) {
             value.alive -= 1;
         };
@@ -371,7 +380,7 @@ fn parse_message(message: &Message) -> anyhow::Result<(PacketFlag, &[u8])> {
 // }
 
 pub struct SocketManager {
-    tx: broadcast::Sender<(Vec<u8>, Uuid)>,
+    tx: broadcast::Sender<(Arc<Vec<u8>>, Uuid)>,
 }
 impl SocketManager {
     #[allow(clippy::new_without_default)]
@@ -379,22 +388,19 @@ impl SocketManager {
         let (tx, _) = broadcast::channel(8);
         Self { tx }
     }
-    pub fn send(
-        &self,
-        bytes: Vec<u8>,
-        target: &Uuid,
-    ) -> Result<usize, broadcast::error::SendError<(Vec<u8>, Uuid)>> {
-        self.tx.send((bytes, *target))
+    pub fn send(&self, bytes: Vec<u8>, target: &Uuid) -> anyhow::Result<usize> {
+        self.tx
+            .send((Arc::new(bytes), *target))
+            .with_context(|| "Could not send bytes")
     }
-    pub fn subscribe(&self) -> Receiver<(Vec<u8>, Uuid)> {
+    pub fn subscribe(&self) -> Receiver<(Arc<Vec<u8>>, Uuid)> {
         self.tx.subscribe()
     }
 }
 
 impl Observer<Uuid> for SocketManager {
     fn notify(&self, value: Uuid) {
-        let sessions = access_shared_sessions();
-        sessions.remove(&value);
+        SHARED_SESSIONS.remove(&value);
     }
 }
 

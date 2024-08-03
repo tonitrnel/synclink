@@ -103,7 +103,7 @@ impl Entity {
         &self.ip
     }
     pub fn get_ip_alias(&self) -> Option<&String> {
-        let device_ip_tags = &config::load().device_ip_tags;
+        let device_ip_tags = &config::CONFIG.device_ip_tags;
         self.ip
             .as_ref()
             .zip(device_ip_tags.as_ref())

@@ -5,24 +5,16 @@ use axum::http::request::Parts;
 use axum::{async_trait, Json};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     exp: usize,
 }
-static SECRET: OnceLock<Option<&'static str>> = OnceLock::new();
-static KEYS: OnceLock<Option<Keys>> = OnceLock::new();
-
-fn load_secret() -> &'static Option<&'static str> {
-    SECRET.get_or_init(|| {
-        let config = config::load();
-        config.authorize.as_ref().map(|it| it.secret.as_str())
-    })
-}
-fn load_keys() -> &'static Option<Keys> {
-    KEYS.get_or_init(|| load_secret().map(|it| Keys::new(it.as_bytes())))
-}
+static SECRET: LazyLock<Option<&'static str>> = LazyLock::new(|| {
+    config::CONFIG.authorize.as_ref().map(|it| it.secret.as_str())
+});
+static KEYS: LazyLock<Option<Keys>> = LazyLock::new(|| SECRET.map(|it| Keys::new(it.as_bytes())));
 
 struct Keys {
     encoding: EncodingKey,
@@ -44,7 +36,7 @@ where
 {
     type Rejection = ApiError;
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        if let Some(keys) = load_keys() {
+        if let Some(keys) = KEYS.as_ref() {
             let authorization = parts
                 .headers
                 .get(axum::http::header::AUTHORIZATION)
@@ -73,7 +65,7 @@ pub struct AuthBodyDto {
     token_type: String,
 }
 pub async fn authorize(Json(payload): Json<AuthPayloadDto>) -> ApiResult<Json<AuthBodyDto>> {
-    let secret = match load_secret() {
+    let secret = match SECRET.as_ref() {
         Some(secret) => *secret,
         None => return Err(ApiError::BadRequest(anyhow::format_err!("Bad Request"))),
     };
@@ -84,7 +76,7 @@ pub async fn authorize(Json(payload): Json<AuthPayloadDto>) -> ApiResult<Json<Au
     let claims = Claims {
         exp: now.timestamp() as usize,
     };
-    let keys = load_keys().as_ref().unwrap();
+    let keys = KEYS.as_ref().unwrap();
     let token = encode(&Header::default(), &claims, &keys.encoding)?;
     Ok(Json(AuthBodyDto {
         access_token: token,

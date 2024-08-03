@@ -33,7 +33,7 @@ fn print_banner() {
 async fn main() -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     let _pid = pidfile::Pidfile::new()?;
-    let config = config::load();
+    let config = &config::CONFIG;
     let (mut log_writer, log_handle) = LogWriter::new()?;
     let listener = {
         // Initialize logger tracing

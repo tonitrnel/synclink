@@ -14,7 +14,7 @@ use serde::Deserialize;
 use std::io::{Read, SeekFrom};
 use std::path;
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tar::Archive;
 use tokio::fs;
@@ -27,19 +27,13 @@ struct Session {
     start: u64,
 }
 
-static SHARED_SESSIONS: OnceLock<Arc<SessionManager<Uuid, Session>>> = OnceLock::new();
+static SHARED_SESSIONS: LazyLock<Arc<SessionManager<Uuid, Session>>> = LazyLock::new(|| SessionManager::new(Duration::from_secs(300)));
 
 #[derive(Deserialize, Debug)]
 pub struct ConcatenateQueryParams {
     id: Uuid,
     tags: Option<String>,
     caption: Option<String>,
-}
-
-fn access_shared_sessions() -> Arc<SessionManager<Uuid, Session>> {
-    SHARED_SESSIONS
-        .get_or_init(|| SessionManager::new(Duration::from_secs(300)))
-        .clone()
 }
 
 /// allocate disk resource
@@ -53,7 +47,7 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     };
     let (uid, start, path) = {
-        if let Some((uid, session)) = access_shared_sessions()
+        if let Some((uid, session)) = SHARED_SESSIONS
             .guard()
             .iter()
             .find(|(_, it)| it.hash == hash)
@@ -88,7 +82,7 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     }
     if start == 0 {
-        access_shared_sessions().insert(uid, Session { hash, start: 0 });
+        SHARED_SESSIONS.insert(uid, Session { hash, start: 0 });
     }
     Ok((uid, start))
 }
@@ -130,8 +124,7 @@ where
                 path: path.to_owned(),
             })?;
     }
-    let sessions = access_shared_sessions();
-    if let Some(it) = sessions.guard().get_mut(uid) {
+    if let Some(it) = SHARED_SESSIONS.guard().get_mut(uid) {
         it.start = end;
     }
     Ok(())
@@ -192,7 +185,7 @@ async fn exec_concatenate(
         .unwrap_or_default();
     let path = storage_path.join(format!("{}{}", uid, ext));
     move_tmp_file(&temp, &path).await?;
-    access_shared_sessions().remove(uid);
+    SHARED_SESSIONS.remove(uid);
     Ok((path, size, format!("{:x}", hasher.finalize())))
 }
 
@@ -249,7 +242,7 @@ async fn exec_cleanup(uid: &Uuid) -> anyhow::Result<()> {
         .with_context(|| InternalError::DeleteFileError {
             path: path.to_owned(),
         })?;
-    access_shared_sessions().remove(uid);
+    SHARED_SESSIONS.remove(uid);
     Ok(())
 }
 #[derive(Deserialize, Debug)]
@@ -293,7 +286,7 @@ pub async fn append(
     let pos = query.pos;
     let current_start_position = {
         // Reduce the scope of the lock
-        access_shared_sessions().get(&id).map(|it| it.start)
+        SHARED_SESSIONS.get(&id).map(|it| it.start)
     };
 
     // Check for duplicate chunk
@@ -331,7 +324,7 @@ pub async fn concatenate(
         })
         .unwrap_or_default();
     let caption = query.caption.clone().unwrap_or_default();
-    if !access_shared_sessions().contains_key(&id) {
+    if !SHARED_SESSIONS.contains_key(&id) {
         return Ok(Json("ok!"));
     }
     let content_type = header.content_type.clone();

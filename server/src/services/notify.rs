@@ -9,7 +9,6 @@ use axum::{
     BoxError, Json,
 };
 use futures::stream;
-use rand::Rng;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
@@ -30,9 +29,17 @@ impl NotifyGuard {
     fn new(ip: String, user_agent: String, notify_manager: Arc<NotifyManager>) -> Self {
         let id = Uuid::new_v4();
         let pin = {
-            let mut rng = rand::thread_rng();
-            let pin: u32 = rng.gen_range(000000..=999999);
-            format!("{:0>6}", pin)
+            #[cfg(debug_assertions)]
+            {
+                "000000".to_string()
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                use rand::Rng;
+                let mut rng = rand::thread_rng();
+                let pin: u32 = rng.gen_range(000000..=999999);
+                format!("{:0>6}", pin)
+            }
         };
         notify_manager.add_client(
             id,
@@ -142,7 +149,7 @@ pub struct ConnectionDto {
     user_agent: String,
 }
 pub async fn sse_connections(State(state): State<AppState>) -> ApiResult<Json<Vec<ConnectionDto>>> {
-    let device_ip_tags = crate::config::load().device_ip_tags.as_ref();
+    let device_ip_tags = crate::config::CONFIG.device_ip_tags.as_ref();
     let guard = state.notify_manager.connections.lock().unwrap();
     let data = guard
         .iter()

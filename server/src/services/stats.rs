@@ -21,7 +21,7 @@ pub async fn stats(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     });
     let version = env!("CARGO_PKG_VERSION");
     let uptime = config::uptime();
-    let c = &config::load().file_storage;
+    let c = &config::CONFIG.file_storage;
     let storage_quota = c.get_quota();
     let default_reserved = c.get_default_reserved();
     Ok(Json(json!({

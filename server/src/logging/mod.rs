@@ -14,7 +14,7 @@ pub fn registry_logs(
 ) -> anyhow::Result<()> {
     let mut layers = Vec::new();
     let dir = dir.unwrap_or_else(|| PathBuf::from("/var/log/cedasync"));
-    let enable_file_logging = super::config::load().logs.enable_file_logging;
+    let enable_file_logging = super::config::CONFIG.logs.enable_file_logging;
     // access_layer
     'access_layer: {
         if !enable_file_logging {
