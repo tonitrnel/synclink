@@ -57,7 +57,7 @@ export const AudioGlobalController: FC<{
           )}
           onClick={stopAll}
         >
-          <MusicIcon className="w-6 h-6 stroke-currentColor" />
+          <MusicIcon className="w-6 h-6 stroke-current" />
         </motion.button>
       )}
     </AnimatePresence>

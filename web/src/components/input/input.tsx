@@ -1,25 +1,13 @@
 import {
   ChangeEventHandler,
   FC,
-  forwardRef,
   KeyboardEventHandler,
   memo,
-  MouseEventHandler,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import {
-  HardDriveUploadIcon,
-  SendIcon,
-  XIcon,
-  FilesIcon as PasteIcon,
-  ArrowLeftRightIcon,
-  FileUpIcon,
-  FolderUpIcon,
-} from 'icons';
-import { DropZone } from '../dropzone';
 import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { openFilePicker } from '~/utils/open-file-picker.ts';
 import {
@@ -31,17 +19,15 @@ import {
 import { Logger } from '~/utils/logger.ts';
 import { upload } from '~/utils/upload.ts';
 import { t } from '@lingui/macro';
-import { useSnackbar } from '~/components/snackbar';
+import { useSnackbar } from '~/components/ui/snackbar';
 import { featureCheck } from '~/utils/feature-check.ts';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
-import { ExtractProps, FilesOrEntries } from '~/constants/types.ts';
-import { InputTextarea } from 'primereact/inputtextarea';
-import type { TooltipOptions } from 'primereact/tooltip/tooltipoptions';
-import { Button } from 'primereact/button';
-import { P2pFileTransferDialog } from '~/components/file-transfer-dialog';
+import { FilesOrEntries } from '~/constants/types.ts';
 import { FileUploadDialog } from '../file-upload-dialog';
 import { useDialog } from '~/utils/hooks/use-dialog.ts';
-import { useLingui } from '@lingui/react';
+import { MobileInput } from './mobile-input';
+import { DesktopInput } from './desktop-input';
+import { clsx } from '~/utils/clsx';
 import './input.less';
 
 const logger = new Logger('Input');
@@ -195,26 +181,106 @@ export const Input: FC = memo(() => {
         change: ChangeEventHandler<HTMLTextAreaElement> = (evt) => {
           setText(evt.target.value);
         };
-        receivedTransferData = async (filesOrEntries: FilesOrEntries) => {
-          fileUploadDialog.open({
-            mode: filesOrEntries.type == 'multi-file' ? 'file' : 'directory',
-            filesOrEntries,
-          });
-          const value = await fileUploadDialog.awaitClose();
-          if (!value) return void 0;
-          try {
-            await upload(value.entries, value.caption, value.tags);
-          } catch (e) {
-            logger.error('Upload Failed', e);
-            snackbar.enqueueSnackbar({
-              message: e instanceof Error ? e.message : String(e),
-              variant: 'error',
+        receivedTransferData = async (
+          filesOrEntries: FilesOrEntries,
+          from: 'drop' | 'paste',
+        ) => {
+          if (
+            from == 'paste' &&
+            filesOrEntries.type == 'multi-file' &&
+            filesOrEntries.files.length == 1 &&
+            filesOrEntries.files[0].size < 2097152 &&
+            filesOrEntries.files[0].type.startsWith('image/')
+          ) {
+            try {
+              await upload(filesOrEntries, undefined, undefined);
+            } catch (e) {
+              logger.error('Upload Failed', e);
+              snackbar.enqueueSnackbar({
+                message: e instanceof Error ? e.message : String(e),
+                variant: 'error',
+              });
+            }
+          } else {
+            fileUploadDialog.open({
+              mode: filesOrEntries.type == 'multi-file' ? 'file' : 'directory',
+              filesOrEntries,
             });
+            const value = await fileUploadDialog.awaitClose();
+            if (!value) return void 0;
+            try {
+              await upload(value.entries, value.caption, value.tags);
+            } catch (e) {
+              logger.error('Upload Failed', e);
+              snackbar.enqueueSnackbar({
+                message: e instanceof Error ? e.message : String(e),
+                variant: 'error',
+              });
+            }
           }
         };
       })(),
     [fileUploadDialog, snackbar],
   );
+  // Register "measure-size" event
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const container = textarea?.parentElement;
+    if (!textarea || !container) return void 0;
+    let measureTimer: number | void = void 0;
+    const measure = document.createElement('div');
+    measure.className = textarea.className;
+    let initialized = false;
+    let unmounted = false;
+    let previousHeight = 0;
+    const initialize = () => {
+      if (unmounted) return void 0;
+      measure.className = clsx(
+        textarea.className,
+        'absolute overflow-y-auto whitespace-pre-wrap -z-50 left-0 top-0 pointer-events-none invisible',
+      );
+      const computedStyle = window.getComputedStyle(textarea);
+      if (!computedStyle.width.trim()) return void 0;
+      measure.style.setProperty('width', computedStyle.width);
+      measure.style.setProperty('height', computedStyle.height);
+      container.appendChild(measure);
+      initialized = true;
+    };
+    const measureSize = () => {
+      if (!initialized) {
+        window.requestAnimationFrame(initialize);
+        return void 0;
+      }
+      if (measureTimer) window.cancelAnimationFrame(measureTimer);
+      measureTimer = window.requestAnimationFrame(() => {
+        const value = textarea.value;
+        measure.innerText = value.endsWith('\n') ? value + ' ' : value || ' ';
+        const measureHeight =  measure.scrollHeight;
+        const height = Math.min(measureHeight, 300);
+        if (
+          measureHeight > 300 &&
+          textarea.selectionStart === value.length &&
+          textarea.scrollHeight > textarea.clientHeight
+        ) {
+          textarea.scrollTo({ top: textarea.scrollHeight });
+        }
+        if (previousHeight === height) {
+          return void 0;
+        }
+        previousHeight = height;
+        textarea.style.setProperty('height', `${height}px`);
+      });
+    };
+    textarea.addEventListener('measure-size', measureSize);
+    window.requestAnimationFrame(initialize);
+    return () => {
+      unmounted = true;
+      if (initialized) container.removeChild(measure);
+      textarea.removeEventListener('measure-size', measureSize);
+      if (measureTimer) window.cancelAnimationFrame(measureTimer);
+      measureTimer = void 0;
+    };
+  }, []);
   // Dispatch the "measure-size" event and update text ref when the text change
   useEffect(() => {
     textRef.current = text;
@@ -309,10 +375,13 @@ export const Input: FC = memo(() => {
     const listener = async (evt: ClipboardEvent) => {
       const files = evt.clipboardData?.files;
       if (!files || files?.length == 0) return void 0;
-      await handler.receivedTransferData({
-        type: 'multi-file',
-        files: [...files],
-      });
+      await handler.receivedTransferData(
+        {
+          type: 'multi-file',
+          files: [...files],
+        },
+        'paste',
+      );
     };
     document.addEventListener('paste', listener);
     return () => {
@@ -352,173 +421,3 @@ export const Input: FC = memo(() => {
     </>
   );
 });
-
-const MobileInput = forwardRef<
-  HTMLTextAreaElement,
-  {
-    text: string;
-    sending: boolean;
-    onKeyUp: KeyboardEventHandler<HTMLTextAreaElement>;
-    onChange: ChangeEventHandler<HTMLTextAreaElement>;
-    onUploadFile: MouseEventHandler<HTMLButtonElement>;
-    onSend: MouseEventHandler<HTMLButtonElement>;
-  }
->(({ text, sending, onKeyUp, onChange, onUploadFile, onSend }, ref) => {
-  return (
-    <section className="relative flex items-end gap-1">
-      <button
-        title={t`upload`}
-        className="active:bg-gray-200 rounded-xl p-2 -ml-2"
-        onClick={onUploadFile}
-      >
-        <HardDriveUploadIcon className="w-6 h-6 stroke-gray-600 " />
-      </button>
-      <textarea
-        ref={ref}
-        value={text}
-        onKeyUp={onKeyUp}
-        onChange={onChange}
-        className="sl-textarea w-auto flex-1 py-2 min-h-0 h-auto"
-        rows={1}
-      />
-      <button
-        disabled={sending}
-        className="bg-info-main text-white rounded px-3 py-2 ml-2 active:bg-info-dark active:bg-opacity-80 select-none mb-0.5"
-        onClick={onSend}
-      >
-        {t`send`}
-      </button>
-    </section>
-  );
-});
-const DesktopInput = forwardRef<
-  HTMLTextAreaElement,
-  {
-    text: string;
-    sending: boolean;
-    onKeyUp: KeyboardEventHandler<HTMLTextAreaElement>;
-    onChange: ChangeEventHandler<HTMLTextAreaElement>;
-    onUploadFile: MouseEventHandler<HTMLButtonElement>;
-    onUploadFolder: MouseEventHandler<HTMLButtonElement>;
-    onPaste: MouseEventHandler<HTMLButtonElement>;
-    onClear: MouseEventHandler<HTMLButtonElement>;
-    onSend: MouseEventHandler<HTMLButtonElement>;
-    onReceivedTransferData: ExtractProps<
-      typeof DropZone
-    >['onReceivedTransferData'];
-  }
->(
-  (
-    {
-      text,
-      sending,
-      onKeyUp,
-      onChange,
-      onUploadFile,
-      onUploadFolder,
-      onPaste,
-      onClear,
-      onSend,
-      onReceivedTransferData,
-    },
-    ref,
-  ) => {
-    const i18n = useLingui();
-    const p2pFileDialog = useDialog(P2pFileTransferDialog);
-    return (
-      <section className="relative border border-gray-200 rounded-xl p-2">
-        {p2pFileDialog.visible && (
-          <p2pFileDialog.Dialog {...p2pFileDialog.DialogProps} />
-        )}
-        <InputTextarea
-          ref={ref}
-          value={text}
-          onKeyUp={onKeyUp}
-          onChange={onChange}
-          className="w-full border-none shadow-none"
-          placeholder={i18n._("Enter your message here...")}
-          autoResize
-          rows={2}
-        />
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            <Button
-              tooltip={i18n._("Upload file")}
-              tooltipOptions={ButtonTooltipOptionsObj}
-              className="p-2 rounded-lg"
-              onClick={onUploadFile}
-              severity="secondary"
-              text
-            >
-              <FileUpIcon className="w-5 h-5 stroke-grey-600" />
-            </Button>
-            <Button
-              tooltip={i18n._("Upload folder")}
-              tooltipOptions={ButtonTooltipOptionsObj}
-              className="p-2 rounded-lg"
-              onClick={onUploadFolder}
-              severity="secondary"
-              text
-            >
-              <FolderUpIcon className="w-5 h-5 stroke-grey-600" />
-            </Button>
-            <Button
-              tooltip={i18n._("Paste")}
-              tooltipOptions={ButtonTooltipOptionsObj}
-              className="p-2 rounded-lg"
-              onClick={onPaste}
-              severity="secondary"
-              text
-            >
-              <PasteIcon className="w-5 h-5 stroke-grey-600" />
-            </Button>
-            <Button
-              tooltip={i18n._("Peer to peer file transfer")}
-              tooltipOptions={ButtonTooltipOptionsObj}
-              className="p-2 rounded-lg"
-              severity="secondary"
-              onClick={() => p2pFileDialog.open()}
-              text
-            >
-              <ArrowLeftRightIcon className="w-5 h-5 stroke-grey-600" />
-            </Button>
-          </div>
-          <div className="flex gap-2">
-            <button
-              title={i18n._("Clear")}
-              hidden={text.length === 0}
-              onClick={onClear}
-              className="text-gray-500 hover:text-gray-600 cursor-pointer"
-            >
-              <XIcon className="w-5 h-5 stroke-currentColor" />
-            </button>
-            <Button
-              severity="secondary"
-              title={i18n._("Send (Ctrl + Enter)")}
-              onClick={onSend}
-            >
-              <span className="box-content text-white mr-2">
-                {sending ? (
-                  <>
-                    <span>{i18n._("Sending")}</span>
-                    <span className="ani_dot">...</span>
-                  </>
-                ) : (
-                  <span>{i18n._("Send")}</span>
-                )}
-              </span>
-              <SendIcon className="box-content w-5 h-5 stroke-white" />
-            </Button>
-          </div>
-        </div>
-        <DropZone onReceivedTransferData={onReceivedTransferData} />
-      </section>
-    );
-  },
-);
-
-const ButtonTooltipOptionsObj = {
-  position: 'bottom',
-  showDelay: 1000,
-  hideDelay: 300,
-} satisfies TooltipOptions;

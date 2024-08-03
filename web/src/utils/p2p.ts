@@ -2,8 +2,8 @@ import { sendP2PSignaling } from '~/endpoints';
 import { EventBus } from '~/utils/event-bus.ts';
 import { wait } from './wait';
 
-const PING = new Uint8Array([0x70, 0x69, 0x6e, 0x67]);
-const PONG = new Uint8Array([0x70, 0x6f, 0x6e, 0x67]);
+const PING_OPCODE = new Uint8Array([0x70, 0x69, 0x6e, 0x67]);
+const PONG_OPCODE = new Uint8Array([0x70, 0x6f, 0x6e, 0x67]);
 
 export enum PacketFlag {
   // 客户端使用 0x01 ~ 0xEF
@@ -35,25 +35,96 @@ export type RTCEvents = {
     source: Event;
     message: string;
   };
-  RTT_CHANGE: number;
+  RTT_UPDATED: number;
 } & Record<PacketFlag, ArrayBuffer>;
 
-export interface RTCImpl extends EventBus<RTCEvents> {
-  protocol: 'webrtc' | 'websocket';
-  rtt: number;
+export abstract class RTCImpl extends EventBus<RTCEvents> {
+  abstract protocol: 'webrtc' | 'websocket';
+  rtt = 0;
+  protected nextPingActiveTime = 0;
 
-  send(bytes: Uint8Array, flag?: PacketFlag): void;
+  abstract send(bytes: Uint8Array, flag?: PacketFlag): void;
 
-  waitForDrain(): Promise<void>;
+  abstract waitForDrain(): Promise<void>;
 
-  ping(): Promise<number>;
+  public ping = async (): Promise<number> => {
+    const startTime = Date.now();
 
-  recv(): AsyncGenerator<ArrayBuffer>;
+    // [OPCODE:4 bytes, SEQ: 2 bytes, TIME: 8 bytes]
+    const packet = new Uint8Array(14);
+    const seq = Math.floor(Math.random() * 10000);
+    packet.set(PING_OPCODE, 0);
+    new DataView(packet.buffer, 4, 2).setUint16(0, seq, true);
+    packet.set(int2u8array(startTime), 6);
 
-  close(): void;
+    this.send(packet, PacketFlag.PING);
+
+    const replyTime = await new Promise<number>((resolve, reject) => {
+      const timeoutDuration = 5000; // 5 seconds timeout
+      const timerId = window.setTimeout(() => {
+        this.off(PacketFlag.PONG, pongHandler);
+        reject(
+          new Error('Ping test timed out after ' + timeoutDuration + ' ms'),
+        );
+      }, timeoutDuration);
+      const pongHandler = (buffer: ArrayBuffer) => {
+        if (buffer.byteLength !== 14) {
+          return void 0;
+        }
+        const receivedBytes = new Uint8Array(buffer);
+        if (
+          !receivedBytes
+            .subarray(0, 4)
+            .every((byte, index) => byte === PONG_OPCODE[index])
+        ) {
+          return;
+        }
+        if (
+          new DataView(receivedBytes.buffer, 4, 2).getUint16(0, true) !== seq
+        ) {
+          return void 0;
+        }
+        window.clearTimeout(timerId);
+        this.off(PacketFlag.PONG, pongHandler);
+        const receivedTime = receivedBytes.subarray(6, 14);
+        resolve(u8array2int(receivedTime));
+      };
+      this.on(PacketFlag.PONG, pongHandler);
+    });
+    this.rtt = Math.max(Math.ceil((replyTime - startTime + this.rtt) / 2), 0);
+    this.emit('RTT_UPDATED', this.rtt);
+    return this.rtt;
+  };
+
+  protected pong = (buffer: ArrayBuffer) => {
+    if (buffer.byteLength != 14) return void 0;
+    const bytes = new Uint8Array(buffer);
+    if (
+      bytes.subarray(0, 4).some((byte, index) => byte != PING_OPCODE[index])
+    ) {
+      return void 0;
+    }
+    const seq = new DataView(bytes.buffer, 4, 2).getUint16(0, true);
+    const startTime = u8array2int(bytes.subarray(6, 14));
+    const replyTime = Date.now();
+
+    const packet = new Uint8Array(14);
+    packet.set(PONG_OPCODE, 0);
+    new DataView(packet.buffer, 4, 2).setUint16(0, seq, true);
+    packet.set(int2u8array(replyTime), 6);
+    this.send(packet, PacketFlag.PONG);
+
+    this.rtt = Math.max(Math.ceil((replyTime - startTime + this.rtt) / 2), 0);
+    this.nextPingActiveTime = replyTime + 5000;
+    this.emit('RTT_UPDATED', this.rtt);
+  };
+
+  abstract recv(): AsyncGenerator<ArrayBuffer>;
+
+  abstract close(): void;
 }
 
-export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
+export class P2PRtc extends RTCImpl {
   readonly conn = new RTCPeerConnection();
   private channel: RTCDataChannel | undefined;
   private established = false;
@@ -70,14 +141,7 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
       if (!evt.candidate) return void 0;
       await this.sendSignaling([1, evt.candidate]);
     });
-    this.on(PacketFlag.PING, (buffer) => {
-      if (buffer.byteLength != PING.byteLength) return void 0;
-      const bytes = new Uint8Array(buffer);
-      for (let i = 0; i < PING.byteLength; i++) {
-        if (bytes.byteLength != PING.byteLength) return void 0;
-      }
-      this.send(PONG, PacketFlag.PONG);
-    });
+    this.on(PacketFlag.PING, (buffer) => this.pong(buffer));
     this.on(PacketFlag.SHAKEHAND, (buf) => {
       if (this.established) return void 0;
       const id = u8array2uuid(new Uint8Array(buf.slice(0, 16)));
@@ -97,7 +161,6 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
         );
         this.MAC_PACKET_SIZE = this.conn.sctp.maxMessageSize - 16; // 预留 16 bytes 的元数据空间
       }
-      this.runIntervalPing();
     });
     this.on(PacketFlag.PEER_CLOSE, () => {
       this.emit('CONNECTION_CLOSE', {
@@ -251,55 +314,6 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
     this.channel.send(buffer);
   }
 
-  private runIntervalPing = async () => {
-    while (true) {
-      try {
-        if (
-          !this.channel ||
-          this.channel.readyState !== 'open' ||
-          !this.established
-        ) {
-          break;
-        }
-        await this.ping();
-        await wait(5000);
-      } catch {
-        this.close(false);
-        return void 0;
-      }
-    }
-  };
-
-  public async ping(): Promise<number> {
-    const start = Date.now();
-    this.send(PING, PacketFlag.PING);
-    await new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        this.off(PacketFlag.PONG, handle);
-        reject(new Error('timeout'));
-      }, 5000);
-      const handle = (buffer: ArrayBuffer) => {
-        window.clearTimeout(timer);
-        if (buffer.byteLength != PONG.byteLength) {
-          resolve(false);
-          return void 0;
-        }
-        const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < PONG.byteLength; i++) {
-          if (bytes.byteLength != PONG.byteLength) {
-            resolve(false);
-            return void 0;
-          }
-        }
-        resolve(true);
-      };
-      this.once(PacketFlag.PONG, handle);
-    });
-    this.rtt = Math.ceil((Date.now() - start + this.rtt) / 2);
-    this.emit('RTT_CHANGE', this.rtt);
-    return this.rtt;
-  }
-
   public async *recv(): AsyncGenerator<ArrayBuffer> {
     if (!this.channel) {
       throw new Error('No established connection');
@@ -353,11 +367,10 @@ export class P2PRtc extends EventBus<RTCEvents> implements RTCImpl {
   }
 }
 
-export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
+export class P2PSocket extends RTCImpl {
   readonly ws: WebSocket;
   private established = false;
   public readonly protocol = 'websocket';
-  public rtt = 0;
 
   public constructor(
     readonly requestId: string,
@@ -376,7 +389,7 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
     this.ws.addEventListener('open', this.onopen, { once: true });
     this.ws.addEventListener('message', this.onmessage);
     this.ws.addEventListener('close', (evt) => {
-      console.log('websocket closed');
+      console.log('websocket closed, reason:', evt.reason);
       if (!this.established) return void 0;
       this.emit('CONNECTION_CLOSE', {
         code: 1006,
@@ -400,14 +413,7 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
         PacketFlag.SHAKEHAND,
       );
     });
-    this.on(PacketFlag.PING, (buffer) => {
-      if (buffer.byteLength != PING.byteLength) return void 0;
-      const bytes = new Uint8Array(buffer);
-      for (let i = 0; i < PING.byteLength; i++) {
-        if (bytes.byteLength != PING.byteLength) return void 0;
-      }
-      this.send(PONG, PacketFlag.PONG);
-    });
+    this.on(PacketFlag.PING, (buffer) => this.pong(buffer));
     this.on(PacketFlag.SHAKEHAND, (buf) => {
       if (this.established) return void 0;
       const id = u8array2uuid(new Uint8Array(buf.slice(0, 16)));
@@ -421,7 +427,6 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
         PacketFlag.SHAKEHAND,
       );
       this.emit('CONNECTION_READY');
-      this.runIntervalPing();
     });
     this.on(PacketFlag.PEER_CLOSE, () => {
       this.emit('CONNECTION_CLOSE', {
@@ -521,52 +526,6 @@ export class P2PSocket extends EventBus<RTCEvents> implements RTCImpl {
     }
   }
 
-  private runIntervalPing = async () => {
-    while (true) {
-      try {
-        if (this.ws.readyState !== this.ws.OPEN || !this.established) {
-          break;
-        }
-        await this.ping();
-        await wait(5000);
-      } catch {
-        this.close(false);
-        return void 0;
-      }
-    }
-  };
-
-  public async ping(): Promise<number> {
-    const start = Date.now();
-    this.send(PING, PacketFlag.PING);
-    const valid = await new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        this.off(PacketFlag.PONG, handle);
-        reject(new Error('ping timeout'));
-      }, 1000);
-      const handle = (buffer: ArrayBuffer) => {
-        window.clearTimeout(timer);
-        if (buffer.byteLength != PONG.byteLength) {
-          resolve(false);
-          return void 0;
-        }
-        const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < PONG.byteLength; i++) {
-          if (bytes.byteLength != PONG.byteLength) {
-            resolve(false);
-            return void 0;
-          }
-        }
-        resolve(true);
-      };
-      this.once(PacketFlag.PONG, handle);
-    });
-    if (!valid) throw new Error('invalid');
-    this.rtt = Math.ceil((Date.now() - start + this.rtt) / 2);
-    this.emit('RTT_CHANGE', this.rtt);
-    return this.rtt;
-  }
-
   public close(notifyPeer = true) {
     if (notifyPeer && this.ws.readyState == this.ws.OPEN) {
       this.ws.send(new Uint8Array([PacketFlag.PEER_CLOSE]));
@@ -595,14 +554,13 @@ const u8array2uuid = (buf: Uint8Array): string => {
     hexParts.slice(start, end).join('');
   return `${part(0, 4)}-${part(4, 6)}-${part(6, 8)}-${part(8, 10)}-${part(10, 16)}`;
 };
-
 const int2u8array = (int: number): Uint8Array => {
-  const buf = new ArrayBuffer(4);
+  const buf = new ArrayBuffer(8);
   const view = new DataView(buf);
-  view.setUint32(0, int, true);
+  view.setBigUint64(0, BigInt(int), true);
   return new Uint8Array(buf);
 };
-// const u8array2int = (buf: Uint8Array): number => {
-//   const view = new DataView(buf.buffer);
-//   return view.getInt32(0, true);
-// };
+const u8array2int = (buf: Uint8Array): number => {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  return Number(view.getBigUint64(0, true));
+};

@@ -24,12 +24,12 @@ export interface SnackbarManager {
   closeSnackbar(id: string): void;
 }
 
-export const __SNACKBAR_CONTEXT = createContext<SnackbarManager | undefined>(
+export const __SNACKBAR_CONTEXT__ = createContext<SnackbarManager | undefined>(
   void 0,
 );
 
 export const useSnackbar = (): SnackbarManager => {
-  const ref = useContext(__SNACKBAR_CONTEXT);
+  const ref = useContext(__SNACKBAR_CONTEXT__);
   if (!ref)
     throw new Error(
       `"useSnackbar" hook must be invoke under <SnackbarProvider/>`,

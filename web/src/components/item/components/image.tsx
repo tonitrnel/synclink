@@ -60,7 +60,7 @@ export const ImageItem: FC = memo(() => {
           data-pswp-width={metadata?.width}
           data-pswp-height={metadata?.height}
           target="_blank"
-          className="cursor-zoom-in"
+          className="cursor-zoom-in block w-fit"
         >
           <img
             className="rounded max-h-[360px] object-cover object-center"

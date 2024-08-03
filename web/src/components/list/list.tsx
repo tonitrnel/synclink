@@ -62,6 +62,7 @@ export const List: FC<{
       setList(
         list.concat((data.data as IEntity[]).filter((it) => !ids.has(it.uid))),
       );
+      // console.log("加载完成");
     },
   });
   const previous = useMemo(
@@ -71,6 +72,7 @@ export const List: FC<{
   );
   const _loadPrevious = useCallback(() => {
     if (!previous || loading) return void 0;
+    // console.log("加载之前的数据");
     setPagination((prev) => ({
       page: previous,
       size: prev.size,
@@ -246,7 +248,7 @@ export const List: FC<{
               {loading && <Loading />}
               <ul
                 className={clsx(
-                  'flex-1 px-1 pt-2 pb-8 transition-opacity',
+                  'flex-1 px-1 pt-2 pb-4 pad:pb-8 transition-opacity',
                   !scrollReady && 'opacity-0',
                 )}
               >

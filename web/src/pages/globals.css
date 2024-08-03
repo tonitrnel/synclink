@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: hsl(0 0% 100%);
+        --foreground: hsl(240 10% 3.9%);
+        --card: hsl(0 0% 100%);
+        --card-foreground: hsl(240 10% 3.9%);
+        --popover: hsl(0 0% 100%);
+        --popover-foreground: hsl(240 10% 3.9%);
+        --primary: hsl(240 5.9% 10%);
+        --primary-foreground: hsl(0 0% 98%);
+        --secondary: hsl(240 4.8% 95.9%);
+        --secondary-foreground: hsl(240 5.9% 10%);
+        --muted: hsl(240 4.8% 95.9%);
+        --muted-foreground: hsl(240 3.8% 46.1%);
+        --accent: hsl(240 4.8% 95.9%);
+        --accent-foreground: hsl(240 5.9% 10%);
+        --destructive: hsl(0 84.2% 60.2%);
+        --destructive-foreground: hsl(0 0% 98%);
+        --border: hsl(240 5.9% 90%);
+        --input: hsl(240 5.9% 90%);
+        --ring: hsl(240 10% 3.9%);
+        --radius: 0.5rem;
+        /*--chart-1: hsl(12 76% 61%);*/
+        /*--chart-2: hsl(173 58% 39%);*/
+        /*--chart-3: hsl(197 37% 24%);*/
+        /*--chart-4: hsl(43 74% 66%);*/
+        /*--chart-5: hsl(27 87% 67%);*/
+
+        --font-display: "Figtree", 'PingFang SC', 'ui-sans-serif', -apple-system, BlinkMacSystemFont,
+            'Segoe UI', Roboto, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+        --font-mono: ui-monospace, "Roboto Mono", "Courier Prime", monospace;
+    }
+
+    .dark {
+        --background: hsl(240 10% 3.9%);
+        --foreground: hsl(0 0% 98%);
+        --card: hsl(240 10% 3.9%);
+        --card-foreground: hsl(0 0% 98%);
+        --popover: hsl(240 10% 3.9%);
+        --popover-foreground: hsl(0 0% 98%);
+        --primary: hsl(0 0% 98%);
+        --primary-foreground: hsl(240 5.9% 10%);
+        --secondary: hsl(240 3.7% 15.9%);
+        --secondary-foreground: hsl(0 0% 98%);
+        --muted: hsl(240 3.7% 15.9%);
+        --muted-foreground: hsl(240 5% 64.9%);
+        --accent: hsl(240 3.7% 15.9%);
+        --accent-foreground: hsl(0 0% 98%);
+        --destructive: hsl(0 62.8% 30.6%);
+        --destructive-foreground: hsl(0 0% 98%);
+        --border: hsl(240 3.7% 15.9%);
+        --input: hsl(240 3.7% 15.9%);
+        --ring: hsl(240 4.9% 83.9%);
+        /*--chart-1: hsl(220 70% 50%);*/
+        /*--chart-2: hsl(160 60% 45%);*/
+        /*--chart-3: hsl(30 80% 55%);*/
+        /*--chart-4: hsl(280 65% 60%);*/
+        /*--chart-5: hsl(340 75% 55%);*/
+    }
+}
+
+@layer base {
+    html {
+        line-height: 1.15; /* 1 */
+        -webkit-text-size-adjust: 100%; /* 2 */
+        font-size: 16px;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: var(--font-display), sans-serif;
+        background-color: var(--background);
+        color: var(--foreground);
+    }
+
+    /* 针对 1080p 屏幕 */
+    @media (max-width: 1920px) {
+        html {
+            font-size: 14px;
+        }
+    }
+
+    /* 针对 2K 屏幕 */
+    @media (min-width: 2560px) {
+        html {
+            font-size: 16px;
+        }
+    }
+    /* 针对高分辨率设备 */
+    @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+        body {
+            font-size: 16px;
+        }
+    }
+
+    /* 针对较低分辨率的设备 */
+    @media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) and (max-resolution: 191dpi) {
+        body {
+            font-size: 14px;
+        }
+    }
+}
+
+@layer base {
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    input[type='search']::-webkit-search-decoration,
+    input[type='search']::-webkit-search-cancel-button,
+    input[type='search']::-webkit-search-results-button,
+    input[type='search']::-webkit-search-results-decoration {
+        display: none;
+    }
+
+    *::-webkit-scrollbar {
+        width: 10px;
+        height: 12px;
+        background-color: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background-color: #999;
+        background-clip: content-box;
+        border: 2px solid transparent;
+        border-radius: 5px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background-color: #333;
+    }
+
+    a,
+    input,
+    button {
+        outline: none;
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+        -webkit-focus-ring-color: rgba(0, 0, 0, 0);
+    }
+
+
+    * {
+        @apply border-border;
+    }
+}

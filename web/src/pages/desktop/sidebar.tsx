@@ -31,9 +31,9 @@ export const Sidebar: FC = memo(() => {
         )}
         <div className="absolute w-full h-full left-0 top-0 aside-overlay" />
       </div>
-      <header className="absolute left-12 top-12 flex items-center gap-2">
-        <LogoIcon className="w-14 h-14  rounded-md p-2 aside-header__logo" />
-        <h1 className="ml-2 text-3xl text-white">
+      <header className="absolute left-12 top-12">
+        <LogoIcon className="w-20 h-20 rounded-md" />
+        <h1 className="text-2xl text-white -mt-3">
           <span>Cedasync</span>
         </h1>
       </header>

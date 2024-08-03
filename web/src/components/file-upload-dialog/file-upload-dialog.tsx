@@ -1,20 +1,21 @@
 import { ChangeEvent, FC, memo, useCallback, useMemo, useState } from 'react';
-import { Button } from 'primereact/button';
-import { Dialog } from 'primereact/dialog';
 import { FileIcon, FolderIcon, Trash2Icon, UploadIcon } from 'icons';
-import { Chips, type ChipsChangeEvent } from 'primereact/chips';
 import { withProduce } from '~/utils/with-produce.ts';
-import { InputText } from 'primereact/inputtext';
-import { Column } from 'primereact/column';
 import { formatBytes } from '~/utils/format-bytes';
 import dayjs from 'dayjs';
-import { TreeTable } from 'primereact/treetable';
 import { useGetStats } from '~/endpoints';
 import { DirEntry, FilesOrEntries } from '~/constants/types';
-import { TreeNode } from 'primereact/treenode';
 import { useLingui } from '@lingui/react';
 import { useLatestRef } from '@painted/shared';
+import { Input } from '~/components/ui/input';
+import { Alert } from '~/components/ui/alert';
+// import { Tag, TagInput } from '../ui/tag';
 import './file-upload-dialog.css';
+import { Dialog } from '../ui/dialog';
+import { Button } from '../ui/button';
+import { TreeNode } from '../ui/tree';
+import { TreeTable, TreeTableColumn } from '../ui/tree-table';
+import { TagInput } from '../ui/tag-input';
 
 interface RecordData {
   name: string;
@@ -92,8 +93,7 @@ export const FileUploadDialog: FC<{
             },
     });
   }, [mode, onClose, stateRef]);
-  const onChipsChange = useCallback((evt: ChipsChangeEvent) => {
-    const value = !evt.value ? [] : evt.value;
+  const onTagsChange = useCallback((value: string[]) => {
     withProduce(setState, (draft) => {
       draft.tags = [...value];
     });
@@ -107,23 +107,20 @@ export const FileUploadDialog: FC<{
     let fileCount = 0;
     let dirCount = 0;
     let total = 0;
-    const nodes = dirEntryToTree(state.entries, (it) => {
+    const nodes = dirEntryToTree(state.entries, (it): TreeNode<RecordData> => {
       if (it.type == 'directory') dirCount += 1;
       else {
         fileCount += 1;
         total += it.file.size;
       }
       return {
-        id: it.path,
-        key: it.path,
+        id: it.path + it.name,
         data: {
           name: it.name,
           size: it.type == 'file' ? formatBytes(it.file.size) : '-',
           lastModified: dayjs(it.mtime).format('DD/MM/YYYY'),
           __raw: it,
         } satisfies RecordData,
-
-        expanded: it.type == 'directory',
         leaf: it.type == 'file',
       };
     });
@@ -136,6 +133,7 @@ export const FileUploadDialog: FC<{
   }, [state.entries]);
   const stats = useMemo(() => {
     if (!data) return void 0;
+    const plannedSpace = Math.floor((total / data.storage_quota) * 10000) / 100;
     return [
       {
         key: 'reservedSpace',
@@ -153,8 +151,13 @@ export const FileUploadDialog: FC<{
       },
       {
         key: 'plannedSpace',
-        color: '#2a94eb',
-        value: Math.floor((total / data.storage_quota) * 10000) / 100,
+        color:
+          plannedSpace >= 100
+            ? '#ec706e'
+            : plannedSpace >= 75
+              ? '#f7921a'
+              : '#2a94eb',
+        value: plannedSpace,
         size: formatBytes(total),
       },
     ];
@@ -166,134 +169,139 @@ export const FileUploadDialog: FC<{
       state.entries.length == 0
     );
   }, [data, state.entries.length, total]);
-  const onlyFile = useMemo(
-    () => nodes.every((it) => !it.children || it.children.length == 0),
-    [nodes],
-  );
+  const columns = useMemo<TreeTableColumn<RecordData>[]>(() => {
+    const onlyFile = nodes.every(
+      (it) => !it.children || it.children.length == 0,
+    );
+    return [
+      {
+        key: 'name',
+        header: i18n._('Name'),
+        expander: !onlyFile,
+        className: 'truncate max-w-[120px]',
+        render: (node) => <NameColumn data={node.data} />,
+      },
+      {
+        key: 'size',
+        header: i18n._('Size'),
+        className: 'w-[96px]',
+      },
+      {
+        key: 'lastModified',
+        header: i18n._('Last modified'),
+        className: 'w-[128px]',
+      },
+    ];
+  }, [i18n, nodes]);
   return (
     <Dialog
       visible={visible}
-      closable={false}
-      onHide={onCancel}
-      modal
-      className="w-[580px] bg-white p-8"
-      content={() => (
-        <>
-          <header className="flex justify-between items-center">
-            <h3 className="font-bold text-lg">
-              {mode == 'directory'
-                ? i18n._('Upload folder')
-                : i18n._('Upload files')}
-            </h3>
-            {stats && (
-              <div
-                className="p-metergroup-meter-container w-[64px] h-[4px] flex rounded-xl bg-gray-200"
-                title={`${i18n._('Application reserved:')} ${stats[0].size}(${stats[0].value}%) \n${i18n._('Used:')} ${stats[1].size}(${stats[1].value}%) \n${i18n._('Planned use:')} ${stats[2].size}(${stats[2].value}%)`}
-              >
-                {stats.map((it) => (
-                  <span
-                    key={it.key}
-                    className="p-metergroup-meter bg-currentColor"
-                    style={{ width: `${it.value}%`, color: it.color }}
-                  />
-                ))}
-              </div>
-            )}
-          </header>
-          <main className="py-4 max-h-[60vh] overflow-auto">
-            <p className="flex gap-1 mb-2">
-              {mode == 'directory' && (
-                <span className="text-palette-ocean-blue">
-                  {i18n._('Folders:')} {dirCount} items
-                </span>
+      onClose={onCancel}
+      className="w-[48rem] bg-white p-8"
+    >
+      <div className="flex justify-between items-center">
+        <Dialog.Title>
+          {mode == 'directory'
+            ? i18n._('Upload folder')
+            : i18n._('Upload files')}
+        </Dialog.Title>
+        <Dialog.Description className="sr-only">
+          {i18n._('Check the files or folders to be upload')}
+        </Dialog.Description>
+        {stats && (
+          <div
+            className="p-metergroup-meter-container w-[64px] h-[4px] flex rounded-xl bg-gray-200"
+            title={`${i18n._('Application reserved:')} ${stats[0].size}(${stats[0].value}%) \n${i18n._('Used:')} ${stats[1].size}(${stats[1].value}%) \n${i18n._('Planned use:')} ${stats[2].size}(${stats[2].value}%)`}
+          >
+            {stats.map((it) => (
+              <span
+                key={it.key}
+                className="p-metergroup-meter bg-current"
+                style={{ width: `${it.value}%`, color: it.color }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      <Dialog.Content>
+        <main className="py-4 max-h-[60vh] overflow-auto">
+          {isLack && (
+            <Alert variant="destructive" className="w-full mb-6 py-4">
+              {i18n._(
+                "You can't upload the file because the disk has exceeded its quota",
               )}
-              <span className="text-palette-deep-green">
-                {i18n._('File:')} {fileCount} items
+            </Alert>
+          )}
+          <p className="flex gap-1 mb-4">
+            {mode == 'directory' && (
+              <span className="text-palette-ocean-blue">
+                {i18n._('Folders:')} {dirCount} items
               </span>
-              <span className="text-palette-bright-orange">
-                {i18n._('Total Size:')} {stats?.[2].size || '-'}
-              </span>
-            </p>
-            <TreeTable
-              id="path"
-              value={nodes}
-              scrollable
-              scrollHeight="240px"
-              className="border border-gray-200 rounded-lg overflow-hidden scroll-default"
-            >
-              <Column
-                field="name"
-                header={i18n._('Name')}
-                expander={!onlyFile}
-                className="truncate max-w-[120px]"
-                body={NameColumn}
-              />
-              <Column
-                field="size"
-                header={i18n._('Size')}
-                className="w-[96px]"
-              />
-              <Column
-                field="lastModified"
-                header={i18n._('Last modified')}
-                className="w-[128px]"
-              />
-            </TreeTable>
-            <div className="mt-8">
-              <div className="mt-2">
-                <label htmlFor="file-caption">
-                  <span className="font-bold">{i18n._('Caption')}</span>
-                  {i18n._('(Optional)')}
-                </label>
-                <div className="py-2">
-                  <InputText
-                    id="file-caption"
-                    className="w-full rounded-lg"
-                    onChange={onCaptionChange}
-                  />
-                </div>
-              </div>
-              <div className="mt-2">
-                <label htmlFor="file-tags">
-                  <span className="font-bold">{i18n._('Add tags')}</span>
-                  {i18n._('(Optional)')}
-                </label>
-                <div className="py-2 w-full upload-dialog__file-tags">
-                  <Chips
-                    inputId="file-tags"
-                    value={state.tags}
-                    onChange={onChipsChange}
-                    separator=","
-                    max={10}
-                    className="w-full"
-                  />
-                </div>
+            )}
+            <span className="text-palette-deep-green">
+              {i18n._('File:')} {fileCount} items
+            </span>
+            <span className="text-palette-bright-orange">
+              {i18n._('Total Size:')} {stats?.[2].size || '-'}
+            </span>
+          </p>
+          <TreeTable
+            records={nodes}
+            columns={columns}
+            scrollHeight="12rem"
+          />
+          <div className="mt-8 px-2">
+            <div className="mt-2">
+              <label htmlFor="file-caption">
+                <span className="font-bold">{i18n._('Caption')}</span>
+              </label>
+              <div className="py-2">
+                <Input
+                  id="file-caption"
+                  className="w-full rounded-lg"
+                  onChange={onCaptionChange}
+                  placeholder={i18n._('Optional')}
+                />
               </div>
             </div>
-          </main>
-          <footer className="flex justify-end px-2 gap-2">
-            <Button
-              severity="danger"
-              text
-              className="px-3 py-2 rounded-lg"
-              onClick={onCancel}
-            >
-              <Trash2Icon className="w-4 h-4 mr-1" />
-              <span>{i18n._('Discard')}</span>
-            </Button>
-            <Button
-              severity="secondary"
-              className="px-3 py-2 rounded-lg"
-              disabled={isLack}
-              onClick={onConfirm}
-            >
-              <UploadIcon className="w-4 h-4 mr-1" />
-              <span>{i18n._('Upload')}</span>
-            </Button>
-          </footer>
-        </>
-      )}
-    />
+            <div className="mt-2">
+              <label htmlFor="file-tags">
+                <span className="font-bold">{i18n._('Add tags')}</span>
+              </label>
+              <div className="py-2 w-full">
+                <TagInput
+                  id="file-tags"
+                  value={state.tags}
+                  onChange={onTagsChange}
+                  separator=","
+                  max={10}
+                  className="w-full rounded-lg"
+                  placeholder={i18n._('Optional')}
+                />
+              </div>
+            </div>
+          </div>
+        </main>
+      </Dialog.Content>
+      <Dialog.Footer className="flex justify-end px-2 gap-2">
+        <Button
+          variant="destructive"
+          className="px-3 py-2 rounded-lg"
+          onClick={onCancel}
+        >
+          <Trash2Icon className="w-4 h-4 mr-1" />
+          <span>{i18n._('Discard')}</span>
+        </Button>
+        <Button
+          className="px-3 py-2 rounded-lg"
+          disabled={isLack}
+          onClick={onConfirm}
+        >
+          <UploadIcon className="w-4 h-4 mr-1" />
+          <span>{i18n._('Upload')}</span>
+        </Button>
+      </Dialog.Footer>
+    </Dialog>
   );
 });
 
@@ -376,12 +384,14 @@ const scanFiles = (items: readonly File[]): DirEntry[] => {
   return entries;
 };
 
-const dirEntryToTree = (
+const dirEntryToTree = <T,>(
   entries: readonly DirEntry[],
-  mapper: (item: DirEntry) => TreeNode,
-): TreeNode[] => {
+  mapper: (item: DirEntry) => TreeNode<T>,
+): TreeNode<T>[] => {
   const stack: DirEntry[] = [...entries];
-  const map = new Map<string, TreeNode>([['/', { id: 'root', children: [] }]]);
+  const map = new Map<string, TreeNode<T>>([
+    ['/', { id: 'root', children: [], data: undefined as T } as TreeNode<T>],
+  ]);
   while (stack.length > 0) {
     const entry = stack.shift()!;
     const path = entry.path.split('/').slice(0, -1).join('/') || '/';
@@ -401,7 +411,7 @@ const dirEntryToTree = (
   return map.get('/')?.children ?? [];
 };
 
-const NameColumn: FC<{ data: RecordData; options: unknown }> = ({ data }) => {
+const NameColumn: FC<{ data: RecordData }> = ({ data }) => {
   return (
     <>
       {data.__raw.type == 'file' ? (
@@ -409,7 +419,9 @@ const NameColumn: FC<{ data: RecordData; options: unknown }> = ({ data }) => {
       ) : (
         <FolderIcon className="inline w-5 h-5 mr-1" />
       )}
-      <span className="align-middle">{data.name}</span>
+      <span className="align-middle" title={data.name}>
+        {data.name}
+      </span>
     </>
   );
 };

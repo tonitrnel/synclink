@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { t } from '@lingui/macro';
 import { DownloadCloudIcon, Share2Icon, EraserIcon } from 'icons';
-import { useSnackbar } from '~/components/snackbar';
+import { useSnackbar } from '~/components/ui/snackbar';
 import { IEntity } from '~/constants/types';
 import { executeAsyncTask } from '~/utils/execute-async-task';
 import { downloadFromURL } from '~/utils/save-as';

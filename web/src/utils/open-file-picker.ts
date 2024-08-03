@@ -40,6 +40,8 @@ export const openFilePicker = (
     input.multiple = multiple;
     if (directory) input.webkitdirectory = true;
     const cancelDetector = async () => {
+      // console.log('cancelDetector');
+      // onChange 触发比聚焦慢，这取决于浏览器对选择文件的处理速度
       await wait(500);
       if (!inputIsAttached) return void 0;
       if (directory && !userIsConfirmed) {
@@ -70,11 +72,9 @@ export const openFilePicker = (
       resolve(result);
       delInputFromBody();
     })
-    input.addEventListener('click', () => {
-      window.addEventListener('focus', cancelDetector);
-      window.addEventListener('touchend', cancelDetector);
-    });
     addInputToBody();
+    window.addEventListener('focus', cancelDetector);
+    window.addEventListener('touchend', cancelDetector);
     if ('showPicker' in HTMLInputElement.prototype) {
       input.showPicker();
     } else {

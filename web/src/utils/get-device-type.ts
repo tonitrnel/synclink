@@ -11,7 +11,7 @@ export const getDeviceType = (userAgent: string) => {
   } else if (isTablet) {
     return 'tablet';
   } else if (isDesktop) {
-    return 'laptop';
+    return 'desktop';
   } else {
     return 'unknown';
   }

@@ -2,12 +2,14 @@ import { FC, PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { dynamicActivate } from '~/locales';
 import { I18nProvider } from '@lingui/react';
 import { i18n } from '@lingui/core';
-import { SnackbarProvider } from '~/components/snackbar';
+import { SnackbarProvider } from '~/components/ui/snackbar';
+import { TooltipProvider } from '~/components/ui/tooltip';
+import { Toaster } from '~/components/ui/toast';
 import { createHttpClient, HttpClientProvider } from '@painted/http';
-import { type APIOptions, PrimeReactProvider } from 'primereact/api';
 import { Routes } from '~/routes';
 import dayjs from 'dayjs';
 import { dayjsLocales } from '~/locales/dayjs-shim.ts';
+import './globals.css';
 import './app.css';
 
 const DynamicI18nLayer: FC<PropsWithChildren> = ({ children }) => {
@@ -76,24 +78,25 @@ const CredentialLayer: FC<PropsWithChildren> = ({ children }) => {
   }, [secret]);
   return <HttpClientProvider value={client}>{children}</HttpClientProvider>;
 };
+const UIProviderLayer: FC<PropsWithChildren> = ({ children }) => {
+  return (
+    <SnackbarProvider>
+      <TooltipProvider>
+        {children}
+        <Toaster />
+      </TooltipProvider>
+    </SnackbarProvider>
+  );
+};
 
-const PRIME_OPTIONS = {
-  appendTo: () => document.querySelector('app#root')!,
-  ripple: false,
-} satisfies APIOptions;
-
-function App() {
+export default function App() {
   return (
     <DynamicI18nLayer>
       <CredentialLayer>
-        <PrimeReactProvider value={PRIME_OPTIONS}>
-          <SnackbarProvider>
-            <Routes />
-          </SnackbarProvider>
-        </PrimeReactProvider>
+        <UIProviderLayer>
+          <Routes />
+        </UIProviderLayer>
       </CredentialLayer>
     </DynamicI18nLayer>
   );
 }
-
-export default App;

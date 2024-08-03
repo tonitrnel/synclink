@@ -1,6 +1,4 @@
-import { FC, useCallback, useEffect, useRef } from 'react';
-import { Toast } from 'primereact/toast';
-import { Button } from 'primereact/button';
+import { FC, useCallback, useEffect } from 'react';
 import { notifyManager } from '~/utils/notify-manager';
 import {
   useDeleteDiscardP2PRequest,
@@ -8,39 +6,42 @@ import {
 } from '~/endpoints';
 import { useDialog } from '~/utils/hooks/use-dialog';
 import { P2pFileTransferDialog } from './p2p-file-transfer-dialog';
-import { t } from '@lingui/macro';
-import { useSnackbar } from '../snackbar';
+import { useSnackbar } from '../ui/snackbar';
+import { useToast } from '~/components/ui/toast';
+import { Button } from '~/components/ui/button';
+import { useLingui } from '@lingui/react'
 
 export const P2PFileReceiver: FC = () => {
-  const toastRef = useRef<Toast>(null);
+  const toast = useToast();
   const p2pFileDialog = useDialog(P2pFileTransferDialog);
+  const i18n = useLingui();
   useEffect(() => {
     let opened = false;
     const closeToast = (accepted: boolean) => {
       opened = false;
-      toastRef.current?.clear();
+      toast.dismiss();
       if (accepted) p2pFileDialog.open();
     };
     return notifyManager.batch(
       notifyManager.on('P2P_REQUEST', async (id) => {
         if (opened) return void 0;
         opened = true;
-        toastRef.current?.show({
-          summary: 'INFO',
-          life: 5 * 60 * 1000,
+        toast.toast({
+          title: 'INFO',
+          duration: 5 * 60 * 1000,
           closable: false,
-          className: 'backdrop-filter-none bg-[#fbfcfe]',
-          contentClassName: 'border border-solid border-gray-300 rounded-lg',
-          detail: <Message requestId={id} onClose={closeToast} />,
+          className: 'bg-[#fbfcfe]',
+          // contentClassName: 'border border-solid border-gray-300 rounded-lg',
+          description: <Message requestId={id} onClose={closeToast} />,
         });
         if (document.visibilityState == 'hidden') {
           Notification.requestPermission().then((permission) => {
             // If the user accepts, let's create a notification
             if (permission === 'granted') {
               const notification = new Notification(
-                t`The villagers want to share some mysterious documents with you`,
+                i18n._("The villagers want to share some mysterious documents with you"),
                 {
-                  body: t`Please confirm if you want to accept`,
+                  body: i18n._("Please confirm if you want to accept"),
                 },
               );
               notification.addEventListener(
@@ -56,14 +57,10 @@ export const P2PFileReceiver: FC = () => {
         }
       }),
     );
-  }, [p2pFileDialog]);
+  }, [i18n, p2pFileDialog, toast]);
+  if (!p2pFileDialog.visible) return null;
   return (
-    <>
-      <Toast ref={toastRef} />
-      {p2pFileDialog.visible && (
-        <p2pFileDialog.Dialog {...p2pFileDialog.DialogProps} mode="receiver" />
-      )}
-    </>
+    <p2pFileDialog.Dialog {...p2pFileDialog.DialogProps} mode="receiver" />
   );
 };
 
@@ -72,6 +69,7 @@ const Message: FC<{
   onClose(accepted: boolean): void;
 }> = ({ requestId, onClose }) => {
   const snackbar = useSnackbar();
+  const i18n = useLingui();
   const { execute: acceptP2PRequest, pending: accepting } =
     usePostAcceptP2PRequest();
   const { execute: discardP2PRequest, pending: rejecting } =
@@ -93,8 +91,8 @@ const Message: FC<{
         if (e instanceof Error) {
           snackbar.enqueueSnackbar({
             variant: 'error',
-            message: e.message
-          })
+            message: e.message,
+          });
         }
         onClose(false);
       }
@@ -116,26 +114,25 @@ const Message: FC<{
   );
   return (
     <section>
-      <p>{t`The villagers want to share some mysterious documents with you`}</p>
-      <p className="mt-2 text-gray-400">{t`Do you want to receive it?`}</p>
-      <div className="flex gap-2 mt-5">
+      <p>{i18n._("The villagers want to share some mysterious documents with you")}</p>
+      <p className="mt-2 text-gray-400">{i18n._("Do you want to receive it?")}</p>
+      <div className="flex gap-2 mt-5 justify-end">
         <Button
           className="px-3 py-2"
-          severity="danger"
+          variant="destructive"
           disabled={accepting}
           loading={rejecting}
           onClick={() => onReject(requestId)}
         >
-          {t`Reject`}
+          {i18n._("Reject")}
         </Button>
         <Button
           className="px-3 py-2 gap-2"
-          severity="info"
           disabled={rejecting}
           loading={accepting}
           onClick={() => onAccept(requestId)}
         >
-          {t`Accept`}
+          {i18n._("Accept")}
         </Button>
       </div>
     </section>

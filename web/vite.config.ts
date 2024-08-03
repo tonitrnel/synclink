@@ -8,16 +8,16 @@ import top_await from 'vite-plugin-top-level-await';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const __PROJECT = process.cwd();
+const __PROJECT__ = process.cwd();
 const parseProject = async () => {
-  return fs.readFile(path.join(__PROJECT, '/package.json')).then<{
+  return fs.readFile(path.join(__PROJECT__, '/package.json')).then<{
     version: string;
   }>((buf) => JSON.parse(buf.toString()));
 };
 const parseTSAlias = async () => {
   try {
     const { baseUrl = '.', paths = {} }: CompilerOptions = await fs
-      .readFile(path.join(__PROJECT, '/tsconfig.json'))
+      .readFile(path.join(__PROJECT__, '/tsconfig.json'))
       .then((r) => {
         const content = r
           .toString()
@@ -28,17 +28,17 @@ const parseTSAlias = async () => {
     return Object.keys(paths).reduce(
       (alias, key) => {
         alias[key.toString().replace('/*', '')] = path.join(
-          __PROJECT,
+          __PROJECT__,
           baseUrl,
           paths[key][0]?.replace('/*', ''),
         );
         return alias;
       },
-      { '@': path.join(__PROJECT, 'src') } as Record<string, string>,
+      { '@': path.join(__PROJECT__, 'src') } as Record<string, string>,
     );
   } catch (e) {
     console.error('[Vite] Parse tsconfig failed, return empty alias', e);
-    return {};
+    process.exit(1);
   }
 };
 
@@ -47,7 +47,7 @@ export default defineConfig(async ({ command }) => {
   const project = await parseProject();
   return {
     define: {
-      __ENDPOINT__: command == 'build' ? '""' : '"http://localhost:8081"',
+      __ENDPOINT__: command == 'build' ? '""' : '"http://localhost:8080"',
       __VERSION__: JSON.stringify(project.version),
       __BUILD_TIMESTAMP__: Date.now(),
     },

@@ -115,7 +115,7 @@ export const TextItem: FC = memo(() => {
       ) : (
         <p
           className={clsx(
-            'w-full whitespace-break-spaces break-words text-gray-900 mt-0 min-h-[32px] italic leading-relaxed',
+            'w-full whitespace-break-spaces break-words text-gray-900 mt-0 min-h-[32px] italic leading-relaxed text-sm',
           )}
           dangerouslySetInnerHTML={{ __html: html }}
         />

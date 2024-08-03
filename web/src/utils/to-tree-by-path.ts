@@ -1,10 +1,10 @@
-import type { TreeNode } from 'primereact/treenode';
+import type { TreeNode } from '~/components/ui/tree';
 
-export const toTreeByPath = <T extends { path: string }>(
+export const toTreeByPath = <T extends { path: string }, R>(
   data: T[],
-  mapper: (item: T, name: string) => TreeNode,
-): TreeNode[] => {
-  const map = new Map<string, TreeNode>([['/', { id: 'root', children: [] }]]);
+  mapper: (item: T, name: string) => TreeNode<R>,
+): TreeNode<R>[] => {
+  const map = new Map<string, TreeNode<R>>([['/', { id: 'root', children: [], data: undefined as R }]]);
   const addPath = (parts: string[], item: T) => {
     const name = parts.pop()!;
     const parentKey = parts.join('/');

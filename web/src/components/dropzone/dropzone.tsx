@@ -8,9 +8,10 @@ import {
   useState,
 } from 'react';
 import { ReactComponent as SendIcon } from '~/assets/send.svg';
-import { IGNORE_FILE_TYPE } from '~/constants';
 import type { DirEntry, FilesOrEntries } from '~/constants/types.ts';
 import { useLingui } from '@lingui/react';
+import { AnimatePresence, motion, Variant } from 'framer-motion';
+import dayjs from 'dayjs';
 import './dropzone.less';
 
 type SettledDirEntry = Exclude<DirEntry, { type: 'file' }>;
@@ -86,50 +87,74 @@ const scanFiles = async (items: FileSystemEntry[]): Promise<DirEntry[]> => {
 };
 
 export const DropZone: FC<{
-  onReceivedTransferData?(
-    filesOrEntries: FilesOrEntries,
-    rawTransferData?: DataTransfer,
-  ): void;
+  onReceivedTransferData?(filesOrEntries: FilesOrEntries, source: 'drop'): void;
 }> = memo(({ onReceivedTransferData }) => {
-  const [drop, setDrop] = useState(false);
+  const [dropped, setDropped] = useState(false);
   const i18n = useLingui();
   const triedRef = useRef(0);
   const handleDrop = useCallback<DragEventHandler>(
     async (evt) => {
       evt.preventDefault();
       triedRef.current = 0;
-      setDrop(false);
+      setDropped(false);
       const items = Array.from(evt.dataTransfer.items);
       if (items.some((it) => it.webkitGetAsEntry()?.isDirectory)) {
         const entries = await scanFiles(
           items.map((it) => it.webkitGetAsEntry()!),
         );
-        onReceivedTransferData?.(
-          { type: 'dir-entries', entries },
-          evt.dataTransfer,
-        );
+        onReceivedTransferData?.({ type: 'dir-entries', entries }, 'drop');
       } else {
-        const files = await Promise.all(
-          items
-            .filter(
-              (_, i) => !IGNORE_FILE_TYPE.includes(evt.dataTransfer.types[i]),
-            )
-            .reverse()
-            .map((it, i) => {
-              const file = it.getAsFile();
-              if (file) return Promise.resolve(file);
-              const type = evt.dataTransfer.types[i];
-              return new Promise<File>((resolve) => {
-                it.getAsString((it) => {
-                  resolve(new File([it], '', { type }));
-                });
-              });
-            }),
-        );
-        onReceivedTransferData?.(
-          { type: 'multi-file', files },
-          evt.dataTransfer,
-        );
+        const types = evt.dataTransfer.types;
+        console.log(`start handle drop event, types: ${types}`);
+        // types 只有 Files 表示拖拽文件文件
+        if (types.length == 1 && types[0] == 'Files') {
+          const files = await Promise.all(items.map((it) => it.getAsFile()!));
+          onReceivedTransferData?.({ type: 'multi-file', files }, 'drop');
+          return void 0;
+        }
+        // types 只有 text/plain 表示纯文本
+        if (types.length == 1 && types[0] == 'text/plain') {
+          const files = await Promise.all(
+            items.map((it) =>
+              new Promise<string>((resolve) => it.getAsString(resolve)).then(
+                (str) =>
+                  new File(
+                    [str],
+                    `pasted_${dayjs().format('YYYYMMDD_HHmm')}.txt`,
+                    { type: 'text/plain', lastModified: Date.now() },
+                  ),
+              ),
+            ),
+          );
+          onReceivedTransferData?.({ type: 'multi-file', files }, 'drop');
+          return void 0;
+        }
+        // types 有多个类型并且存在 Files 常见于拖拽其他页面的图片
+        if (types.length > 1 && types.includes('Files')) {
+          const index = types.indexOf('Files');
+          const files = await Promise.all([items[index].getAsFile()!]);
+          onReceivedTransferData?.({ type: 'multi-file', files }, 'drop');
+          return void 0;
+        }
+        // types 有多个类型并且存在 text/plain 表示存在富文本或者其他类型的文本，但都不支持，因此忽略
+        if (types.length > 1 && types.includes('text/plain')) {
+          const index = types.indexOf('text/plain');
+          const files = await Promise.all([
+            new Promise<string>((resolve) =>
+              items[index].getAsString(resolve),
+            ).then(
+              (str) =>
+                new File(
+                  [str],
+                  `pasted_${dayjs().format('YYYYMMDD_HHmm')}.txt`,
+                  { type: 'text/plain', lastModified: Date.now() },
+                ),
+            ),
+          ]);
+          onReceivedTransferData?.({ type: 'multi-file', files }, 'drop');
+          return void 0;
+        }
+        console.warn(`Unable handle drop event, types: ${types}`);
       }
     },
     [onReceivedTransferData],
@@ -144,7 +169,7 @@ export const DropZone: FC<{
       if (dialog) return void 0;
       triedRef.current++;
       if (triedRef.current === 1) {
-        setDrop(true);
+        setDropped(true);
       }
     };
     const handleDragLeave = () => {
@@ -153,7 +178,7 @@ export const DropZone: FC<{
       if (forbidden) return void 0;
       triedRef.current--;
       if (triedRef.current === 0) {
-        setDrop(false);
+        setDropped(false);
       }
     };
 
@@ -164,7 +189,7 @@ export const DropZone: FC<{
       forbidden = false;
     };
     const handleUnexpectedBlur = () => {
-      setDrop(false);
+      setDropped(false);
       triedRef.current = 0;
     };
     document.body.addEventListener('dragenter', handleDragEnter);
@@ -181,7 +206,7 @@ export const DropZone: FC<{
     };
   }, []);
   useEffect(() => {
-    if (drop) {
+    if (dropped) {
       document.body.style.setProperty('overflow', 'hidden');
     } else {
       document.body.style.removeProperty('overflow');
@@ -189,18 +214,47 @@ export const DropZone: FC<{
     return () => {
       document.body.style.removeProperty('overflow');
     };
-  }, [drop]);
-  if (!drop) return null;
+  }, [dropped]);
   return (
-    <section
-      className="dropzone"
-      onDrop={handleDrop}
-      onDragOver={(evt) => evt.preventDefault()}
-    >
-      <div className="dropzone-wrapper">
-        <SendIcon />
-        <span>{i18n._("Drag and Drop file here")}</span>
-      </div>
-    </section>
+    <AnimatePresence>
+      {dropped && (
+        <motion.section
+          className="dropzone"
+          onDrop={handleDrop}
+          onDragOver={(evt) => evt.preventDefault()}
+          variants={variants}
+          initial="hidden"
+          animate="show"
+        >
+          <motion.div
+            className="dropzone-wrapper"
+            variants={wrapperVariants}
+            initial="hidden"
+            animate="show"
+          >
+            <SendIcon />
+            <span>{i18n._('Drag and Drop file here')}</span>
+          </motion.div>
+        </motion.section>
+      )}
+    </AnimatePresence>
   );
 });
+
+const variants: Record<string, Variant> = {
+  hidden: {
+    opacity: 0,
+  },
+  show: {
+    opacity: 1,
+  },
+};
+
+const wrapperVariants: Record<string, Variant> = {
+  hidden: {
+    scale: 0.9,
+  },
+  show: {
+    scale: 1,
+  },
+};

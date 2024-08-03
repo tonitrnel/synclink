@@ -17,13 +17,11 @@ import {
 } from '~/endpoints';
 import { notifyManager } from '~/utils/notify-manager.ts';
 import { P2PRtc, P2PSocket, PacketFlag, RTCImpl } from '~/utils/p2p.ts';
-import { Dialog } from 'primereact/dialog';
-import { Divider } from 'primereact/divider';
-import { InputOtp, InputOtpChangeEvent } from 'primereact/inputotp';
 import { getBrowserInfo, getDeviceType } from '~/utils/get-device-type.ts';
 import {
   AlertCircleIcon,
   CheckCircleIcon,
+  CircleXIcon,
   KeyIcon,
   LaptopIcon,
   LoaderCircleIcon,
@@ -33,21 +31,29 @@ import {
   UploadIcon,
   XCircleIcon,
 } from 'icons';
-import { Button } from 'primereact/button';
 import { Loading } from '~/components/loading';
-import { t } from '@lingui/macro';
 import { withProduce } from '~/utils/with-produce';
 import { clsx } from '~/utils/clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { formatBytes } from '~/utils/format-bytes';
-import { useConstant, useLatestRef } from '@painted/shared';
+import { useLatestRef } from '@painted/shared';
 import {
   createRemainingTimeCalculator,
   createTransmissionRateCalculator,
 } from '~/utils/transmission-rate-calculator';
 import { formatSeconds } from '~/utils/format-time';
-import { Dropdown } from 'primereact/dropdown';
-import { useSnackbar } from '../snackbar';
+import { useSnackbar } from '../ui/snackbar';
+import { useLingui } from '@lingui/react';
+import { Dialog } from '../ui/dialog';
+import { Divider } from '../ui/divider';
+import { Select } from '../ui/select';
+import { Button } from '../ui/button';
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from '../ui/input-opt';
 
 type Panel =
   | {
@@ -83,11 +89,14 @@ export const P2pFileTransferDialog: FC<{
     connection: undefined,
     protocol: undefined,
   }));
+  const connRef = useLatestRef(state.connection);
   const participantsRef = useLatestRef([state.senderId, state.receiverId]);
+  const i18n = useLingui();
   const { data: connections = [], refresh } = useGetSseConnections({
     keepDirtyOnPending: true,
     onBefore: () => notifyManager.ensureWork(),
   });
+
   const [currentConnection, otherConnections] = useMemo(
     () => [
       connections.find((it) => it.id == notifyManager.clientId),
@@ -95,6 +104,7 @@ export const P2pFileTransferDialog: FC<{
     ],
     [connections],
   );
+
   const handleConnect = useCallback(
     (id: string, protocol?: ProtocolPriority) => {
       withProduce(setState, (draft) => {
@@ -135,6 +145,7 @@ export const P2pFileTransferDialog: FC<{
     },
     [mode, onClose],
   );
+
   useEffect(() => {
     notifyManager.keepConnection = true;
     return notifyManager.batch(
@@ -156,8 +167,10 @@ export const P2pFileTransferDialog: FC<{
         refresh().catch(console.error);
       }),
       () => void (notifyManager.keepConnection = false),
+      () => void connRef.current?.close(),
     );
-  }, [refresh, mode, participantsRef, onClose]);
+  }, [refresh, mode, participantsRef, onClose, connRef]);
+
   const panel = ((): Panel => {
     if (state.connection)
       return {
@@ -170,7 +183,7 @@ export const P2pFileTransferDialog: FC<{
       return {
         key: 'second',
         element: (
-          <ConnectionStatus
+          <ConnectionControl
             receiverId={state.receiverId}
             mode={mode}
             protocol={state.protocol}
@@ -200,46 +213,59 @@ export const P2pFileTransferDialog: FC<{
         ),
       };
   })();
+
   return (
     <Dialog
-      header={`Peer to peer file transfer`}
-      visible={true}
-      onHide={onClose}
-      className="w-[500px]"
       id="p2p-file-transfer-dialog"
+      visible={true}
+      onClose={onClose}
+      className="w-[40rem]"
     >
-      <AnimatePresence mode="wait">
-        <motion.section
-          key={panel.key}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="w-full min-h-[200px] relative"
-        >
-          {panel.element}
-        </motion.section>
-      </AnimatePresence>
+      <Dialog.Header>
+        <Dialog.Title>{i18n._('Peer to peer file transfer')}</Dialog.Title>
+        <Dialog.Description className="sr-only">
+          {i18n._('Quickly share files with other client who open this page')}
+        </Dialog.Description>
+      </Dialog.Header>
+      <Dialog.Content>
+        <AnimatePresence mode="wait">
+          <motion.section
+            key={panel.key}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="w-full min-h-[16rem] relative"
+          >
+            {panel.element}
+          </motion.section>
+        </AnimatePresence>
+      </Dialog.Content>
     </Dialog>
   );
 };
 
-const ConnectionItem: FC<{
+const ClientItem: FC<{
   isCurrent: boolean;
   conn: InferResponse<typeof useGetSseConnections>[number];
   onClick(id: string): void;
 }> = ({ isCurrent, conn, onClick }) => {
+  const i18n = useLingui();
   return (
     <li className="flex gap-2 mt-8 first-of-type:mt-0 justify-between">
       <div>
         <div className="flex">
           <span>{conn.ip_alias || conn.id}</span>
         </div>
-        <UserAgent value={conn.user_agent} className="w-[360px] mt-2" />
+        <UserAgent value={conn.user_agent} className="w-[30rem] mt-2" />
       </div>
       {!isCurrent && (
-        <Button link onClick={() => onClick(conn.id)} className="px-3 py-2 m-1">
-          {t`Connect`}
+        <Button
+          variant="ghost"
+          onClick={() => onClick(conn.id)}
+          className="px-3 py-2 m-1"
+        >
+          {i18n._('Connect')}
         </Button>
       )}
     </li>
@@ -256,18 +282,18 @@ const UserAgent: FC<{
     const ua = getBrowserInfo(value);
     const deviceType = getDeviceType(value);
     switch (deviceType) {
-      case 'laptop':
-        return [ua, <LaptopIcon className="w-5 h-5" />];
+      case 'desktop':
+        return [ua, <LaptopIcon className="w-4 h-4" />];
       case 'mobile':
-        return [ua, <SmartphoneIcon className="w-5 h-5" />];
+        return [ua, <SmartphoneIcon className="w-4 h-4" />];
       case 'tablet':
-        return [ua, <TabletIcon className="w-5 h-5" />];
+        return [ua, <TabletIcon className="w-4 h-4" />];
       case 'unknown':
-        return [ua, <PcCaseIcon className="w-5 h-5" />];
+        return [ua, <PcCaseIcon className="w-4 h-4" />];
     }
   }, [value]);
   return (
-    <div className={clsx('flex items-end justify-end gap-2', className)}>
+    <div className={clsx('flex justify-end gap-2 items-center', className)}>
       {icon}
       <span className="flex flex-1 truncate gap-2" title={value}>
         {ua ? (
@@ -296,14 +322,15 @@ const ClientSetup: FC<{
     pin: notifyManager.clientPin?.split(''),
     protocol: 'auto',
   }));
+  const i18n = useLingui();
   const protocolRef = useLatestRef(state.protocol);
   const protocolOptions = useMemo(
     () => [
-      { label: t`Auto`, value: 'auto' },
+      { label: i18n._('Auto'), value: 'auto' },
       { label: 'WebRTC', value: 'webrtc' },
       { label: 'WebSocket', value: 'websocket' },
     ],
-    [],
+    [i18n],
   );
   const handleConnect = useCallback(
     (id: string) => {
@@ -314,7 +341,7 @@ const ClientSetup: FC<{
   );
   return (
     <section className="w-full">
-      <form className="flex flex-col gap-6 w-full">
+      <form className="flex flex-col gap-6 w-full text-sm">
         <div className="flex items-center justify-between gap-8 w-full">
           <div className="flex-1">
             <label className="font-bold">ID</label>
@@ -323,30 +350,39 @@ const ClientSetup: FC<{
         </div>
         <div className="flex items-center justify-between gap-8 w-full">
           <div className="flex-1">
-            <label className="font-bold">{t`User agent`}</label>
+            <label className="font-bold">{i18n._(`User agent`)}</label>
           </div>
           <UserAgent value={currentConnection.user_agent} />
         </div>
         <div className="flex items-center justify-between gap-8 w-full">
           <div className="flex-1">
-            <label className="font-bold">{t`Protocol`}</label>
+            <label className="font-bold">{i18n._('Protocol')}</label>
           </div>
-          <Dropdown
+          <Select
             value={state.protocol}
-            onChange={(evt) =>
+            onValueChange={(value) =>
               withProduce(
                 setState,
-                (draft) => void (draft.protocol = evt.value),
+                (draft) => void (draft.protocol = value as ProtocolPriority),
               )
             }
-            options={protocolOptions}
-            optionLabel="label"
-          />
+          >
+            <Select.Trigger className="w-[8rem]">
+              <Select.Value placeholder={i18n._('Select a protocol')} />
+            </Select.Trigger>
+            <Select.Content>
+              {protocolOptions.map((it) => (
+                <Select.Item key={it.value} value={it.value}>
+                  {it.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select>
         </div>
         <div className="w-full">
           <div className="flex items-center justify-between gap-8">
             <div className="flex-1">
-              <label className="font-bold">{t`Peer PIN`}</label>
+              <label className="font-bold">{i18n._('Peer PIN')}</label>
             </div>
             <div className="font-mono">
               {state.pin?.map((it, i) => (
@@ -358,14 +394,14 @@ const ClientSetup: FC<{
           </div>
         </div>
       </form>
-      <Divider align="center">
-        <span>{t`Client`}</span>
+      <Divider align="center" className="text-sm">
+        <span>{i18n._('Client')}</span>
       </Divider>
       <section>
-        <ul className="my-2 max-h-[120px] overflow-y-auto">
+        <ul className="my-2 max-h-[10rem] overflow-y-auto text-sm">
           {otherConnections.length > 0 ? (
             otherConnections.map((it) => (
-              <ConnectionItem
+              <ClientItem
                 key={it.id}
                 isCurrent={false}
                 conn={it}
@@ -373,7 +409,9 @@ const ClientSetup: FC<{
               />
             ))
           ) : (
-            <li className="text-gray-300 py-3 select-none">{t`No data`}</li>
+            <li className="text-gray-300 py-3 select-none">
+              {i18n._('No data')}
+            </li>
           )}
         </ul>
       </section>
@@ -381,18 +419,18 @@ const ClientSetup: FC<{
   );
 };
 
-enum ConnectStatus {
+enum ConnectionStatus {
   WaitingForAcceptance = 1,
+  WaitingForKeyInput = 2,
+  Accepted = 3,
   Connecting,
   TestingAvailability,
   Connected,
-  Accepted,
   RejectedByPeer,
   ConnectionTimeout,
-  WaitingForKeyInput,
 }
 
-const ConnectionStatus: FC<{
+const ConnectionControl: FC<{
   receiverId?: string;
   mode: 'sender' | 'receiver';
   protocol?: ProtocolPriority;
@@ -401,7 +439,7 @@ const ConnectionStatus: FC<{
 }> = ({ mode, protocol, receiverId, onSuccess, onCancel }) => {
   const [state, setState] = useState<{
     error: Error | undefined;
-    status: ConnectStatus;
+    status: ConnectionStatus;
     protocol: string;
     delay: number;
     requirePin: boolean;
@@ -411,42 +449,53 @@ const ConnectionStatus: FC<{
     status:
       mode == 'sender'
         ? notifyManager.clientPin !== undefined
-          ? ConnectStatus.WaitingForKeyInput
-          : ConnectStatus.WaitingForAcceptance
-        : ConnectStatus.Accepted,
+          ? ConnectionStatus.WaitingForKeyInput
+          : ConnectionStatus.WaitingForAcceptance
+        : ConnectionStatus.Accepted,
     protocol: 'webrtc',
     delay: 0,
     requirePin: notifyManager.clientPin !== undefined,
     pin: '',
   }));
-  const metadata = useConstant<{
+  const metadataRef = useRef<{
     requestId: string | undefined;
     clientId: string | undefined;
-  }>(() => ({
+    lock: boolean;
+  }>({
     requestId: undefined,
     clientId: undefined,
-  }));
+    lock: false,
+  });
+  const stateRef = useLatestRef(state);
   const { execute: createP2PRequest, pending: creating } =
     usePostCreateP2PRequest();
   const { execute: discardP2PRequest } = useDeleteDiscardP2PRequest();
   const snackbar = useSnackbar();
+  const i18n = useLingui();
 
   const statusTexts = useMemo(
     () => ({
-      [ConnectStatus.WaitingForAcceptance]: '等待对方接受',
-      [ConnectStatus.Connecting]: `正在连接中，采用 ${state.protocol}`,
-      [ConnectStatus.TestingAvailability]: '测试可用性中',
-      [ConnectStatus.Connected]: `已连接，延迟 ${state.delay}ms`,
-      [ConnectStatus.Accepted]: '已接受，等待建立连接',
-      [ConnectStatus.RejectedByPeer]: '对方已拒绝',
-      [ConnectStatus.ConnectionTimeout]: '连接超时',
-      [ConnectStatus.WaitingForKeyInput]: '请输入连接密钥',
+      [ConnectionStatus.WaitingForAcceptance]: i18n._('Waiting for acceptance'),
+      [ConnectionStatus.Connecting]: i18n._(
+        `Connecting, using ${state.protocol} protocol`,
+      ),
+      [ConnectionStatus.TestingAvailability]: i18n._('Testing availability'),
+      [ConnectionStatus.Connected]: i18n._(`Connected, delay ${state.delay}ms`),
+      [ConnectionStatus.Accepted]: i18n._(
+        'Accepted, waiting to establish connection',
+      ),
+      [ConnectionStatus.RejectedByPeer]: i18n._('The peer has refused'),
+      [ConnectionStatus.ConnectionTimeout]: i18n._('Connection timeout'),
+      [ConnectionStatus.WaitingForKeyInput]: i18n._(
+        'Please enter the peer client PIN',
+      ),
     }),
-    [state.protocol, state.delay],
+    [i18n, state.protocol, state.delay],
   );
 
   const createRequest = useCallback(
     async (id: string, target_pin?: string): Promise<boolean> => {
+      metadataRef.current.lock = true;
       try {
         const res = await createP2PRequest({
           client_id: notifyManager.clientId!,
@@ -454,7 +503,7 @@ const ConnectionStatus: FC<{
           supports_rtc: Reflect.has(window, 'RTCPeerConnection'),
           target_pin,
         });
-        metadata.requestId = res.request_id;
+        metadataRef.current.requestId = res.request_id;
         return true;
       } catch (e) {
         console.error('Failed to create request', e);
@@ -465,9 +514,11 @@ const ConnectionStatus: FC<{
           });
         }
         return false;
+      } finally {
+        metadataRef.current.lock = false;
       }
     },
-    [createP2PRequest, metadata, snackbar],
+    [createP2PRequest, snackbar],
   );
 
   const discardRequest = useCallback(
@@ -476,9 +527,9 @@ const ConnectionStatus: FC<{
     },
     [discardP2PRequest],
   );
-  const handleChangePin = useCallback((evt: InputOtpChangeEvent) => {
+  const handleChangePin = useCallback((value: string) => {
     withProduce(setState, (draft) => {
-      draft.pin = evt.value?.toString() || '';
+      draft.pin = value;
     });
   }, []);
   useEffect(() => {
@@ -489,7 +540,7 @@ const ConnectionStatus: FC<{
       try {
         const delays: number[] = [];
         withProduce(setState, (draft) => {
-          draft.status = ConnectStatus.TestingAvailability;
+          draft.status = ConnectionStatus.TestingAvailability;
         });
         for (let i = 0; i < 3; i++) {
           const delay = await conn.ping();
@@ -500,7 +551,7 @@ const ConnectionStatus: FC<{
         );
         withProduce(setState, (draft) => {
           draft.delay = delay;
-          draft.status = ConnectStatus.Connected;
+          draft.status = ConnectionStatus.Connected;
         });
         onSuccess(conn, delay);
         // 放在该组件销毁时关闭连接，conn 已经转移处理者
@@ -509,7 +560,7 @@ const ConnectionStatus: FC<{
         console.error(e);
         if (e instanceof Error) {
           withProduce(setState, (draft) => {
-            draft.error = e;
+            draft.error = e as Error;
           });
         }
       }
@@ -525,13 +576,14 @@ const ConnectionStatus: FC<{
     }
     return notifyManager.batch(
       notifyManager.on('P2P_EXCHANGE', async (value) => {
-        // console.log('exchange', value);
+        const metadata = metadataRef.current;
+        console.log('exchange', value);
         metadata.clientId = notifyManager.clientId;
         metadata.requestId = value.request_id;
         if (!metadata.requestId)
           throw new Error('Unexpected error, missing requestId');
         withProduce(setState, (draft) => {
-          draft.status = ConnectStatus.Connecting;
+          draft.status = ConnectionStatus.Connecting;
           draft.protocol = value.protocol;
         });
         switch (protocol || value.protocol) {
@@ -559,6 +611,7 @@ const ConnectionStatus: FC<{
         });
       }),
       notifyManager.on('P2P_SIGNALING', async (value) => {
+        const metadata = metadataRef.current;
         if (value[0] == 0) {
           if (value[1].type === 'offer') {
             if (!metadata.requestId || !metadata.clientId) return void 0;
@@ -579,14 +632,15 @@ const ConnectionStatus: FC<{
         }
       }),
       notifyManager.on('P2P_REJECT', (id) => {
+        const metadata = metadataRef.current;
         console.log('id', id, 'requestId', metadata.requestId);
         if (id !== metadata.requestId) return void 0;
         withProduce(setState, (draft) => {
-          draft.status = ConnectStatus.RejectedByPeer;
+          draft.status = ConnectionStatus.RejectedByPeer;
         });
       }),
       () => {
-        conn?.close();
+        const metadata = metadataRef.current;
         if (metadata.requestId && mode == 'sender' && !conn)
           discardRequest(metadata.requestId);
       },
@@ -594,7 +648,6 @@ const ConnectionStatus: FC<{
   }, [
     createRequest,
     discardRequest,
-    metadata,
     mode,
     onSuccess,
     protocol,
@@ -603,27 +656,35 @@ const ConnectionStatus: FC<{
     state.requirePin,
   ]);
   useEffect(() => {
-    if (state.pin.length != 6 || !receiverId) return void 0;
+    if (
+      state.pin.length != 6 ||
+      !receiverId ||
+      stateRef.current.status > 3 ||
+      metadataRef.current.lock
+    )
+      return void 0;
     createRequest(receiverId, state.pin).then((success) => {
       if (success) {
         withProduce(setState, (draft) => {
-          draft.status = ConnectStatus.WaitingForAcceptance;
+          draft.status = ConnectionStatus.WaitingForAcceptance;
         });
       }
     });
-  }, [createRequest, receiverId, state.pin]);
+  }, [createRequest, receiverId, state.pin, stateRef]);
   const icon = (() => {
     switch (state.status) {
-      case ConnectStatus.RejectedByPeer:
-        return <XCircleIcon className="w-[32px] h-[32px] stroke-error-main" />;
-      case ConnectStatus.WaitingForKeyInput:
-        return <KeyIcon className="w-[24px] h-[24px] -mt-4" />;
+      case ConnectionStatus.RejectedByPeer:
+        return (
+          <XCircleIcon className="w-[2.5rem] h-[2.5rem] stroke-error-main" />
+        );
+      case ConnectionStatus.WaitingForKeyInput:
+        return <KeyIcon className="w-[2rem] h-[2rem] -mt-4" />;
       default:
         return (
           <svg
             viewBox="0 0 52 12"
             enableBackground="new 0 0 0 0"
-            className="w-[32px] fill-gray-600"
+            className="w-[2.5rem] fill-gray-600"
           >
             <circle stroke="none" cx="6" cy="6" r="6">
               <animate
@@ -657,32 +718,47 @@ const ConnectionStatus: FC<{
     }
   })();
   return (
-    <section className="flex flex-col w-full items-center gap-2 justify-between min-h-[200px]">
+    <section className="flex flex-col w-full items-center gap-2 justify-between min-h-[16rem]">
       {state.error ? (
-        <>
-          <p>Error:</p>
-          <p>{String(state.error)}</p>
-        </>
+        <div className="flex flex-col w-full items-center gap-2 my-10 ">
+          <CircleXIcon className="w-[2.6rem] h-[2.6rem] -mt-4 text-red-600" />
+          <div className="text-left mt-2">
+            <p className="font-bold">{i18n._('Oh! An error has occurred')}</p>
+            <p className="text-gray-600">{String(state.error.message)}</p>
+          </div>
+        </div>
       ) : (
         <div className="flex flex-col w-full items-center gap-2 my-10">
           {icon}
           <div className="relative text-center mt-10">
             {statusTexts[state.status]}
           </div>
-          {state.status == ConnectStatus.WaitingForKeyInput && (
+          {state.status == ConnectionStatus.WaitingForKeyInput && (
             <div id="pin-input" className="mt-6">
-              <InputOtp
-                length={6}
+              <InputOTP
+                maxLength={6}
                 disabled={creating}
                 value={state.pin}
                 onChange={handleChangePin}
-              />
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
             </div>
           )}
         </div>
       )}
-      <Button severity="danger" onClick={onCancel} className="px-3 py-2">
-        {t`cancel`}
+      <Button variant="destructive" onClick={onCancel} className="px-3 py-2">
+        {i18n._('Cancel')}
       </Button>
     </section>
   );
@@ -714,6 +790,8 @@ const FileSelection: FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const [deliveryItems, setDeliveryItems] = useState<DeliveryFile[]>([]);
   const [rtt, setRTT] = useState(() => conn.rtt);
+  const i18n = useLingui();
+
   const sendFile = useCallback(
     async (file: File) => {
       const fileSeq = seqRef.current;
@@ -889,6 +967,153 @@ const FileSelection: FC<{
     },
     [],
   );
+  const recvFile = useCallback(
+    (metadata: FileMetadata) => {
+      const fileSeq = metadata.seq;
+      const total = metadata.size;
+      let received = 0;
+      let packetSeq = 0;
+      let previousUpdateTime = Date.now();
+      const getTransmissionRate = createTransmissionRateCalculator(
+        metadata.date,
+      );
+      const getRemainingTime = createRemainingTimeCalculator(metadata.size);
+      const markFileAsAborted = () => {
+        withProduce(setDeliveryItems, (draft) => {
+          const target = draft.find((it) => it.seq == fileSeq);
+          if (!target) return void 0;
+          target.aborted = true;
+        });
+      };
+      const updateProgress = () => {
+        const currentTime = Date.now();
+        const rate = getTransmissionRate(received, currentTime);
+        const eta = getRemainingTime(received, currentTime);
+
+        // 限制 UI 刷新频率
+        if (currentTime - previousUpdateTime > 1000) {
+          previousUpdateTime = currentTime;
+          withProduce(setDeliveryItems, (draft) => {
+            const target = draft.find((it) => it.seq == fileSeq);
+            if (!target) return;
+            target.progress = Math.ceil((received / total) * 100);
+            target.transmitted = received;
+            target.eta = eta;
+            target.rate = rate;
+          });
+        }
+      };
+      const finalizeTransfer = () => {
+        const currentTime = Date.now();
+        const rate = getTransmissionRate(received, currentTime);
+        const eta = getRemainingTime(received, currentTime);
+
+        withProduce(setDeliveryItems, (draft) => {
+          const target = draft.find((it) => it.seq == fileSeq);
+          if (!target) return;
+          target.eta = eta;
+          target.rate = rate;
+          target.transmitted = target.size;
+          target.progress = 100;
+        });
+
+        receiver!.return();
+      };
+
+      const enableAck = conn.protocol === 'webrtc';
+      const buffers = new Map<number, ArrayBuffer>();
+
+      let receiver: AsyncGenerator<ArrayBuffer, void> | undefined = undefined;
+      const stream = new ReadableStream({
+        async start() {
+          receiver = await conn.recv();
+        },
+        async pull(controller) {
+          // console.log('start pull', fileSeq, packetSeq + 1);
+          if (!receiver) throw new Error('Unexpected loss of receiver');
+          try {
+            let _packetSeq: number | undefined = packetSeq + 1;
+            let packet: ArrayBuffer | undefined = buffers.get(_packetSeq);
+            // 如果多文件同时传输，receiver 会接收到其他文件的 packet，因此需要循环直到找到符合的 packet
+            while (packet === undefined || _packetSeq === undefined) {
+              const { done, value } = await receiver.next();
+              if (done) {
+                markFileAsAborted();
+                controller.error(
+                  new StreamAbnormalTerminationError(total, received),
+                );
+                return void 0;
+              }
+              if (!value) continue;
+              const [_fileSeq, _packetSeq2] = parseACKPacket(value);
+              
+              // Ignore packet from non-target file
+              if (_fileSeq !== fileSeq) continue;
+              _packetSeq = _packetSeq2;
+              packet = value;
+              break;
+            }
+            if (buffers.size > 16) {
+              markFileAsAborted();
+              controller.error(new Error('lack of buffer space'));
+              receiver.return();
+              return void 0;
+            }
+
+            if (_packetSeq && !buffers.has(_packetSeq)) {
+              buffers.set(_packetSeq, packet);
+              console.log(
+                `Push #${_packetSeq} to buffer space, size: ${buffers.size}`,
+              );
+            }
+
+            // 顺序错乱，结束并标记文件传输异常中止
+            if (!buffers.has(packetSeq + 1)) {
+              markFileAsAborted();
+              controller.error(
+                new PacketSequenceError(packetSeq + 1, _packetSeq),
+              );
+              receiver.return();
+              return void 0;
+            }
+            packetSeq = packetSeq + 1;
+            packet = buffers.get(packetSeq)!;
+            buffers.delete(packetSeq);
+            console.log(
+              `Pop #${packetSeq} from buffer space, size: ${buffers.size}`,
+            );
+            // 推入 packet 至文件流
+            // console.log('接收 PACKET', fileSeq, _packetSeq);
+            controller.enqueue(new Uint8Array(packet.slice(8)));
+
+            // 发送 ACK
+            const packetLength = packet.byteLength - 8;
+            received += packetLength;
+            if (enableAck) {
+              // await conn.waitForDrain();
+              conn.send(createACKPacket(fileSeq, _packetSeq), PacketFlag.ACK);
+              // console.log('发送 ACK', fileSeq, _packetSeq);
+            }
+
+            // 刷新 UI
+            if (received >= total) {
+              finalizeTransfer();
+              controller.close();
+            } else {
+              updateProgress();
+            }
+          } catch (e) {
+            markFileAsAborted();
+            receiver.return();
+            controller.error(e);
+          }
+        },
+      });
+      downloadFile(stream, metadata.name, metadata.type, metadata.mtime);
+    },
+    [conn, downloadFile],
+  );
+
   useEffect(() => {
     return conn.batch(
       conn.on(PacketFlag.META, (buf) => {
@@ -907,143 +1132,9 @@ const FileSelection: FC<{
               aborted: false,
             });
           });
-          const fileSeq = metadata.seq;
-          const total = metadata.size;
-          let received = 0;
-          let packetSeq = 0;
-          let previousUpdateTime = Date.now();
-          const getTransmissionRate = createTransmissionRateCalculator(
-            metadata.date,
-          );
-          const getRemainingTime = createRemainingTimeCalculator(metadata.size);
-          const markFileAsAborted = () => {
-            withProduce(setDeliveryItems, (draft) => {
-              const target = draft.find((it) => it.seq == fileSeq);
-              if (!target) return void 0;
-              target.aborted = true;
-            });
-          };
-          const updateProgress = () => {
-            const currentTime = Date.now();
-            const rate = getTransmissionRate(received, currentTime);
-            const eta = getRemainingTime(received, currentTime);
-
-            // 限制 UI 刷新频率
-            if (currentTime - previousUpdateTime > 1000) {
-              previousUpdateTime = currentTime;
-              withProduce(setDeliveryItems, (draft) => {
-                const target = draft.find((it) => it.seq == fileSeq);
-                if (!target) return;
-                target.progress = Math.ceil((received / total) * 100);
-                target.transmitted = received;
-                target.eta = eta;
-                target.rate = rate;
-              });
-            }
-          };
-          const finalizeTransfer = () => {
-            const currentTime = Date.now();
-            const rate = getTransmissionRate(received, currentTime);
-            const eta = getRemainingTime(received, currentTime);
-
-            withProduce(setDeliveryItems, (draft) => {
-              const target = draft.find((it) => it.seq == fileSeq);
-              if (!target) return;
-              target.eta = eta;
-              target.rate = rate;
-              target.transmitted = target.size;
-              target.progress = 100;
-            });
-
-            receiver!.return();
-          };
-          const enableAck = conn.protocol === 'webrtc';
-
           // 表示已收到 Metadata Packet 数据, packetSeq 为 0
-          // console.log('fileSeq', fileSeq, 'packetSeq', packetSeq);
-          conn.send(createACKPacket(fileSeq, packetSeq), PacketFlag.ACK);
-          let receiver: AsyncGenerator<ArrayBuffer, void> | undefined =
-            undefined;
-          const stream = new ReadableStream({
-            async start() {
-              receiver = await conn.recv();
-            },
-            async pull(controller) {
-              // console.log('start pull', fileSeq, packetSeq + 1);
-              if (!receiver) throw new Error('Unexpected loss of receiver');
-              try {
-                let packet: ArrayBuffer | undefined,
-                  _packetSeq: number | undefined;
-                // 如果多文件同时传输，receiver 会接收到其他文件的 packet，因此需要循环直到找到符合的 packet
-                while (packet === undefined || _packetSeq === undefined) {
-                  const { done, value } = await receiver.next();
-                  if (done) {
-                    markFileAsAborted();
-                    controller.error(
-                      new StreamAbnormalTerminationError(total, received),
-                    );
-                    return void 0;
-                  }
-                  if (!value) continue;
-                  const [_fileSeq, _packetSeq2] = parseACKPacket(value);
-                  // console.log(
-                  //   'pull success',
-                  //   `excepted: ${fileSeq}_${packetSeq + 1}`,
-                  //   'done',
-                  //   done,
-                  //   value?.byteLength || 'empty',
-                  //   `[${_fileSeq}_${_packetSeq}]`,
-                  // );
-
-                  // Ignore packet from non-target file
-                  if (_fileSeq !== fileSeq) continue;
-                  _packetSeq = _packetSeq2;
-                  packet = value;
-                  break;
-                }
-
-                // 顺序错乱，结束并标记文件传输异常中止
-                if (_packetSeq !== packetSeq + 1) {
-                  markFileAsAborted();
-                  controller.error(
-                    new PacketSequenceError(packetSeq + 1, _packetSeq),
-                  );
-                  receiver.return();
-                  return void 0;
-                }
-
-                // 推入 packet 至文件流
-                // console.log('接收 PACKET', fileSeq, _packetSeq);
-                packetSeq = _packetSeq;
-                controller.enqueue(new Uint8Array(packet.slice(8)));
-
-                // 发送 ACK
-                const packetLength = packet.byteLength - 8;
-                received += packetLength;
-                if (enableAck) {
-                  // await conn.waitForDrain();
-                  conn.send(
-                    createACKPacket(fileSeq, _packetSeq),
-                    PacketFlag.ACK,
-                  );
-                  // console.log('发送 ACK', fileSeq, _packetSeq);
-                }
-
-                // 刷新 UI
-                if (received >= total) {
-                  finalizeTransfer();
-                  controller.close();
-                } else {
-                  updateProgress();
-                }
-              } catch (e) {
-                markFileAsAborted();
-                receiver.return();
-                controller.error(e);
-              }
-            },
-          });
-          downloadFile(stream, metadata.name, metadata.type, metadata.mtime);
+          conn.send(createACKPacket(metadata.seq, 0), PacketFlag.ACK);
+          recvFile(metadata);
         } catch (e) {
           console.error(e);
         }
@@ -1051,34 +1142,38 @@ const FileSelection: FC<{
       conn.on('CONNECTION_CLOSE', ({ code, reason }) => {
         onClose(code, reason);
       }),
-      conn.on('RTT_CHANGE', (rtt) => setRTT(rtt)),
-      () => conn.close(),
+      conn.on('RTT_UPDATED', (rtt) => setRTT(rtt)),
     );
-  }, [conn, downloadFile, onClose]);
+  }, [conn, onClose, recvFile]);
   return (
     <section className="flex flex-col w-full items-center gap-2">
-      <p className="w-full flex text-left gap-1">
-        <span>
-          {t`Protocol`}: {conn.protocol}
+      <p className="w-full flex text-left gap-1 text-sm">
+        <span
+          className={clsx(
+            'uppercase text-white px-1',
+            conn.protocol == 'webrtc' && 'bg-[#2f8bd0]',
+            conn.protocol == 'websocket' && 'bg-[#161616]',
+          )}
+        >
+          {conn.protocol}
         </span>
-        <span>
-          {t`RTT`}: {rtt}ms
-        </span>
+        <span>{rtt}ms</span>
       </p>
       <div
         ref={containerRef}
-        className="flex flex-col items-center justify-center border border-dashed border-gray-300 w-full h-[180px] rounded"
+        className="flex flex-col items-center justify-center border border-dashed border-gray-300 w-full h-[15rem] rounded text-sm"
       >
         <UploadIcon className="w-10 h-10" />
         <p className="flex items-center gap-1 mt-6">
-          <span className="leading-none">{t`Drag and Drop file here or`}</span>
-          <Button
-            text
-            className="p-0 leading-none underline rounded-none"
+          <span className="leading-none">
+            {i18n._('Drag and Drop file here or')}
+          </span>
+          <button
+            className="leading-none underline rounded-none px-1"
             onClick={onClickChoose}
           >
-            {t`Choose file`}
-          </Button>
+            {i18n._('Choose file')}
+          </button>
         </p>
         <input
           ref={inputRef}
@@ -1088,11 +1183,11 @@ const FileSelection: FC<{
           onChange={onInputChange}
         />
       </div>
-      <div className="w-full mt-4">
-        <span className="font-bold ml-1">{t`History:`}</span>
-        <ul className="w-full mt-2  max-h-[120px] overflow-y-auto">
+      <div className="w-full mt-4 text-sm">
+        <span className="font-bold ml-1">{i18n._('History:')}</span>
+        <ul className="w-full mt-2  max-h-[10rem] overflow-y-auto">
           {deliveryItems.length == 0 ? (
-            <li className="text-gray-300 mt-2 ml-1">{t`No data`}</li>
+            <li className="text-gray-300 mt-2 ml-1">{i18n._('No data')}</li>
           ) : (
             deliveryItems.map((it) => (
               <li
@@ -1106,14 +1201,13 @@ const FileSelection: FC<{
                   >
                     {it.name}
                   </div>
-                  <div className="flex gap-2 font-mono">
-                    <span>
-                      {it.progress}% ({formatBytes(it.transmitted)} /{' '}
-                      {formatBytes(it.size)})
+                  <div className="flex gap-2 font-mono text-sm">
+                    <span className="block">{it.progress}%</span>
+                    <span className="block w-[12.5rem]">
+                      {`(${formatBytes(it.transmitted)} / ${formatBytes(it.size)})`}
                     </span>
-                    <span className="ml-1">
-                      [{formatBytes(it.rate)}/s] ETA: {formatSeconds(it.eta)}
-                    </span>
+                    <span>[{formatBytes(it.rate)}/s] </span>
+                    <span className="ml-1">ETA: {formatSeconds(it.eta)}</span>
                   </div>
                 </div>
                 <div className="flex justify-end mx-2">
