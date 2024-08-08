@@ -7,16 +7,24 @@ import {
   type MouseEvent,
 } from 'react';
 import { t } from '@lingui/macro';
-import { DownloadCloudIcon, Share2Icon, EraserIcon } from 'icons';
+import { DownloadCloudIcon, Share2Icon, EraserIcon, EllipsisIcon } from 'icons';
 import { useSnackbar } from '~/components/ui/snackbar';
 import { IEntity } from '~/constants/types';
 import { executeAsyncTask } from '~/utils/execute-async-task';
 import { downloadFromURL } from '~/utils/save-as';
+import { useMediaQuery } from '~/utils/hooks/use-media-query';
+import { useLingui } from '@lingui/react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu';
 
 export type CustomMenuSlot = {
   key: string;
   component: ReactNode;
-  event: (evt: MouseEvent<HTMLButtonElement>) => void;
+  event: (evt: MouseEvent<HTMLElement>) => void;
 };
 
 const SUPPORTED_SHARE =
@@ -38,9 +46,10 @@ export const Menu: FC<{
   ({
     entity,
     features = ['downloadable', 'deletable', 'shareable'],
-    slots = [],
+    slots: slotsProp = [],
   }) => {
     const snackbar = useSnackbar();
+    const i18n = useLingui();
     const onDelete = useMemo(
       () =>
         executeAsyncTask(async (uid: string) => {
@@ -110,44 +119,87 @@ export const Menu: FC<{
         entity.name,
       );
     }, [entity.name, entity.uid]);
-    return (
-      <div className="flex gap-3 items-center whitespace-nowrap text-sm">
-        {slots
-          .filter((it): it is CustomMenuSlot => typeof it === 'object')
-          .map((it) => (
-            <button
-              key={it.key}
-              className="cedasync-item-link"
-              onClick={it.event}
-            >
-              {it.component}
-            </button>
-          ))}
-        {features.includes('downloadable') && (
-          <button className="cedasync-item-link" onClick={onDownload}>
-            <DownloadCloudIcon className="w-4 h-4" />
-            <span className="capitalize">{t`download`}</span>
-          </button>
-        )}
-        {features.includes('shareable') && SUPPORTED_SHARE && (
-          <button
-            className="cedasync-item-link"
-            onClick={() => onShare(entity)}
-          >
-            <Share2Icon className="w-4 h-4" />
-            <span className="capitalize">{t`share`}</span>
-          </button>
-        )}
-        {features.includes('deletable') && (
-          <button
-            className="cedasync-item-link"
-            onClick={() => onDelete(entity.uid)}
-          >
-            <EraserIcon className="w-4 h-4" />
-            <span className="capitalize">{t`delete`}</span>
-          </button>
-        )}
-      </div>
-    );
+    const slots = useMemo<CustomMenuSlot[]>(() => {
+      return [
+        ...slotsProp.filter(
+          (it): it is CustomMenuSlot => typeof it === 'object',
+        ),
+        ...[
+          features.includes('downloadable') &&
+            ({
+              key: '__download',
+              component: (
+                <>
+                  <DownloadCloudIcon className="h-4 w-4" />
+                  <span>{i18n._('Download')}</span>
+                </>
+              ),
+              event: onDownload,
+            } as CustomMenuSlot),
+          features.includes('shareable') &&
+            SUPPORTED_SHARE &&
+            ({
+              key: '__share',
+              component: (
+                <>
+                  <Share2Icon className="h-4 w-4" />
+                  <span>{i18n._('Share')}</span>
+                </>
+              ),
+              event: () => onShare(entity),
+            } as CustomMenuSlot),
+          features.includes('deletable') &&
+            ({
+              key: '__delete',
+              component: (
+                <>
+                  <EraserIcon className="h-4 w-4" />
+                  <span>{i18n._('Delete')}</span>
+                </>
+              ),
+              event: () => onDelete(entity.uid),
+            } as CustomMenuSlot),
+        ].filter((it): it is CustomMenuSlot => typeof it === 'object'),
+      ];
+    }, [entity, features, i18n, onDelete, onDownload, onShare, slotsProp]);
+    return <ButtonGroup slots={slots} />;
   },
 );
+
+interface MenuButtonGroupProps {
+  slots: Array<CustomMenuSlot>;
+}
+
+const ButtonGroup: FC<MenuButtonGroupProps> = ({ slots }) => {
+  const isMobile = useMediaQuery(useMediaQuery.MOBILE_QUERY);
+  return isMobile ? (
+    <div className="flex items-center gap-3 whitespace-nowrap text-sm">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button className="rounded p-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            <EllipsisIcon className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          {slots.map((it) => (
+            <DropdownMenuItem
+              key={it.key}
+              onClick={it.event}
+              className="flex items-center gap-1 [&>svg]:text-gray-600"
+            >
+              {it.component}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  ) : (
+    <div className="flex items-center gap-3 whitespace-nowrap text-sm">
+      {slots.map((it) => (
+        <button key={it.key} className="cedasync-item-link" onClick={it.event}>
+          {it.component}
+        </button>
+      ))}
+    </div>
+  );
+};

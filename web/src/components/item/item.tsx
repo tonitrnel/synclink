@@ -26,25 +26,25 @@ export const Item: FC<{
       format,
     };
   }, [it]);
-  const render = useMemo(() => {
+  const Render = useMemo(() => {
     switch (file.category) {
       case 'text':
-        return <TextItem />;
+        return TextItem;
       case 'image':
-        return <ImageItem />;
+        return ImageItem;
       case 'video':
-        return <VideoItem />;
+        return VideoItem;
       case 'audio':
-        return <AudioItem />;
+        return AudioItem;
       case 'application':
         switch (file.format) {
           case 'x-tar':
-            return <FolderItem />;
+            return FolderItem;
           default:
-            return <UnknownItem />;
+            return UnknownItem;
         }
       default:
-        return <UnknownItem />;
+        return UnknownItem;
     }
   }, [file.category, file.format]);
   const time = useMemo(() => {
@@ -53,7 +53,7 @@ export const Item: FC<{
     if (diff > 7) {
       return (
         <span>
-          <span className="block text-xl text-gray-700 font-bold">
+          <span className="block text-lg text-gray-700 font-bold">
             {created.format('MMM DD ')}
           </span>
           <span className="block text-sm text-gray-600">
@@ -84,12 +84,12 @@ export const Item: FC<{
         data-uid={it.uid}
         key={it.uid}
       >
-        <div className="mb-2 text-sm flex items-end bg-[#f6f8fa] px-6 py-4">
+        <div className="pad:mb-2 text-sm flex items-end bg-[#f6f8fa] px-3 pad:px-6 py-4">
           {time}
           {from}
         </div>
-        <div className="flex-1 bg-white shadow-sm rounded p-5 px-3 pad:p-7 pb-4 outline-gray-400">
-          {render}
+        <div className="flex-1 bg-white shadow-sm rounded p-5 px-3 pad:p-7 pad:pb-4 outline-gray-400">
+          <Render />
         </div>
       </li>
     </EntityProvider>

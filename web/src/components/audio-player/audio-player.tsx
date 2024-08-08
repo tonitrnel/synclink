@@ -15,6 +15,7 @@ import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { Logger } from '~/utils/logger.ts';
 import { clsx } from '~/utils/clsx.ts';
 import { ImageValue, metadataParser } from './metadata-parser';
+import { useIntersection } from '~/utils/hooks/use-intersection.ts';
 import './audio-player.less';
 
 const logger = new Logger('AudioPlayer');
@@ -63,7 +64,9 @@ export const AudioPlayer: FC<{
     },
   }));
   const [metadata, setMetadata] = useState<Metadata>(() => ({}));
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const visible = useIntersection(containerRef);
   const controllers = useMemo(() => {
     return new (class {
       private enabledPointer = false;
@@ -156,12 +159,16 @@ export const AudioPlayer: FC<{
     })();
   }, []);
   useEffect(() => {
+    if (!visible) return void 0;
+    const container = containerRef.current!;
+    if (container.hasAttribute('data-metadata-loaded')) return void 0;
+    container.setAttribute('data-metadata-loaded', '');
     let objectURL: string | void = void 0;
     const readCover = (image: ImageValue, ost: string) => {
       const file = new File(
         [image.data as ArrayBuffer],
         `${ost}-${image.description}`,
-        { type: image.mime || 'image/png' }
+        { type: image.mime || 'image/png' },
       );
       objectURL = URL.createObjectURL(file);
       return objectURL;
@@ -187,7 +194,7 @@ export const AudioPlayer: FC<{
     return () => {
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
-  }, [src]);
+  }, [src, visible]);
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return void 0;
@@ -196,7 +203,7 @@ export const AudioPlayer: FC<{
       document.body.dispatchEvent(
         new CustomEvent('audio-playback-change', {
           detail: audio.dataset['audioId'],
-        })
+        }),
       );
     };
     audio.ondurationchange = () =>
@@ -256,7 +263,7 @@ export const AudioPlayer: FC<{
       }));
   }, []);
   return (
-    <div className={clsx('audio-player', className)}>
+    <div ref={containerRef} className={clsx('audio-player', className)}>
       {!state.ready && <div className="audio-skeleton" />}
       <audio
         ref={audioRef}
@@ -401,6 +408,6 @@ const pad = (str: number) => {
 
 const mmss = (duration: number) => {
   return `${pad(Math.floor(duration / 60) | 0)}:${pad(
-    Math.floor(duration % 60) | 0
+    Math.floor(duration % 60) | 0,
   )}`;
 };

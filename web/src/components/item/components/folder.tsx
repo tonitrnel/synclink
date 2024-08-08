@@ -1,4 +1,4 @@
-import { FC, useMemo, MouseEvent } from 'react';
+import { FC, useMemo, MouseEvent, useRef, HTMLAttributes, memo } from 'react';
 import { useEntityConsumer } from '../entity-provider';
 import { InferResponse, useGetDirectory } from '~/endpoints';
 import { toTreeByPath } from '~/utils/to-tree-by-path';
@@ -21,6 +21,8 @@ import { useSnackbar } from '~/components/ui/snackbar';
 import { openViewer, supportsFileViewer } from '~/components/viewer-dialog';
 import { TreeNode } from '~/components/ui/tree';
 import { TreeTable, TreeTableColumn } from '~/components/ui/tree-table';
+import { useIntersection } from '~/utils/hooks/use-intersection.ts';
+import { clsx } from '~/utils/clsx.ts';
 
 type RecordData = {
   name: string;
@@ -30,146 +32,156 @@ type RecordData = {
   __raw: InferResponse<typeof useGetDirectory>[number];
 };
 
-export const FolderItem: FC = () => {
-  const entity = useEntityConsumer();
-  const i18n = useLingui();
-  const snackbar = useSnackbar();
-  const { data: list } = useGetDirectory({
-    path: {
-      id: entity.uid,
-    },
-  });
-  const nodes = useMemo<TreeNode<RecordData>[]>(() => {
-    if (!list) return [];
-    const folderSizes = calculateFolderSize(list);
+export const FolderItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
+  ({ className, ...props }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const entity = useEntityConsumer();
+    const i18n = useLingui();
+    const snackbar = useSnackbar();
+    const visible = useIntersection(containerRef);
+    const { data: list } = useGetDirectory({
+      path: {
+        id: entity.uid,
+      },
+      enabled: visible,
+    });
+    const nodes = useMemo<TreeNode<RecordData>[]>(() => {
+      if (!list) return [];
+      const folderSizes = calculateFolderSize(list);
 
-    return toTreeByPath(list || [], (item, name) => ({
-      id: item.hash || item.path,
-      data: {
-        name: name,
-        size: item.is_file
-          ? formatBytes(item.size)
-          : formatBytes(folderSizes[item.path]) || '',
-        type: item.mimetype || '-',
-        lastModified: dayjs(item.mtime * 1e3).format('DD/MM/YYYY'),
-        __raw: item,
-      },
-      leaf: item.is_file,
-    }));
-  }, [list]);
-  const downloadButton = useMemo<CustomMenuSlot>(
-    () => ({
-      key: 'download-as-directory',
-      event: async () => {
-        const res = await fetch(`${__ENDPOINT__}/api/file/${entity.uid}?raw`);
-        if (!res.ok) {
-          console.log(res);
-          return void 0;
-        }
-        if (!res.body) {
-          console.error('missing body');
-          return void 0;
-        }
-        try {
-          await saveDirectoryFromTarStream(res.body);
-          snackbar.enqueueSnackbar({
-            variant: 'success',
-            message: i18n._('Download success'),
-          });
-        } catch (e) {
-          console.error(e);
-          if (e instanceof Error) {
-            snackbar.enqueueSnackbar({
-              variant: 'error',
-              message: e.message,
-            });
+      return toTreeByPath(list || [], (item, name) => ({
+        id: item.hash || item.path,
+        data: {
+          name: name,
+          size: item.is_file
+            ? formatBytes(item.size)
+            : formatBytes(folderSizes[item.path]) || '',
+          type: item.mimetype || '-',
+          lastModified: dayjs(item.mtime * 1e3).format('DD/MM/YYYY'),
+          __raw: item,
+        },
+        leaf: item.is_file,
+      }));
+    }, [list]);
+    const downloadButton = useMemo<CustomMenuSlot>(
+      () => ({
+        key: 'download-as-directory',
+        event: async () => {
+          const res = await fetch(`${__ENDPOINT__}/api/file/${entity.uid}?raw`);
+          if (!res.ok) {
+            console.log(res);
+            return void 0;
           }
-        }
-      },
-      component: (
-        <>
-          <FolderDownIcon className="w-4 h-4" />
-          <span className="capitalize">{t`Download folder`}</span>
-        </>
-      ),
-    }),
-    [entity.uid, i18n, snackbar],
-  );
-  const handler = useMemo(
-    () => ({
-      download: (data: RecordData, evt: MouseEvent<HTMLAnchorElement>) => {
-        evt.preventDefault();
-        downloadFromURL(
-          `${__ENDPOINT__}/api/directory/${entity.uid}/${data.__raw.hash}?raw`,
-          data.name,
-        );
-      },
-      preview: (data: RecordData) => {
-        openViewer({
-          resourceId: entity.uid,
-          subResourceId: data.__raw.hash || data.__raw.path,
-          filename: data.name,
-          mimetype: data.type,
-        });
-      },
-    }),
-    [entity.uid],
-  );
-  const columns = useMemo<TreeTableColumn<RecordData>[]>(() => {
-    const onlyFile = nodes.every(
-      (it) => !it.children || it.children.length == 0,
-    );
-    return [
-      {
-        key: 'name',
-        header: i18n._('Name'),
-        expander: !onlyFile,
-        className: 'truncate',
-        render: (node) => <NameColumn data={node.data} />,
-      },
-      {
-        key: 'size',
-        header: i18n._('Size'),
-        className: 'w-[96px]',
-      },
-      {
-        key: 'type',
-        header: i18n._('Type'),
-        className: 'truncate',
-      },
-      {
-        key: 'lastModified',
-        header: i18n._('Last modified'),
-        className: 'w-[128px]',
-      },
-      {
-        key: 'action',
-        render: (node) => (
-          <ActionColumn
-            id={entity.uid}
-            data={node.data}
-            onDownload={handler.download}
-            onPreview={handler.preview}
-          />
+          if (!res.body) {
+            console.error('missing body');
+            return void 0;
+          }
+          try {
+            await saveDirectoryFromTarStream(res.body);
+            snackbar.enqueueSnackbar({
+              variant: 'success',
+              message: i18n._('Download success'),
+            });
+          } catch (e) {
+            console.error(e);
+            if (e instanceof Error) {
+              snackbar.enqueueSnackbar({
+                variant: 'error',
+                message: e.message,
+              });
+            }
+          }
+        },
+        component: (
+          <>
+            <FolderDownIcon className="w-4 h-4" />
+            <span className="capitalize">{t`Download folder`}</span>
+          </>
         ),
-      },
-    ];
-  }, [entity.uid, handler.download, handler.preview, i18n, nodes]);
-  return (
-    <>
-      <div className="cedasync-item-header">
-        <TreeTable records={nodes} columns={columns} />
+      }),
+      [entity.uid, i18n, snackbar],
+    );
+    const handler = useMemo(
+      () => ({
+        download: (data: RecordData, evt: MouseEvent<HTMLAnchorElement>) => {
+          evt.preventDefault();
+          downloadFromURL(
+            `${__ENDPOINT__}/api/directory/${entity.uid}/${data.__raw.hash}?raw`,
+            data.name,
+          );
+        },
+        preview: (data: RecordData) => {
+          openViewer({
+            resourceId: entity.uid,
+            subResourceId: data.__raw.hash || data.__raw.path,
+            filename: data.name,
+            mimetype: data.type,
+          });
+        },
+      }),
+      [entity.uid],
+    );
+    const columns = useMemo<TreeTableColumn<RecordData>[]>(() => {
+      const onlyFile = nodes.every(
+        (it) => !it.children || it.children.length == 0,
+      );
+      return [
+        {
+          key: 'name',
+          header: i18n._('Name'),
+          expander: !onlyFile,
+          className: 'truncate',
+          render: (node) => <NameColumn data={node.data} />,
+        },
+        {
+          key: 'size',
+          header: i18n._('Size'),
+          className: 'w-[6.85rem]',
+        },
+        {
+          key: 'type',
+          header: i18n._('Type'),
+          className: 'truncate w-[8rem]',
+        },
+        {
+          key: 'lastModified',
+          header: i18n._('Last modified'),
+          className: 'w-[9.14rem]',
+        },
+        {
+          key: 'action',
+          className: 'w-[10rem]',
+          render: (node) => (
+            <ActionColumn
+              id={entity.uid}
+              data={node.data}
+              onDownload={handler.download}
+              onPreview={handler.preview}
+            />
+          ),
+        },
+      ];
+    }, [entity.uid, handler.download, handler.preview, i18n, nodes]);
+    return (
+      <div ref={containerRef} className={clsx('', className)} {...props}>
+        <div className="w-full overflow-x-auto border-t border-gray-100">
+          <TreeTable
+            records={nodes}
+            columns={columns}
+            className="relative min-w-[50rem]"
+          />
+        </div>
+        <div className="mt-4 flex justify-between items-center">
+          <Metadata entity={entity} />
+          <Menu
+            entity={entity}
+            slots={[saveDirectoryFromTarStream.SUPPORTED && downloadButton]}
+          />
+        </div>
       </div>
-      <div className="mt-4 flex justify-between">
-        <Metadata entity={entity} />
-        <Menu
-          entity={entity}
-          slots={[saveDirectoryFromTarStream.SUPPORTED && downloadButton]}
-        />
-      </div>
-    </>
-  );
-};
+    );
+  },
+);
 
 const NameColumn: FC<{ data: RecordData }> = ({ data }) => {
   return (
