@@ -15,6 +15,7 @@ import { clsx } from '~/utils/clsx';
 import { isFunction } from '@painted/shared';
 import { ChevronRightIcon } from 'icons';
 import { withProduce } from '~/utils/with-produce';
+import { useLingui } from '@lingui/react';
 
 interface TreeTableProps<T> {
   records: TreeNode<T>[];
@@ -30,6 +31,7 @@ interface Row<T = unknown> {
   className?: string;
   expanded: boolean;
 }
+
 interface Col<T = unknown> {
   key: string;
   className?: string;
@@ -38,6 +40,7 @@ interface Col<T = unknown> {
   expander?: boolean | ((expanded: boolean, record: TreeNode<T>) => ReactNode);
   render?: (record: TreeNode<T>) => ReactNode;
 }
+
 const TreeTableImpl = <T,>(
   {
     records,
@@ -94,12 +97,12 @@ const TreeTableImpl = <T,>(
   return (
     <div
       className={clsx(scrollHeight && 'overflow-y-scroll', className)}
-      style={{ height: scrollHeight }}
+      style={{ maxHeight: scrollHeight }}
     >
       <table
         ref={ref}
         role="table"
-        className={clsx('w-full border-collapse table-fixed')}
+        className={clsx('w-full table-fixed border-collapse')}
         {...props}
       >
         <TableHead
@@ -128,7 +131,7 @@ const TableHead: FC<{
             role="columnheader"
             key={col.key}
             className={clsx(
-              'p-3 border-b-[1px] text-left border-gray-200 font-bold text-gray-700 bg-gray-50',
+              'border border-gray-100 bg-gray-50 p-3 text-left font-bold text-gray-700',
               scrollable && 'sticky top-0',
               col.className,
               col.headerClassName,
@@ -146,8 +149,19 @@ const TableBody: FC<{
   cols: Col[];
   onExpand(id: string, expanded: boolean): void;
 }> = memo(({ rows, cols, onExpand }) => {
+  const i18n = useLingui();
   return (
     <tbody role="rowgroup">
+      {rows.length === 0 && (
+        <tr className="border-l border-r border-gray-100">
+          <td
+            colSpan={cols.length}
+            className="border border-gray-100 p-4 text-gray-400"
+          >
+            {i18n._('No data')}
+          </td>
+        </tr>
+      )}
       {rows.map((row) => (
         <TableBodyRow
           key={String(row.id)}
@@ -165,7 +179,7 @@ const TableBodyRow: FC<{
   onExpand(id: string, expanded: boolean): void;
 }> = memo(({ row, cols, onExpand }) => {
   return (
-    <tr className={clsx('', row.className)}>
+    <tr className={clsx('border-l border-r border-gray-100', row.className)}>
       {cols.map((col) => (
         <TableBodyCol key={col.key} col={col} row={row} onExpand={onExpand} />
       ))}
@@ -179,7 +193,7 @@ const TableBodyCol: FC<{
 }> = memo(({ col, row, onExpand }) => {
   const expander = col.expander && !row.leaf && (
     <button
-      className="inline-flex w-8 h-8 -ml-3 align-middle justify-center items-center text-gray-500"
+      className="-ml-3 inline-flex h-8 w-8 items-center justify-center align-middle text-gray-500"
       onClick={() => onExpand(row.id, !row.expanded)}
     >
       {isFunction(col.expander) ? (
@@ -187,7 +201,7 @@ const TableBodyCol: FC<{
       ) : (
         <ChevronRightIcon
           className={clsx(
-            'w-5 h-5  transition-transform',
+            'h-5 w-5 transition-transform',
             row.expanded && 'rotate-90',
           )}
         />
@@ -205,7 +219,7 @@ const TableBodyCol: FC<{
     <td
       role="cell"
       className={clsx(
-        'p-3 border-b border-gray-200 text-sm box-border',
+        'box-border border-b border-gray-200 p-3 text-sm',
         col.className,
       )}
     >

@@ -1,0 +1,80 @@
+.ui-button {
+  @apply inline-flex items-center justify-center;
+  @apply whitespace-nowrap rounded-md text-sm font-medium transition-colors;
+
+  &:focus-visible {
+    @apply outline-none ring-1 ring-ring;
+  }
+
+  &:disabled {
+    @apply pointer-events-none opacity-50;
+  }
+
+  /* Variants */
+
+  &.variant {
+    &-default {
+      @apply bg-primary text-primary-foreground shadow;
+
+      &:hover {
+        @apply ~ "bg-primary/90";
+      }
+    }
+
+    &-destructive {
+      @apply bg-destructive text-destructive-foreground shadow-sm;
+
+      &:hover {
+        @apply ~ "bg-destructive/90";
+      }
+    }
+
+    &-outline {
+      @apply border border-input bg-background shadow-sm;
+
+      &:hover {
+        @apply bg-accent text-accent-foreground;
+      }
+    }
+
+    &-secondary {
+      @apply bg-secondary text-secondary-foreground shadow-sm;
+
+      &:hover {
+        @apply ~ "bg-secondary/80";
+      }
+    }
+
+    &-ghost {
+      &:hover {
+        @apply bg-accent text-accent-foreground;
+      }
+    }
+
+    &-link {
+      @apply text-primary underline-offset-4;
+
+      &:hover {
+        @apply underline;
+      }
+    }
+  }
+
+  &.size {
+    &-default {
+      @apply h-9 px-4 py-2;
+    }
+
+    &-sm {
+      @apply h-8 rounded-md px-3 text-xs;
+    }
+
+    &-lg {
+      @apply h-10 rounded-md px-8;
+    }
+
+    &-icon {
+      @apply h-9 w-9;
+    }
+  }
+}

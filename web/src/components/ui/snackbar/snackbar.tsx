@@ -137,7 +137,7 @@ export const SnackbarContainer: FC<{
 }> = ({ items, onExit }) => {
   return (
     <ol className="fixed left-[50%] translate-x-[-50%] top-8 box-border flex items-center flex-col-reverse pointer-events-none gap-2 w-[80vw] pad:w-auto z-[9999]">
-      <AnimatePresence onExitComplete={onExit}>
+      <AnimatePresence mode="popLayout" onExitComplete={onExit}>
         {items.map((it) => (
           <Snackbar key={it.key} id={it.key!} {...it.originalProps} />
         ))}
