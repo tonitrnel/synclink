@@ -92,6 +92,7 @@ export const usePostCreateP2PRequest = createHttpFactory('POST:/api/p2p/create')
       target_id: string;
       target_pin?: string;
       supports_rtc: boolean;
+      priority?: 'webrtc' | 'websocket'
     }
   >()
   .apply<

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AnimationPage } from '~/components/animation-page';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { useSnackbar } from '~/components/ui/snackbar';
@@ -10,7 +12,7 @@ export default function DebugPage() {
   const toast = useToast();
   const [tags, setTags] = useState<string[]>(['Apple', 'Banana']);
   return (
-    <section className="p-10 w-full">
+    <AnimationPage className="p-10 w-full">
       <h1 className="font-bold text-xxl">Debug Page</h1>
       <div className="my-6">
         <h2 className="font-bold my-4">snackbar: </h2>
@@ -55,6 +57,8 @@ export default function DebugPage() {
           >
             info
           </Button>
+        </div>
+        <div className="flex gap-2 mt-2">
           <Button
             onClick={() =>
               snackbar.enqueueSnackbar({
@@ -117,12 +121,31 @@ export default function DebugPage() {
       </div>
       <div>
         <h2 className="font-bold my-4">Tag Input: </h2>
-        <div className="flex gap-2">
-          <TagInput value={tags} onChange={(value) => setTags(value)}  className='w-[20rem]' max={6} placeholder="fruits" />
-          <Input value={tags.join(", ")} className='w-[20rem]' onChange={noop} />
+        <div>
+          <TagInput
+            value={tags}
+            onChange={(value) => setTags(value)}
+            className="w-[20rem]"
+            max={6}
+            placeholder="fruits"
+          />
+        </div>
+        <div className="mt-2">
+          <Input
+            value={tags.join(', ')}
+            className="w-[20rem]"
+            onChange={noop}
+          />
         </div>
       </div>
-    </section>
+
+      <div>
+        <h2 className="font-bold my-4">Links: </h2>
+        <div>
+          <Link to="/file-transfer">navigate</Link>
+        </div>
+      </div>
+    </AnimationPage>
   );
 }
 

@@ -41,7 +41,7 @@ export type RTCEvents = {
 export abstract class RTCImpl extends EventBus<RTCEvents> {
   abstract protocol: 'webrtc' | 'websocket';
   rtt = 0;
-  protected nextPingActiveTime = 0;
+  private nextPingActiveTime = 0;
 
   abstract send(bytes: Uint8Array, flag?: PacketFlag): void;
 
@@ -49,6 +49,7 @@ export abstract class RTCImpl extends EventBus<RTCEvents> {
 
   public ping = async (): Promise<number> => {
     const startTime = Date.now();
+    this.nextPingActiveTime = startTime + 30_000;
 
     // [OPCODE:4 bytes, SEQ: 2 bytes, TIME: 8 bytes]
     const packet = new Uint8Array(14);
@@ -117,6 +118,11 @@ export abstract class RTCImpl extends EventBus<RTCEvents> {
     this.rtt = Math.max(Math.ceil((replyTime - startTime + this.rtt) / 2), 0);
     this.nextPingActiveTime = replyTime + 5000;
     this.emit('RTT_UPDATED', this.rtt);
+  };
+
+  protected sendPing = () => {
+    if (Date.now() < this.nextPingActiveTime) return void 0;
+    this.ping();
   };
 
   abstract recv(): AsyncGenerator<ArrayBuffer>;
@@ -312,6 +318,7 @@ export class P2PRtc extends RTCImpl {
     view[0] = flag;
     view.set(bytes, 1);
     this.channel.send(buffer);
+    this.sendPing();
   }
 
   public async *recv(): AsyncGenerator<ArrayBuffer> {
@@ -481,6 +488,7 @@ export class P2PSocket extends RTCImpl {
     view.set(bytes, 1);
     this.ws.send(buffer);
     // this.ws.bufferedAmount
+    this.sendPing();
   }
 
   public async *recv(): AsyncGenerator<ArrayBuffer, void> {

@@ -5,7 +5,7 @@ export type ViewerOptions = {
   subResourceId?: string; // 用于访问指定资源 ID 下路径或 hash 的资源
   filename: string;
   mimetype: string;
-  extname?: string
+  extname?: string;
 };
 
 export const event = new EventBus<{

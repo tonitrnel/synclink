@@ -2,7 +2,6 @@ import { FC, memo, useEffect, useRef, useState } from 'react';
 import { ReactComponent as LogoIcon } from '~/assets/logo.svg';
 import { AudioGlobalController } from '~/components/audio-player';
 import { Stats } from '~/components/stats';
-import './sidebar.less';
 
 export const Sidebar: FC = memo(() => {
   const containerRef = useRef<HTMLElement>(null);
@@ -32,7 +31,7 @@ export const Sidebar: FC = memo(() => {
         <div className="absolute w-full h-full left-0 top-0 aside-overlay" />
       </div>
       <header className="absolute left-12 top-12">
-        <LogoIcon className="w-20 h-20 rounded-md" />
+        <LogoIcon className="w-20 h-20 rounded-md text-white" />
         <h1 className="text-2xl text-white -mt-3">
           <span>Cedasync</span>
         </h1>

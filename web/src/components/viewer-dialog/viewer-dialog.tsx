@@ -1,5 +1,4 @@
-import { FC, Suspense, useCallback, useMemo, useState } from 'react';
-import { loadViewerComponent } from './viewers';
+import { FC, Suspense, useCallback, useState } from 'react';
 import { withProduce } from '~/utils/with-produce';
 import { Loading } from '../loading';
 import { ViewerOptions } from './event';
@@ -7,6 +6,7 @@ import { Dialog } from '../ui/dialog';
 import { useLingui } from '@lingui/react';
 import { MaximizeIcon, MinimizeIcon } from 'icons';
 import { clsx } from '~/utils/clsx';
+import { useSrc, useViewerLoader } from './hooks.ts';
 
 export const ViewerDialog: FC<
   {
@@ -36,17 +36,8 @@ export const ViewerDialog: FC<
   const toggleFullscreen = useCallback(() => {
     setFullscreen((fullscreen) => !fullscreen);
   }, []);
-  const Viewer = useMemo(() => {
-    const ext = extname || filename.split('.').pop() || '';
-    return loadViewerComponent(mimetype, ext);
-  }, [extname, filename, mimetype]);
-  const src = useMemo(() => {
-    if (subResourceId) {
-      return `${__ENDPOINT__}/api/directory/${resourceId}/${subResourceId}`;
-    } else {
-      return `${__ENDPOINT__}/api/file/${resourceId}`;
-    }
-  }, [resourceId, subResourceId]);
+  const Viewer = useViewerLoader({ extname, filename, mimetype });
+  const src = useSrc(resourceId, subResourceId);
   return (
     <Dialog visible={visible} fullscreen={fullscreen} onClose={onClose}>
       <Dialog.Header className="-mt-2">
@@ -73,9 +64,12 @@ export const ViewerDialog: FC<
         </button>
       </Dialog.Header>
       <Dialog.Content
-        className={clsx('p-0 overflow-y-auto', fullscreen ? 'w-full' : 'w-[560px]')}
+        className={clsx(
+          'overflow-y-auto p-0',
+          fullscreen ? 'w-full' : 'w-[560px]',
+        )}
       >
-        <section className="min-h-[240px] relative h-full">
+        <section className="relative h-full min-h-[18rem]">
           {!state.ready && (
             <Loading.Wrapper>
               <Loading />

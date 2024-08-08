@@ -194,7 +194,7 @@ const UploadManagerImpl: FC<{
     [tasksRef, timers],
   );
   return (
-    <div ref={containerRef} className={clsx("px-1",className)}>
+    <div ref={containerRef} className={clsx('px-1', className)}>
       <AnimatePresence>
         {tasks.map((task) => (
           <Task key={task.id} {...task} onCancel={handleCancel} />
@@ -329,9 +329,7 @@ const Task: FC<
                       </span>
                     );
                   case 'FAILED':
-                    return (
-                      <span className="text-red-600">{reason}</span>
-                    );
+                    return <span className="text-red-600">{reason}</span>;
                   case 'CANCELED':
                     return (
                       <span className="text-gray-400">
@@ -354,16 +352,17 @@ const Task: FC<
             {i18n._('Total:')} {formatBytes(data?.total || 0)}
           </span>
           {!isMobile && (
-            <span title={i18n._("Length of data sent to server")}>
+            <span title={i18n._('Length of data sent to server')}>
               {i18n._('Transferred:')} {formatBytes(uploaded || 0)}
             </span>
           )}
-          <span title={i18n._("Hash calculation speed or upload speed")}>
+          <span title={i18n._('Hash calculation speed or upload speed')}>
             {i18n._('Speed:')} {formatBytes(upload_speed || 0)}/s
           </span>
           {!isMobile && (
-            <span title={i18n._("Duration time")}>
-              {i18n._('Duration:')} {calculateDuration(data?.timestamp || 0, now)}
+            <span title={i18n._('Duration time')}>
+              {i18n._('Duration:')}{' '}
+              {calculateDuration(data?.timestamp || 0, now)}
             </span>
           )}
         </div>

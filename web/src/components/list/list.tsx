@@ -20,6 +20,7 @@ import { useGetList } from '~/endpoints';
 import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
 import { notifyManager } from '~/utils/notify-manager.ts';
+import { useSnackbar } from '~/components/ui/snackbar';
 
 const logger = new Logger('cedasync');
 
@@ -35,7 +36,8 @@ const __TIME = Date.now();
 
 export const List: FC<{
   className?: string;
-}> = memo(({ className }) => {
+  onReady(): void;
+}> = memo(({ className, onReady }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pagination, setPagination] = useState<Pagination>(() => ({
     page: 1,
@@ -43,8 +45,11 @@ export const List: FC<{
   }));
   const [total, setTotal] = useState(0);
   const [list, setList] = useState<IEntity[]>([]);
-  const [scrollReady, setScrollReady] = useState(false);
-  const prohibitScrollLoadRef = useRef(false);
+  const scrollStateRef = useRef({
+    isProhibitScrollLoad: false,
+    isProgrammaticScroll: false,
+  });
+  const snackbar = useSnackbar();
   const {
     done,
     error,
@@ -79,27 +84,16 @@ export const List: FC<{
     }));
   }, [loading, previous]);
   const loadPrevious = useLatestFunc(_loadPrevious);
-  const scrollToBottom = useCallback(async (): Promise<void> => {
+  const scrollToBottom = useCallback((behavior?: ScrollBehavior): void => {
     const element = containerRef.current;
     if (!element) return void 0;
-    let height = element.scrollHeight - element.clientHeight;
-    return new Promise<void>((resolve) => {
-      const scroll = () => {
-        const currentHeight = element.scrollHeight - element.clientHeight;
-        if (currentHeight != height) {
-          height = currentHeight;
-          window.requestAnimationFrame(scroll);
-          return void 0;
-        }
-        element.scrollTo({ top: currentHeight });
-        resolve();
-      };
-      window.requestAnimationFrame(scroll);
-    });
+    const currentHeight = element.scrollHeight - element.clientHeight;
+    element.scrollTo({ top: currentHeight, behavior });
   }, []);
   useEffect(() => {
     if (!done || error) return void 0;
     let previousTimestamp = Date.now();
+    const scrollState = scrollStateRef.current;
     const loadLatest = async () => {
       const records = await fetch(
         `${__ENDPOINT__}/api?page=1&per_page=${10}&after=${previousTimestamp}`,
@@ -113,7 +107,15 @@ export const List: FC<{
         });
       }
     };
-    notifyManager.ensureWork().catch(logger.error);
+    notifyManager.ensureWork().catch((error) => {
+      logger.error(error);
+      if (error instanceof Error) {
+        snackbar.enqueueSnackbar({
+          variant: 'error',
+          message: error.message,
+        });
+      }
+    });
     return notifyManager.batch(
       notifyManager.on('CONNECTED', () => {
         loadLatest().catch(console.error);
@@ -126,7 +128,7 @@ export const List: FC<{
           total = draft.length;
         });
         previousTimestamp = Date.now();
-        prohibitScrollLoadRef.current = true;
+        scrollState.isProhibitScrollLoad = true;
         if (total == 0) await refresh();
       }),
       notifyManager.on('RECORD_ADDED', async (uid) => {
@@ -141,19 +143,22 @@ export const List: FC<{
             }
           });
           previousTimestamp = Date.now();
-          await scrollToBottom();
+          setTimeout(() => {
+            scrollToBottom('smooth');
+          }, 16);
         } catch (e) {
           logger.error('Failed to update list, reason:', e);
         }
       }),
     );
-  }, [done, error, refresh, scrollToBottom]);
+  }, [done, error, refresh, scrollToBottom, snackbar]);
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return void 0;
+    const scrollState = scrollStateRef.current;
     const scrollWatcher = () => {
-      if (prohibitScrollLoadRef.current) {
-        prohibitScrollLoadRef.current = false;
+      if (scrollState.isProhibitScrollLoad) {
+        scrollState.isProhibitScrollLoad = false;
         return void 0;
       }
       if (element.scrollTop <= 0) {
@@ -171,45 +176,58 @@ export const List: FC<{
     if (!done) return void 0;
     const element = containerRef.current;
     if (!element) return void 0;
-    const ul = element.querySelector('ul');
-    if (!ul) return void 0;
-    let raf: number | undefined = void 0;
-    const ulObs = new ResizeObserver(() => {
-      if (raf) window.cancelAnimationFrame(raf);
-      raf = window.requestAnimationFrame(async () => {
-        raf = void 0;
-        await scrollToBottom();
-        ulObs.disconnect();
-        setScrollReady(true);
-      });
-    });
-    ulObs.observe(ul);
-    let previousHeight = element.getBoundingClientRect().height;
-    const obs = new ResizeObserver((entries) => {
-      const height = entries[0].contentRect.height;
-      const isBottom =
-        element.scrollTop ===
-        element.scrollHeight - element.clientHeight + (height - previousHeight);
-      if (previousHeight != 0 && previousHeight != height && isBottom) {
+    const scrollState = scrollStateRef.current;
+    const list = element.querySelector('ul')!;
+    const items = [...list.children];
+    if (items.length == 0) return void 0;
+    let timer: number | undefined = void 0;
+    // let startTime = Date.now();
+    const resizeObs = new ResizeObserver(() => {
+      // const resizeObs = new ResizeObserver((entries) => {
+      //   const now = Date.now();
+      //   console.log(
+      //     'resize',
+      //     timer,
+      //     `${now - startTime}ms`,
+      //     entries.map((it) => it.target),
+      //   );
+      //   startTime = now;
+      scrollToBottom();
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = void 0;
         scrollToBottom();
-      }
-      previousHeight = height;
+        onReady();
+        resizeObs.disconnect();
+      }, 160);
     });
-    obs.observe(element);
-    return () => {
-      obs.disconnect();
+    items.forEach((item) => resizeObs.observe(item));
+    const onScroll = () => {
+      if (scrollState.isProgrammaticScroll) {
+        scrollState.isProgrammaticScroll = false;
+        return void 0;
+      }
+      resizeObs.disconnect();
+      element.removeEventListener('scroll', onScroll);
     };
-  }, [done, scrollToBottom]);
+    element.addEventListener('scroll', onScroll);
+    return () => {
+      resizeObs.disconnect();
+      element.removeEventListener('scroll', onScroll);
+      // obs.disconnect();
+    };
+  }, [done, onReady, scrollToBottom]);
   const reversedList = useMemo(() => [...list].reverse(), [list]);
   return (
-    <motion.section
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       ref={containerRef}
       className={className}
     >
-      <div className="relative w-full h-full">
+      <div className="relative w-full h-full flex flex-col">
         {(() => {
+          if (!done) return null;
           if (error)
             return (
               <Loading.Wrapper>
@@ -220,15 +238,6 @@ export const List: FC<{
                   />
                   <p className="block mt-4 capitalize">{String(error)}</p>
                 </div>
-              </Loading.Wrapper>
-            );
-          if (!done)
-            return (
-              <Loading.Wrapper>
-                <Loading>
-                  <span className="capitalize">{t`receiving`}</span>
-                  <span className="ani_dot">...</span>
-                </Loading>
               </Loading.Wrapper>
             );
           if (list.length == 0)
@@ -244,23 +253,18 @@ export const List: FC<{
               </Loading.Wrapper>
             );
           return (
-            <motion.div className="flex h-full flex-col relative">
+            <>
               {loading && <Loading />}
-              <ul
-                className={clsx(
-                  'flex-1 px-1 pt-2 pb-4 pad:pb-8 transition-opacity',
-                  !scrollReady && 'opacity-0',
-                )}
-              >
+              <ul className={clsx('flex-1 pt-2 pb-8 transition-opacity')}>
                 {reversedList.map((it) => (
                   <Item key={it.uid} it={it} />
                 ))}
               </ul>
               <UploadManager scrollToBottom={scrollToBottom} />
-            </motion.div>
+            </>
           );
         })()}
       </div>
-    </motion.section>
+    </motion.div>
   );
 });

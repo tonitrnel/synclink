@@ -77,7 +77,34 @@ export const P2pFileTransferDialog: FC<{
   mode?: 'sender' | 'receiver';
   id?: string;
   onClose(): void;
-}> = ({ id, mode = 'sender', onClose }) => {
+}> = ({ id, mode, onClose }) => {
+  const i18n = useLingui();
+  return (
+    <Dialog
+      id="p2p-file-transfer-dialog"
+      visible={true}
+      onClose={onClose}
+      className="w-[40rem]"
+    >
+      <Dialog.Header>
+        <Dialog.Title>{i18n._('Peer to peer file transfer')}</Dialog.Title>
+        <Dialog.Description className="sr-only">
+          {i18n._('Quickly share files with other client who open this page')}
+        </Dialog.Description>
+      </Dialog.Header>
+      <Dialog.Content>
+        <FileTransferImpl id={id} mode={mode} onClose={onClose} isDialog />
+      </Dialog.Content>
+    </Dialog>
+  );
+};
+
+export const FileTransferImpl: FC<{
+  mode?: 'sender' | 'receiver';
+  id?: string;
+  onClose?(): void;
+  isDialog?: boolean;
+}> = ({ id, mode = 'sender', isDialog = false, onClose }) => {
   const [state, setState] = useState<{
     receiverId: string | undefined;
     senderId: string | undefined;
@@ -91,7 +118,6 @@ export const P2pFileTransferDialog: FC<{
   }));
   const connRef = useLatestRef(state.connection);
   const participantsRef = useLatestRef([state.senderId, state.receiverId]);
-  const i18n = useLingui();
   const { data: connections = [], refresh } = useGetSseConnections({
     keepDirtyOnPending: true,
     onBefore: () => notifyManager.ensureWork(),
@@ -120,16 +146,7 @@ export const P2pFileTransferDialog: FC<{
       draft.connection = conn;
     });
   }, []);
-  const handleCancel = useCallback(() => {
-    if (mode == 'sender') {
-      withProduce(setState, (draft) => {
-        draft.receiverId = undefined;
-        draft.senderId = undefined;
-      });
-    } else {
-      onClose();
-    }
-  }, [mode, onClose]);
+
   const handleConnClose = useCallback(
     (code: number, reason: string) => {
       console.log(`connection closed, code: ${code}, reason: ${reason}`);
@@ -140,11 +157,22 @@ export const P2pFileTransferDialog: FC<{
           draft.connection = void 0;
         });
       } else {
-        onClose();
+        onClose?.();
       }
     },
     [mode, onClose],
   );
+
+  const handleCancel = useCallback(() => {
+    if (mode == 'sender') {
+      withProduce(setState, (draft) => {
+        draft.receiverId = undefined;
+        draft.senderId = undefined;
+      });
+    } else {
+      onClose?.();
+    }
+  }, [mode, onClose]);
 
   useEffect(() => {
     notifyManager.keepConnection = true;
@@ -155,7 +183,7 @@ export const P2pFileTransferDialog: FC<{
       notifyManager.on('USER_DISCONNECTED', (id) => {
         const [senderId, receiverId] = participantsRef.current;
         if (id == senderId) {
-          onClose();
+          onClose?.();
           return void 0;
         }
         if (id == receiverId) {
@@ -197,6 +225,7 @@ export const P2pFileTransferDialog: FC<{
         key: 'first',
         element: (
           <ClientSetup
+            isDialog={isDialog}
             currentConnection={currentConnection}
             otherConnections={otherConnections}
             onConnect={handleConnect}
@@ -213,55 +242,43 @@ export const P2pFileTransferDialog: FC<{
         ),
       };
   })();
-
   return (
-    <Dialog
-      id="p2p-file-transfer-dialog"
-      visible={true}
-      onClose={onClose}
-      className="w-[40rem]"
-    >
-      <Dialog.Header>
-        <Dialog.Title>{i18n._('Peer to peer file transfer')}</Dialog.Title>
-        <Dialog.Description className="sr-only">
-          {i18n._('Quickly share files with other client who open this page')}
-        </Dialog.Description>
-      </Dialog.Header>
-      <Dialog.Content>
-        <AnimatePresence mode="wait">
-          <motion.section
-            key={panel.key}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="w-full min-h-[16rem] relative"
-          >
-            {panel.element}
-          </motion.section>
-        </AnimatePresence>
-      </Dialog.Content>
-    </Dialog>
+    <AnimatePresence mode="wait">
+      <motion.section
+        key={panel.key}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="w-full min-h-[16rem] relative"
+      >
+        {panel.element}
+      </motion.section>
+    </AnimatePresence>
   );
 };
 
 const ClientItem: FC<{
+  isDialog: boolean;
   isCurrent: boolean;
   conn: InferResponse<typeof useGetSseConnections>[number];
   onClick(id: string): void;
-}> = ({ isCurrent, conn, onClick }) => {
+}> = ({ isCurrent, isDialog, conn, onClick }) => {
   const i18n = useLingui();
   return (
-    <li className="flex gap-2 mt-8 first-of-type:mt-0 justify-between">
+    <li className={clsx('flex gap-2 mt-8 first-of-type:mt-0 justify-between')}>
       <div>
         <div className="flex">
           <span>{conn.ip_alias || conn.id}</span>
         </div>
-        <UserAgent value={conn.user_agent} className="w-[30rem] mt-2" />
+        <UserAgent
+          value={conn.user_agent}
+          className={clsx('mt-2 truncate', isDialog ? 'w-[30rem]' : 'w-full')}
+        />
       </div>
       {!isCurrent && (
         <Button
-          variant="ghost"
+          variant={isDialog ? 'ghost' : 'outline'}
           onClick={() => onClick(conn.id)}
           className="px-3 py-2 m-1"
         >
@@ -311,10 +328,11 @@ const UserAgent: FC<{
 });
 
 const ClientSetup: FC<{
+  isDialog: boolean;
   currentConnection: InferResponse<typeof useGetSseConnections>[number];
   otherConnections: InferResponse<typeof useGetSseConnections>;
   onConnect(targetId: string, protocol?: ProtocolPriority): void;
-}> = ({ currentConnection, otherConnections, onConnect }) => {
+}> = ({ currentConnection, otherConnections, onConnect, isDialog }) => {
   const [state, setState] = useState<{
     pin: string[] | undefined;
     protocol: 'auto' | ProtocolPriority;
@@ -398,12 +416,13 @@ const ClientSetup: FC<{
         <span>{i18n._('Client')}</span>
       </Divider>
       <section>
-        <ul className="my-2 max-h-[10rem] overflow-y-auto text-sm">
+        <ul className="my-2 max-h-[18rem] overflow-y-auto text-sm">
           {otherConnections.length > 0 ? (
             otherConnections.map((it) => (
               <ClientItem
                 key={it.id}
                 isCurrent={false}
+                isDialog={isDialog}
                 conn={it}
                 onClick={handleConnect}
               />
@@ -436,7 +455,13 @@ const ConnectionControl: FC<{
   protocol?: ProtocolPriority;
   onCancel(): void;
   onSuccess(conn: RTCImpl, delay: number): void;
-}> = ({ mode, protocol, receiverId, onSuccess, onCancel }) => {
+}> = ({
+  mode,
+  protocol: protocolPriority,
+  receiverId,
+  onSuccess,
+  onCancel,
+}) => {
   const [state, setState] = useState<{
     error: Error | undefined;
     status: ConnectionStatus;
@@ -502,6 +527,7 @@ const ConnectionControl: FC<{
           target_id: id,
           supports_rtc: Reflect.has(window, 'RTCPeerConnection'),
           target_pin,
+          priority: protocolPriority,
         });
         metadataRef.current.requestId = res.request_id;
         return true;
@@ -518,7 +544,7 @@ const ConnectionControl: FC<{
         metadataRef.current.lock = false;
       }
     },
-    [createP2PRequest, snackbar],
+    [createP2PRequest, protocolPriority, snackbar],
   );
 
   const discardRequest = useCallback(
@@ -584,9 +610,9 @@ const ConnectionControl: FC<{
           throw new Error('Unexpected error, missing requestId');
         withProduce(setState, (draft) => {
           draft.status = ConnectionStatus.Connecting;
-          draft.protocol = value.protocol;
+          draft.protocol = protocolPriority || value.protocol;
         });
-        switch (protocol || value.protocol) {
+        switch (protocolPriority || value.protocol) {
           case 'webrtc': {
             if (value.participants[0] == metadata.clientId) {
               const webrtc = new P2PRtc(metadata.requestId, metadata.clientId);
@@ -650,7 +676,7 @@ const ConnectionControl: FC<{
     discardRequest,
     mode,
     onSuccess,
-    protocol,
+    protocolPriority,
     receiverId,
     snackbar,
     state.requirePin,
@@ -840,7 +866,7 @@ const FileSelection: FC<{
         const getRemainingTime = createRemainingTimeCalculator(
           fileMetadata.size,
         );
-        const enableAck = conn.protocol === 'webrtc';
+        const enableAck = false;
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
@@ -1020,7 +1046,7 @@ const FileSelection: FC<{
         receiver!.return();
       };
 
-      const enableAck = conn.protocol === 'webrtc';
+      const enableAck = false;
       const buffers = new Map<number, ArrayBuffer>();
 
       let receiver: AsyncGenerator<ArrayBuffer, void> | undefined = undefined;
@@ -1046,7 +1072,7 @@ const FileSelection: FC<{
               }
               if (!value) continue;
               const [_fileSeq, _packetSeq2] = parseACKPacket(value);
-              
+
               // Ignore packet from non-target file
               if (_fileSeq !== fileSeq) continue;
               _packetSeq = _packetSeq2;
@@ -1201,7 +1227,7 @@ const FileSelection: FC<{
                   >
                     {it.name}
                   </div>
-                  <div className="flex gap-2 font-mono text-sm">
+                  <div className="flex flex-wrap gap-2 font-mono text-sm">
                     <span className="block">{it.progress}%</span>
                     <span className="block w-[12.5rem]">
                       {`(${formatBytes(it.transmitted)} / ${formatBytes(it.size)})`}

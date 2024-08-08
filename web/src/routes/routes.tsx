@@ -25,19 +25,19 @@ const PAGE_MAP = import.meta.glob([
 const ModuleNotExportPage: FC = () => {
   return (
     <div className="p-4">
-      <h2 className="text-error-main font-bold text-xl">Error</h2>
+      <h2 className="text-error-main text-xl font-bold">Error</h2>
       <p>Module does not export pages!</p>
     </div>
   );
 };
-const ModuleNotFound: FC = () => {
-  return (
-    <div className="p-4">
-      <h2 className="text-error-main font-bold text-xl">Error </h2>
-      <p>Module not found!</p>
-    </div>
-  );
-};
+// const ModuleNotFound: FC = () => {
+//   return (
+//     <div className="p-4">
+//       <h2 className="text-error-main font-bold text-xl">Error </h2>
+//       <p>Module not found!</p>
+//     </div>
+//   );
+// };
 
 const routeMap = new Map<
   string,
@@ -65,7 +65,7 @@ for (const relationPath of Object.keys(PAGE_MAP)) {
     relationPath,
     urlPath:
       urlPath.toLowerCase() === (isDesktop ? 'desktop' : 'mobile')
-        ? '/'
+        ? '*'
         : `/${urlPath}`,
     Component: lazy(() =>
       PAGE_MAP[relationPath]().then((module) => {
@@ -92,7 +92,6 @@ export const Routes = () => {
               );
             },
           )}
-          <Route path="*" element={<ModuleNotFound />} />
         </Switch>
       </Router>
     </Suspense>
