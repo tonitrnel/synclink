@@ -37,6 +37,9 @@ class NotifyManager extends EventBus<
   private connecting = false;
   private visibilityTimer: number | undefined;
   public keepConnection = false;
+  private resolveQueue: Array<
+    [resolve: (value: string) => void, reject: (reason: unknown) => void]
+  > = [];
 
   constructor() {
     super();
@@ -45,7 +48,10 @@ class NotifyManager extends EventBus<
   }
 
   public async connect(): Promise<string | undefined> {
-    if (this.connecting) return void 0;
+    if (this.connecting)
+      return new Promise((resolve, reject) => {
+        this.resolveQueue.push([resolve, reject]);
+      });
     this.connecting = true;
     this.clear('CLIENT_ID');
     try {
@@ -59,6 +65,10 @@ class NotifyManager extends EventBus<
             this.clientPin = pin;
             this.emit('CONNECTED');
             resolve(id);
+            while (this.resolveQueue.length > 0) {
+              const [resolve] = this.resolveQueue.pop()!;
+              resolve(id);
+            }
           });
           console.debug('sse connected');
         };
@@ -68,7 +78,12 @@ class NotifyManager extends EventBus<
             eventSource.readyState == eventSource.CONNECTING ||
             eventSource.readyState == eventSource.CLOSED
           ) {
-            reject(new Error('Failed to connect'));
+            const reason = new Error('Failed to connect');
+            reject(reason);
+            while (this.resolveQueue.length > 0) {
+              const [, reject] = this.resolveQueue.pop()!;
+              reject(reason);
+            }
             return void 0;
           }
           if (eventSource.readyState == eventSource.OPEN) {
