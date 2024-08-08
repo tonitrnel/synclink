@@ -12,7 +12,8 @@ export const clsx = (
         .map(([k]) => k);
     })
     .flat()
-    .join(' ');
+    .join(' ')
+    .replace(/\s+/g, ' ');
 };
 
 type ClassVariantConfigurations = Record<string, Record<string, string>>;
@@ -34,6 +35,7 @@ export type VariantProps<T> = T extends (
   ? ClassVariantProps<Variants>
   : never;
 
+// Port https://github.com/joe-bell/cva
 /**
  * 根据提供的配置和属性生成 CSS 类名。支持单一变体和复合变体的配置。
  * @param base 基础类名，所有生成的类名都会包含这个基础类名
