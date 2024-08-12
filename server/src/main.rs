@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
         tokio::net::TcpListener::bind(addr).await?
     };
     print_banner();
-    #[cfg(not(debug_assertions))]
+    #[cfg(all(not(debug_assertions), target_os = "linux"))]
     tracing::info!(
         "cedasync {version} ({commit_id} {build_date}) built with docker{docker_version}, {system_version}, rustc{rustc_version}",
         build_date = env!("BUILD_DATE"),
