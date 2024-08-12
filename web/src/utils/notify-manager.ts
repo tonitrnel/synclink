@@ -29,6 +29,7 @@ type SseMessage = ToEventUnion<SseMessageMap>;
 class NotifyManager extends EventBus<
   SseMessageMap & {
     CONNECTED: undefined;
+    DISCONNECTED: undefined;
   }
 > {
   private eventSource: EventSource | undefined;
@@ -100,6 +101,7 @@ class NotifyManager extends EventBus<
   public async disconnect(): Promise<void> {
     this.eventSource?.close();
     this.eventSource = undefined;
+    this.emit('DISCONNECTED');
   }
 
   private handleMessage = async (evt: MessageEvent) => {

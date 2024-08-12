@@ -57,14 +57,14 @@ const DialogImpl: FC<
               className={clsx(
                 'fixed z-50',
                 fullscreen
-                  ? 'left-0 top-0 w-screen h-screen'
+                  ? 'left-0 top-0 h-screen w-screen'
                   : 'left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]',
               )}
             >
               <MotionDialogContent
                 className={clsx(
                   'flex flex-col',
-                  fullscreen && 'w-full h-full',
+                  fullscreen && 'h-full w-full',
                   'gap-4 border bg-background p-5 shadow',
                   // 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                   // 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',

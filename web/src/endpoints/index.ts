@@ -51,8 +51,8 @@ export const useGetStats = createHttpFactory('GET:/api/stats')
       disk_usage: number;
       memory_usage: number;
       version: string;
-      default_reserved: number
-      storage_quota: number
+      default_reserved: number;
+      storage_quota: number;
     }
   >()
   .doQueryRequest();
@@ -92,7 +92,7 @@ export const usePostCreateP2PRequest = createHttpFactory('POST:/api/p2p/create')
       target_id: string;
       target_pin?: string;
       supports_rtc: boolean;
-      priority?: 'webrtc' | 'websocket'
+      priority?: 'webrtc' | 'websocket';
     }
   >()
   .apply<
