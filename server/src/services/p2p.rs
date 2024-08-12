@@ -18,15 +18,24 @@ use crate::services::notify::SSEBroadcastEvent;
 use crate::state::AppState;
 use crate::utils::{Observer, SessionManager};
 
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ExchangeProtocolPriority {
+    Webrtc,
+    Websocket,
+}
+
 struct P2PSession {
     supports_rtc: bool,
     sender_id: Uuid,
     receiver_id: Uuid,
     established: bool,
+    priority: Option<ExchangeProtocolPriority>,
     alive: u8,
 }
 
-static SHARED_SESSIONS: LazyLock<Arc<SessionManager<Uuid, P2PSession>>> = LazyLock::new(|| SessionManager::new(Duration::from_secs(300)));
+static SHARED_SESSIONS: LazyLock<Arc<SessionManager<Uuid, P2PSession>>> =
+    LazyLock::new(|| SessionManager::new(Duration::from_secs(300)));
 
 #[derive(Debug, Deserialize)]
 pub struct CreateP2PRequestDto {
@@ -34,6 +43,7 @@ pub struct CreateP2PRequestDto {
     target_id: Uuid,
     target_pin: Option<String>,
     supports_rtc: bool,
+    priority: Option<ExchangeProtocolPriority>,
 }
 pub async fn create_request(
     State(state): State<AppState>,
@@ -69,6 +79,7 @@ pub async fn create_request(
         request_id,
         P2PSession {
             supports_rtc: form.supports_rtc,
+            priority: form.priority,
             sender_id: form.client_id,
             receiver_id: form.target_id,
             established: false,
@@ -121,7 +132,14 @@ pub async fn accept_request(
             )));
         }
         session.established = true;
-        let protocol = if session.supports_rtc && session.supports_rtc == form.supports_rtc {
+        let protocol = if session.supports_rtc
+            && session.supports_rtc == form.supports_rtc
+            && session
+                .priority
+                .as_ref()
+                .map(|priority| priority != &ExchangeProtocolPriority::Websocket)
+                .unwrap_or(true)
+        {
             ExchangeProtocol::Rtc
         } else {
             ExchangeProtocol::Socket
