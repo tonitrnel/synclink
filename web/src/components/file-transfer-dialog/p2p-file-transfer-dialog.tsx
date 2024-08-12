@@ -250,7 +250,7 @@ export const FileTransferImpl: FC<{
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="w-full min-h-[16rem] relative"
+        className="relative min-h-[16rem] w-full"
       >
         {panel.element}
       </motion.section>
@@ -266,7 +266,7 @@ const ClientItem: FC<{
 }> = ({ isCurrent, isDialog, conn, onClick }) => {
   const i18n = useLingui();
   return (
-    <li className={clsx('flex gap-2 mt-8 first-of-type:mt-0 justify-between')}>
+    <li className={clsx('mt-8 flex justify-between gap-2 first-of-type:mt-0')}>
       <div>
         <div className="flex">
           <span>{conn.ip_alias || conn.id}</span>
@@ -280,7 +280,7 @@ const ClientItem: FC<{
         <Button
           variant={isDialog ? 'ghost' : 'outline'}
           onClick={() => onClick(conn.id)}
-          className="px-3 py-2 m-1"
+          className="m-1 px-3 py-2"
         >
           {i18n._('Connect')}
         </Button>
@@ -300,19 +300,19 @@ const UserAgent: FC<{
     const deviceType = getDeviceType(value);
     switch (deviceType) {
       case 'desktop':
-        return [ua, <LaptopIcon className="w-4 h-4" />];
+        return [ua, <LaptopIcon className="h-4 w-4" />];
       case 'mobile':
-        return [ua, <SmartphoneIcon className="w-4 h-4" />];
+        return [ua, <SmartphoneIcon className="h-4 w-4" />];
       case 'tablet':
-        return [ua, <TabletIcon className="w-4 h-4" />];
+        return [ua, <TabletIcon className="h-4 w-4" />];
       case 'unknown':
-        return [ua, <PcCaseIcon className="w-4 h-4" />];
+        return [ua, <PcCaseIcon className="h-4 w-4" />];
     }
   }, [value]);
   return (
-    <div className={clsx('flex justify-end gap-2 items-center', className)}>
+    <div className={clsx('flex items-center justify-end gap-2', className)}>
       {icon}
-      <span className="flex flex-1 truncate gap-2" title={value}>
+      <span className="flex flex-1 gap-2 truncate" title={value}>
         {ua ? (
           <>
             <span>{ua.os}</span>
@@ -359,20 +359,20 @@ const ClientSetup: FC<{
   );
   return (
     <section className="w-full">
-      <form className="flex flex-col gap-6 w-full text-sm">
-        <div className="flex items-center justify-between gap-8 w-full">
+      <form className="flex w-full flex-col gap-6 text-sm">
+        <div className="flex w-full items-center justify-between gap-8">
           <div className="flex-1">
             <label className="font-bold">ID</label>
           </div>
           <span>{currentConnection.id}</span>
         </div>
-        <div className="flex items-center justify-between gap-8 w-full">
+        <div className="flex w-full items-center justify-between gap-8">
           <div className="flex-1">
             <label className="font-bold">{i18n._(`User agent`)}</label>
           </div>
           <UserAgent value={currentConnection.user_agent} />
         </div>
-        <div className="flex items-center justify-between gap-8 w-full">
+        <div className="flex w-full items-center justify-between gap-8">
           <div className="flex-1">
             <label className="font-bold">{i18n._('Protocol')}</label>
           </div>
@@ -428,7 +428,7 @@ const ClientSetup: FC<{
               />
             ))
           ) : (
-            <li className="text-gray-300 py-3 select-none">
+            <li className="select-none py-3 text-gray-300">
               {i18n._('No data')}
             </li>
           )}
@@ -610,25 +610,19 @@ const ConnectionControl: FC<{
           throw new Error('Unexpected error, missing requestId');
         withProduce(setState, (draft) => {
           draft.status = ConnectionStatus.Connecting;
-          draft.protocol = protocolPriority || value.protocol;
+          draft.protocol = value.protocol;
         });
-        switch (protocolPriority || value.protocol) {
+        switch (value.protocol) {
           case 'webrtc': {
             if (value.participants[0] == metadata.clientId) {
               const webrtc = new P2PRtc(metadata.requestId, metadata.clientId);
               await webrtc.createSender();
-              // console.log(webrtc);
               conn = webrtc;
             }
             break;
           }
           case 'websocket': {
-            const websocket = new P2PSocket(
-              metadata.requestId,
-              metadata.clientId!,
-            );
-            // console.log(websocket);
-            conn = websocket;
+            conn = new P2PSocket(metadata.requestId, metadata.clientId!);
           }
         }
         conn?.once('CONNECTION_READY', () => {
@@ -701,10 +695,10 @@ const ConnectionControl: FC<{
     switch (state.status) {
       case ConnectionStatus.RejectedByPeer:
         return (
-          <XCircleIcon className="w-[2.5rem] h-[2.5rem] stroke-error-main" />
+          <XCircleIcon className="stroke-error-main h-[2.5rem] w-[2.5rem]" />
         );
       case ConnectionStatus.WaitingForKeyInput:
-        return <KeyIcon className="w-[2rem] h-[2rem] -mt-4" />;
+        return <KeyIcon className="-mt-4 h-[2rem] w-[2rem]" />;
       default:
         return (
           <svg
@@ -744,19 +738,19 @@ const ConnectionControl: FC<{
     }
   })();
   return (
-    <section className="flex flex-col w-full items-center gap-2 justify-between min-h-[16rem]">
+    <section className="flex min-h-[16rem] w-full flex-col items-center justify-between gap-2">
       {state.error ? (
-        <div className="flex flex-col w-full items-center gap-2 my-10 ">
-          <CircleXIcon className="w-[2.6rem] h-[2.6rem] -mt-4 text-red-600" />
-          <div className="text-left mt-2">
+        <div className="my-10 flex w-full flex-col items-center gap-2">
+          <CircleXIcon className="-mt-4 h-[2.6rem] w-[2.6rem] text-red-600" />
+          <div className="mt-2 text-left">
             <p className="font-bold">{i18n._('Oh! An error has occurred')}</p>
             <p className="text-gray-600">{String(state.error.message)}</p>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col w-full items-center gap-2 my-10">
+        <div className="my-10 flex w-full flex-col items-center gap-2">
           {icon}
-          <div className="relative text-center mt-10">
+          <div className="relative mt-10 text-center">
             {statusTexts[state.status]}
           </div>
           {state.status == ConnectionStatus.WaitingForKeyInput && (
@@ -952,7 +946,7 @@ const FileSelection: FC<{
     [conn],
   );
   const onInputChange = useCallback(
-    (evt: ChangeEvent<HTMLInputElement>) => {
+    async (evt: ChangeEvent<HTMLInputElement>) => {
       const files = evt.target.files;
       if (!files || files.length == 0) return void 0;
       for (const file of files) {
@@ -1172,11 +1166,11 @@ const FileSelection: FC<{
     );
   }, [conn, onClose, recvFile]);
   return (
-    <section className="flex flex-col w-full items-center gap-2">
-      <p className="w-full flex text-left gap-1 text-sm">
+    <section className="flex w-full flex-col items-center gap-2">
+      <p className="flex w-full gap-1 text-left text-sm">
         <span
           className={clsx(
-            'uppercase text-white px-1',
+            'px-1 uppercase text-white',
             conn.protocol == 'webrtc' && 'bg-[#2f8bd0]',
             conn.protocol == 'websocket' && 'bg-[#161616]',
           )}
@@ -1187,15 +1181,15 @@ const FileSelection: FC<{
       </p>
       <div
         ref={containerRef}
-        className="flex flex-col items-center justify-center border border-dashed border-gray-300 w-full h-[15rem] rounded text-sm"
+        className="flex h-[15rem] w-full flex-col items-center justify-center rounded border border-dashed border-gray-300 text-sm"
       >
-        <UploadIcon className="w-10 h-10" />
-        <p className="flex items-center gap-1 mt-6">
+        <UploadIcon className="h-10 w-10" />
+        <p className="mt-6 flex items-center gap-1">
           <span className="leading-none">
             {i18n._('Drag and Drop file here or')}
           </span>
           <button
-            className="leading-none underline rounded-none px-1"
+            className="rounded-none px-1 leading-none underline"
             onClick={onClickChoose}
           >
             {i18n._('Choose file')}
@@ -1209,18 +1203,18 @@ const FileSelection: FC<{
           onChange={onInputChange}
         />
       </div>
-      <div className="w-full mt-4 text-sm">
-        <span className="font-bold ml-1">{i18n._('History:')}</span>
-        <ul className="w-full mt-2  max-h-[10rem] overflow-y-auto">
+      <div className="mt-4 w-full text-sm">
+        <span className="ml-1 font-bold">{i18n._('History:')}</span>
+        <ul className="mt-2 max-h-[10rem] w-full overflow-y-auto">
           {deliveryItems.length == 0 ? (
-            <li className="text-gray-300 mt-2 ml-1">{i18n._('No data')}</li>
+            <li className="ml-1 mt-2 text-gray-300">{i18n._('No data')}</li>
           ) : (
             deliveryItems.map((it) => (
               <li
                 key={it.seq}
-                className="flex items-center w-full border-b border-gray-100 p-2 my-2 relative gap-2"
+                className="relative my-2 flex w-full items-center gap-2 border-b border-gray-100 p-2"
               >
-                <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex flex-1 flex-col overflow-hidden">
                   <div
                     className="w-full truncate leading-relaxed"
                     title={it.name}
@@ -1236,13 +1230,13 @@ const FileSelection: FC<{
                     <span className="ml-1">ETA: {formatSeconds(it.eta)}</span>
                   </div>
                 </div>
-                <div className="flex justify-end mx-2">
+                <div className="mx-2 flex justify-end">
                   {it.progress === 100 ? (
-                    <CheckCircleIcon className="w-4 h-4" />
+                    <CheckCircleIcon className="h-4 w-4" />
                   ) : it.aborted ? (
-                    <AlertCircleIcon className="w-4 h-4 stroke-error-main" />
+                    <AlertCircleIcon className="stroke-error-main h-4 w-4" />
                   ) : (
-                    <LoaderCircleIcon className="w-4 h-4 animate-spin" />
+                    <LoaderCircleIcon className="h-4 w-4 animate-spin" />
                   )}
                 </div>
               </li>

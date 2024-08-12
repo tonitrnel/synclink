@@ -98,7 +98,7 @@ export const FileUploadImpl: FC<{
                 className="inline-block h-1 w-2 bg-current"
                 style={{ color: stats[0].color }}
               />
-              <span>{`${i18n._('Application reserved:')} ${stats[0].size}(${stats[0].value}%)`}</span>
+              <span>{`${i18n._('Reserved:')} ${stats[0].size}(${stats[0].value}%)`}</span>
             </div>
             <div className="flex items-center gap-1">
               <span
@@ -113,6 +113,13 @@ export const FileUploadImpl: FC<{
                 style={{ color: stats[2].color }}
               />
               <span>{`${i18n._('Planned use:')} ${stats[2].size}(^${stats[2].value}%)`}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span
+                className="inline-block h-1 w-2 bg-current"
+                style={{ color: stats[3].color }}
+              />
+              <span>{`${i18n._('Free:')} ${stats[3].size}(${stats[3].value}%)`}</span>
             </div>
           </div>
         </div>

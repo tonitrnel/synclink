@@ -25,14 +25,16 @@ const variants: Variants = {
 
 export const AnimationPage: FC<
   PropsWithChildren<
-    Omit<HTMLAttributes<HTMLElement>, keyof DOMAttributes<HTMLElement>>
+    {
+      animationEnabled?: boolean;
+    } & Omit<HTMLAttributes<HTMLElement>, keyof DOMAttributes<HTMLElement>>
   >
-> = ({ children, className, ...props }) => {
+> = ({ animationEnabled = true, children, className, ...props }) => {
   return (
     <motion.section
-      initial="initial"
-      animate="in"
-      exit="out"
+      initial={animationEnabled ? 'initial' : undefined}
+      animate={animationEnabled ? 'in' : undefined}
+      exit={animationEnabled ? 'out' : undefined}
       variants={variants}
       className={clsx(
         'absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full overflow-hidden bg-background',

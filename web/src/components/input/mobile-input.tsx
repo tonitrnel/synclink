@@ -2,7 +2,6 @@ import { useLingui } from '@lingui/react';
 import { ArrowLeftRightIcon, FileUpIcon, SendHorizonalIcon } from 'icons';
 import { forwardRef, useEffect, useRef, HTMLAttributes } from 'react';
 import { clsx } from '~/utils/clsx';
-import { useNavigate } from 'react-router-dom';
 import { useComposedRefs } from '~/utils/hooks/use-compose-refs.ts';
 import { useInputLogic } from './hooks/use-input-logic.ts';
 import {
@@ -16,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
+import { openFileTransfer } from '~/components/file-transfer-dialog';
 
 export const MobileInput = forwardRef<
   HTMLTextAreaElement,
@@ -29,7 +29,6 @@ export const MobileInput = forwardRef<
       return void 0;
     },
   );
-  const navigate = useNavigate();
   const i18n = useLingui();
   useMeasureSize(textareaRef);
   useEffect(() => {
@@ -72,7 +71,7 @@ export const MobileInput = forwardRef<
               </DropdownMenuItem>
               <DropdownMenuItem
                 key="Direct transfer"
-                onClick={() => navigate('/file-transfer')}
+                onClick={() => openFileTransfer({ mode: 'sender' })}
                 className="flex items-center gap-1 [&>svg]:text-gray-600"
                 aria-label={i18n._('Direct transfer')}
               >

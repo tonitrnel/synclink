@@ -9,7 +9,11 @@ import FileTransferPage from './file-transfer';
 import ViewerPage from './viewer';
 import { AnimatedRoutes } from '~/components/animated-routes';
 import { ChevronLeftIcon } from 'icons';
-import { useNavigateOnOpen } from '~/components/viewer-dialog';
+import { ViewerProvider } from '~/components/viewer-dialog';
+import {
+  P2PFileReceiverProvider,
+  P2PFileTransferProvider,
+} from '~/components/file-transfer-dialog';
 
 const Header: FC = memo(() => {
   const location = useLocation();
@@ -48,35 +52,39 @@ export default function MobileHomePage() {
   const onReady = useCallback(() => {
     setReady(true);
   }, []);
-  useNavigateOnOpen();
   return (
-    <section className="relative flex h-full w-full flex-1 flex-col overflow-hidden">
-      <div className="relative flex flex-col">
-        <Header />
-      </div>
-      <div className="relative flex min-h-0 min-w-0 flex-auto flex-col items-stretch justify-stretch">
-        <main className="relative flex-1">
-          {!ready && (
-            <Loading.Wrapper className="bg-background">
-              <Loading>
-                <span className="capitalize">{i18n._('Receiving')}</span>
-                <span className="ani_dot">...</span>
-              </Loading>
-            </Loading.Wrapper>
-          )}
-          <List
-            className="hidden-scrollbar absolute bottom-0 left-0 right-0 top-0 box-border h-full w-full overflow-x-hidden overflow-y-scroll px-4 pad:px-40"
-            onReady={onReady}
-          />
-        </main>
-        <footer className="shadow-footer relative z-10 -mt-2 box-border flex w-full flex-shrink-0 items-center bg-background px-4">
-          <MobileInput />
-        </footer>
-        <AnimatedRoutes>
-          <Route path="/file-transfer" element={<FileTransferPage />} />
-          <Route path="/viewer" element={<ViewerPage />} />
-        </AnimatedRoutes>
-      </div>
-    </section>
+    <>
+      <section className="relative flex h-full w-full flex-1 flex-col overflow-hidden">
+        <div className="relative flex flex-col">
+          <Header />
+        </div>
+        <div className="relative flex min-h-0 min-w-0 flex-auto flex-col items-stretch justify-stretch">
+          <main className="relative flex-1">
+            {!ready && (
+              <Loading.Wrapper className="bg-background">
+                <Loading>
+                  <span className="capitalize">{i18n._('Receiving')}</span>
+                  <span className="ani_dot">...</span>
+                </Loading>
+              </Loading.Wrapper>
+            )}
+            <List
+              className="hidden-scrollbar absolute bottom-0 left-0 right-0 top-0 box-border h-full w-full overflow-x-hidden overflow-y-scroll px-4 pad:px-40"
+              onReady={onReady}
+            />
+          </main>
+          <footer className="shadow-footer relative z-10 -mt-2 box-border flex w-full flex-shrink-0 items-center bg-background px-4">
+            <MobileInput />
+          </footer>
+          <AnimatedRoutes>
+            <Route path="/file-transfer" element={<FileTransferPage />} />
+            <Route path="/viewer" element={<ViewerPage />} />
+          </AnimatedRoutes>
+        </div>
+      </section>
+      <ViewerProvider isMobile={true} />
+      <P2PFileTransferProvider isMobile={true} />
+      <P2PFileReceiverProvider />
+    </>
   );
 }

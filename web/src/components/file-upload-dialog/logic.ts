@@ -132,40 +132,51 @@ export const useFileUploadLogic = ({
   }, [state.entries]);
   const stats = useMemo<Stat[] | undefined>(() => {
     if (!data) return void 0;
-    const reservedSpace =
+    const reservedSpacePct =
       Math.floor((data.default_reserved / data.storage_quota) * 10000) / 100;
-    const usedSpace = Math.min(
-      100 - reservedSpace,
+    const usedSpacePct = Math.min(
+      100 - reservedSpacePct,
       Math.floor((data.disk_usage / data.storage_quota) * 10000) / 100,
     );
-    const plannedSpace = Math.min(
-      Math.ceil(100 - reservedSpace - usedSpace),
+    const plannedSpacePct = Math.min(
+      Math.ceil(100 - reservedSpacePct - usedSpacePct),
       Math.floor((total / data.storage_quota) * 10000) / 100,
     );
-    const totalSpace = reservedSpace + usedSpace + plannedSpace;
+    const freeSpace = Math.max(
+      0,
+      data.storage_quota - data.default_reserved - data.disk_usage - total,
+    );
+    const freeSpacePct =
+      Math.floor((freeSpace / data.storage_quota) * 10000) / 100;
     return [
       {
         key: 'reservedSpace',
         color: '#52525b',
-        value: reservedSpace,
+        value: reservedSpacePct,
         size: formatBytes(data.default_reserved),
       },
       {
         key: 'usedSpace',
-        color: '#2563eb',
-        value: usedSpace,
+        color: '#1e40af',
+        value: usedSpacePct,
         size: formatBytes(data.disk_usage),
       },
       {
         key: 'plannedSpace',
+        color: '#2563eb',
+        value: plannedSpacePct,
+        size: formatBytes(total),
+      },
+      {
+        key: 'freeSpace',
         color:
-          totalSpace >= 100
+          freeSpacePct < 10
             ? '#dc2626'
-            : totalSpace >= 50
+            : freeSpacePct < 25
               ? '#ea580c'
               : '#16a34a',
-        value: plannedSpace,
-        size: formatBytes(total),
+        value: freeSpacePct,
+        size: formatBytes(freeSpace),
       },
     ];
   }, [data, total]);
