@@ -51,7 +51,7 @@ export const Stats: FC<{
     };
   }, [data]);
   return (
-    <div className={className}>
+    <div className={clsx('select-none', className)}>
       <span
         title={`${stats?.disk_usage}/${stats?.storage_quota}${stats?.percentage}`}
       >
@@ -62,7 +62,7 @@ export const Stats: FC<{
       <RefreshCwIcon
         onClick={() => refresh()}
         className={clsx(
-          'w-4 h-4 cursor-pointer',
+          'h-4 w-4 cursor-pointer',
           data && pending && 'animate-spin',
         )}
       />
