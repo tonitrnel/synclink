@@ -6,13 +6,14 @@ import {
   P2PFileTransferProvider,
 } from '~/components/file-transfer-dialog';
 import { ViewerProvider } from '~/components/viewer-dialog';
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import { Sidebar } from './sidebar';
 import { clsx } from '~/utils/clsx';
 import { DesktopInput } from '~/components/input';
 import { Loading } from '~/components/loading';
 import { useLingui } from '@lingui/react';
 import { withProduce } from '~/utils/with-produce.ts';
+import { getScrollBarWidth } from '~/utils/get-scrollbar-width.ts';
 
 export default function DesktopHomePage() {
   const [state, setState] = useState(() => ({
@@ -24,6 +25,9 @@ export default function DesktopHomePage() {
     withProduce(setState, (draft) => {
       draft.ready = true;
     });
+  }, []);
+  useLayoutEffect(() => {
+    getScrollBarWidth();
   }, []);
   return (
     <>

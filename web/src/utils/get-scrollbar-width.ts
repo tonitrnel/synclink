@@ -19,4 +19,3 @@ export const getScrollBarWidth = () => {
   document.head.appendChild(style);
   return scrollbarWidth;
 };
-export const SCROLLBAR_WIDTH = getScrollBarWidth();
