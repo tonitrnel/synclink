@@ -9,12 +9,19 @@ export const useMeasureSize = (ref: RefObject<HTMLTextAreaElement>) => {
     if (!textarea || !container) return void 0;
     let measureTimer: number | void = void 0;
     const measure = document.createElement('div');
+    const obs = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      window.requestAnimationFrame(() => {
+        measure.style.setProperty('width', `${width}px`);
+      });
+    });
     measure.className = textarea.className;
     let initialized = false;
     let unmounted = false;
     let previousHeight = 0;
     const initialize = () => {
       if (unmounted) return void 0;
+      measure.id = 'textarea-measurer';
       measure.className = clsx(
         textarea.className,
         'absolute overflow-y-auto whitespace-pre-wrap -z-50 left-0 top-0 pointer-events-none invisible',
@@ -24,6 +31,7 @@ export const useMeasureSize = (ref: RefObject<HTMLTextAreaElement>) => {
       measure.style.setProperty('width', computedStyle.width);
       measure.style.setProperty('height', computedStyle.height);
       container.appendChild(measure);
+      obs.observe(textarea);
       initialized = true;
     };
     const measureSize = () => {
@@ -59,6 +67,7 @@ export const useMeasureSize = (ref: RefObject<HTMLTextAreaElement>) => {
       textarea.removeEventListener('measure-size', measureSize);
       if (measureTimer) window.cancelAnimationFrame(measureTimer);
       measureTimer = void 0;
+      obs.disconnect();
     };
   }, [ref]);
 };
