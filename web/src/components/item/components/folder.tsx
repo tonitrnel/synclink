@@ -1,5 +1,5 @@
-import { FC, useMemo, MouseEvent, useRef, HTMLAttributes, memo } from 'react';
-import { useEntityConsumer } from '../entity-provider';
+import { FC, useMemo, MouseEvent, HTMLAttributes, memo } from 'react';
+import { useEntity } from '../hooks/use-entity.ts';
 import { InferResponse, useGetDirectory } from '~/endpoints';
 import { toTreeByPath } from '~/utils/to-tree-by-path';
 import { formatBytes } from '~/utils/format-bytes';
@@ -21,8 +21,9 @@ import { useSnackbar } from '~/components/ui/snackbar';
 import { openViewer, supportsFileViewer } from '~/components/viewer-dialog';
 import { TreeNode } from '~/components/ui/tree';
 import { TreeTable, TreeTableColumn } from '~/components/ui/tree-table';
-import { useIntersection } from '~/utils/hooks/use-intersection.ts';
 import { clsx } from '~/utils/clsx.ts';
+import { useCoordinator } from '../hooks/use-coordinator.ts';
+import { RenderProps } from './type.ts';
 
 type RecordData = {
   name: string;
@@ -32,19 +33,19 @@ type RecordData = {
   __raw: InferResponse<typeof useGetDirectory>[number];
 };
 
-export const FolderItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
-  ({ className, ...props }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const entity = useEntityConsumer();
+export const FolderItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> =
+  memo(({ visible, className, ...props }) => {
+    const entity = useEntity();
     const i18n = useLingui();
     const snackbar = useSnackbar();
-    const visible = useIntersection(containerRef);
-    const { data: list } = useGetDirectory({
+    const { data: list, done } = useGetDirectory({
       path: {
         id: entity.uid,
       },
+      keepDirtyOnNotEnabled: true,
       enabled: visible,
     });
+    useCoordinator(entity.uid, !visible || done);
     const nodes = useMemo<TreeNode<RecordData>[]>(() => {
       if (!list) return [];
       const folderSizes = calculateFolderSize(list);
@@ -94,7 +95,7 @@ export const FolderItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
         },
         component: (
           <>
-            <FolderDownIcon className="w-4 h-4" />
+            <FolderDownIcon className="h-4 w-4" />
             <span className="capitalize">{t`Download folder`}</span>
           </>
         ),
@@ -163,15 +164,16 @@ export const FolderItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
       ];
     }, [entity.uid, handler.download, handler.preview, i18n, nodes]);
     return (
-      <div ref={containerRef} className={clsx('', className)} {...props}>
+      <div className={clsx('', className)} {...props}>
         <div className="w-full overflow-x-auto border-t border-gray-100">
           <TreeTable
             records={nodes}
             columns={columns}
             className="relative min-w-[50rem]"
+            scrollHeight="24rem"
           />
         </div>
-        <div className="mt-4 flex justify-between items-center">
+        <div className="mt-4 flex items-center justify-between">
           <Metadata entity={entity} />
           <Menu
             entity={entity}
@@ -180,16 +182,15 @@ export const FolderItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
         </div>
       </div>
     );
-  },
-);
+  });
 
 const NameColumn: FC<{ data: RecordData }> = ({ data }) => {
   return (
     <>
       {data.__raw.is_file ? (
-        <FileIcon className="inline w-4 h-4 mr-1 text-gray-600" />
+        <FileIcon className="mr-1 inline h-4 w-4 text-gray-600" />
       ) : (
-        <FolderIcon className="inline w-4 h-4 mr-1 text-gray-600" />
+        <FolderIcon className="mr-1 inline h-4 w-4 text-gray-600" />
       )}
       <span className="align-middle">{data.name}</span>
     </>
@@ -204,22 +205,19 @@ const ActionColumn: FC<{
   const i18n = useLingui();
   if (!data.__raw.is_file) return null;
   return (
-    <div className="flex gap-2 justify-end">
+    <div className="flex justify-end gap-2">
       {supportsFileViewer(data.name, data.type) && (
-        <button
-          className="cedasync-item-link"
-          onClick={(evt) => onPreview(data, evt)}
-        >
-          <EyeIcon className="w-4 h-4" />
+        <button className="item-link" onClick={(evt) => onPreview(data, evt)}>
+          <EyeIcon className="h-4 w-4" />
           <span>{i18n._('Preview')}</span>
         </button>
       )}
       <a
-        className="cedasync-item-link"
+        className="item-link"
         onClick={(evt) => onDownload(data, evt)}
         href={`${__ENDPOINT__}/api/directory/${id}/${data.__raw.hash}?raw`}
       >
-        <DownloadCloudIcon className="w-4 h-4" />
+        <DownloadCloudIcon className="h-4 w-4" />
         <span>{i18n._('Download')}</span>
       </a>
     </div>

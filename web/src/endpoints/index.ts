@@ -33,6 +33,8 @@ export const useGetList = createHttpFactory('GET:/api')
         metadata?: {
           width: number;
           height: number;
+          thumbnail_width?: number;
+          thumbnail_height?: number;
         };
       }[];
     }

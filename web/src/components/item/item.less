@@ -1,25 +1,24 @@
 @import 'photoswipe/dist/photoswipe.css';
 
 /* Item */
-.cedasync-item {
-  @apply relative pad:mt-10 mt-4;
+.item {
+  @apply relative mt-4 pad:mt-10;
   border: 1px solid #d0d7de;
   border-radius: 6px;
   overflow: hidden;
-  content-visibility: auto;
 }
 
 @media screen and (max-width: 780px) {
-  .cedasync-item {
+  .item {
     margin-bottom: 0;
   }
 }
 
-.cedasync-item-title {
+.item-title {
   @apply mt-0 font-semibold;
 }
 
-.cedasync-item-link {
+.item-link {
   -webkit-appearance: none;
   border: none;
   background-color: transparent;
@@ -45,6 +44,6 @@
 }
 /* Preview Item */
 
-.cedasync-item-preview {
+.item-preview {
   max-width: 100%;
 }

@@ -196,7 +196,7 @@ const ButtonGroup: FC<MenuButtonGroupProps> = ({ slots }) => {
   ) : (
     <div className="flex items-center gap-3 whitespace-nowrap text-sm">
       {slots.map((it) => (
-        <button key={it.key} className="cedasync-item-link" onClick={it.event}>
+        <button key={it.key} className="item-link" onClick={it.event}>
           {it.component}
         </button>
       ))}

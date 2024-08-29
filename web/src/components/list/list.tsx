@@ -21,33 +21,41 @@ import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
 import { notifyManager } from '~/utils/notify-manager.ts';
 import { useSnackbar } from '~/components/ui/snackbar';
+import { loadCoordinator } from '~/components/item/hooks/use-coordinator.ts';
 
 const logger = new Logger('cedasync');
 
-interface Pagination {
-  page: number;
-  size: number;
+interface State {
+  pagination: {
+    page: number;
+    size: number;
+  };
+  total: number;
+  records: IEntity[];
+  beforeTime: number;
 }
 
 const getEntity = async (uid: string) => {
   return fetch(`${__ENDPOINT__}/api/${uid}`).then<IEntity>((res) => res.json());
 };
-const __TIME = Date.now();
-
+const __BEFORE_TIME__ = Date.now();
 export const List: FC<{
   className?: string;
   onReady(): void;
 }> = memo(({ className, onReady }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [pagination, setPagination] = useState<Pagination>(() => ({
-    page: 1,
-    size: 10,
+  const [state, setState] = useState<State>(() => ({
+    pagination: {
+      page: 1,
+      size: 10,
+    },
+    total: 0,
+    records: [],
+    beforeTime: __BEFORE_TIME__,
   }));
-  const [total, setTotal] = useState(0);
-  const [list, setList] = useState<IEntity[]>([]);
-  const scrollStateRef = useRef({
+  const metadataRef = useRef({
     isProhibitScrollLoad: false,
-    isProgrammaticScroll: false,
+    isLoading: false,
   });
   const snackbar = useSnackbar();
   const {
@@ -55,57 +63,79 @@ export const List: FC<{
     error,
     pending: loading,
     refresh,
+    execute,
   } = useGetList({
     query: {
-      page: pagination.page,
-      per_page: pagination.size,
-      before: __TIME,
+      page: state.pagination.page,
+      per_page: state.pagination.size,
+      before: state.beforeTime,
     },
     onSuccess: (data) => {
-      setTotal(data.total);
-      const ids = new Set(list.map((it) => it.uid));
-      setList(
-        list.concat((data.data as IEntity[]).filter((it) => !ids.has(it.uid))),
-      );
+      withProduce(setState, (draft) => {
+        draft.total = data.total;
+        draft.records.unshift(...data.data.toReversed());
+      });
+      metadataRef.current.isLoading = false;
       // console.log("加载完成");
     },
   });
-  const previous = useMemo(
+  const previousPage = useMemo(
     () =>
-      total > pagination.size * pagination.page ? pagination.page + 1 : void 0,
-    [pagination.page, pagination.size, total],
+      state.total > state.pagination.size * state.pagination.page
+        ? state.pagination.page + 1
+        : void 0,
+    [state.pagination.page, state.pagination.size, state.total],
   );
-  const _loadPrevious = useCallback(() => {
-    if (!previous || loading) return void 0;
-    // console.log("加载之前的数据");
-    setPagination((prev) => ({
-      page: previous,
-      size: prev.size,
-    }));
-  }, [loading, previous]);
-  const loadPrevious = useLatestFunc(_loadPrevious);
+  const loadPrevious = useLatestFunc(() => {
+    const container = containerRef.current;
+    if (!previousPage || loading || !container) return void 0;
+    withProduce(setState, (draft) => {
+      draft.pagination.page = previousPage;
+    });
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    loadCoordinator.waitForNextBatch().then(() => {
+      const _scrollTop = container.scrollTop;
+      const _scrollHeight = container.scrollHeight;
+      console.log(
+        `finish loadPrevious\nscrollTop: ${scrollTop} > ${_scrollTop} > ${_scrollHeight - scrollHeight + scrollTop}`,
+        `scrollHeight: ${scrollHeight} > ${_scrollHeight}`,
+      );
+      container.scrollTo({
+        top: _scrollHeight - scrollHeight + scrollTop,
+        behavior: 'instant',
+      });
+    });
+  });
   const scrollToBottom = useCallback((behavior?: ScrollBehavior): void => {
     const element = containerRef.current;
     if (!element) return void 0;
     const currentHeight = element.scrollHeight - element.clientHeight;
     element.scrollTo({ top: currentHeight, behavior });
   }, []);
+  // 处理来自 SSE 的记录新增、删除信息，如果 SSE 重连则还加载最新的记录
   useEffect(() => {
     if (!done || error) return void 0;
-    let previousTimestamp = Date.now();
-    const scrollState = scrollStateRef.current;
+    let afterTime = __BEFORE_TIME__;
+    const metadata = metadataRef.current;
     const loadLatest = async () => {
-      const records = await fetch(
-        `${__ENDPOINT__}/api?page=1&per_page=${10}&after=${previousTimestamp}`,
-      ).then<IEntity[]>((res) => (res.ok ? res.json() : []));
-      if (records.length > 0) {
-        logger.info(`updated ${records.length} records`);
-        previousTimestamp = Date.now();
-        withProduce(setList, (draft) => {
-          const ids = new Set<string>(draft.map((it) => it.uid));
-          return draft.concat(records.filter((it) => !ids.has(it.uid)));
-        });
-      }
+      const records = await execute(
+        {
+          page: 1,
+          per_page: 100,
+          after: afterTime,
+        },
+        { silent: true },
+      ).then((res) => res.data);
+      if (records.length == 0) return void 0;
+      afterTime = Date.now();
+      logger.info(`Updated ${records.length} records`);
+      withProduce(setState, (draft) => {
+        draft.total += records.length;
+        return draft.records.push(...records);
+      });
+      await loadCoordinator.waitForNextBatch();
+      scrollToBottom('smooth');
     };
     notifyManager.ensureWork().catch((error) => {
       logger.error(error);
@@ -118,106 +148,99 @@ export const List: FC<{
     });
     return notifyManager.batch(
       notifyManager.on('CONNECTED', () => {
+        if (afterTime == __BEFORE_TIME__) return void 0;
         loadLatest().catch(console.error);
+      }),
+      notifyManager.on('DISCONNECTED', () => {
+        afterTime = Date.now();
       }),
       notifyManager.on('RECORD_DELETED', async (uid) => {
         let total = -1;
-        withProduce(setList, (draft) => {
-          const index = draft.findIndex((it) => it.uid == uid);
-          draft.splice(index, 1);
-          total = draft.length;
+        withProduce(setState, (draft) => {
+          const index = draft.records.findIndex((it) => it.uid == uid);
+          draft.records.splice(index, 1);
+          total = draft.records.length;
         });
-        previousTimestamp = Date.now();
-        scrollState.isProhibitScrollLoad = true;
+        metadata.isProhibitScrollLoad = true;
         if (total == 0) await refresh();
       }),
       notifyManager.on('RECORD_ADDED', async (uid) => {
         try {
           const entity = await getEntity(uid);
-          withProduce(setList, (draft) => {
-            const ids = new Set<string>(draft.map((it) => it.uid));
-            if (ids.has(uid)) {
-              return draft;
-            } else {
-              return [entity].concat(draft);
-            }
+          withProduce(setState, (draft) => {
+            draft.records.push(entity);
           });
-          previousTimestamp = Date.now();
-          setTimeout(() => {
-            scrollToBottom('smooth');
-          }, 16);
+          await loadCoordinator.waitForNextBatch();
+          scrollToBottom('smooth');
         } catch (e) {
           logger.error('Failed to update list, reason:', e);
         }
       }),
     );
-  }, [done, error, refresh, scrollToBottom, snackbar]);
+  }, [done, error, execute, refresh, scrollToBottom, snackbar]);
+  // 监视滚动位置，如果小于 10 则加载之前的数据
   useEffect(() => {
-    const element = containerRef.current;
-    if (!element) return void 0;
-    const scrollState = scrollStateRef.current;
-    const scrollWatcher = () => {
-      if (scrollState.isProhibitScrollLoad) {
-        scrollState.isProhibitScrollLoad = false;
+    const container = containerRef.current;
+    if (!container) return void 0;
+    const metadata = metadataRef.current;
+    const scrollWatcher = async () => {
+      if (metadata.isProhibitScrollLoad) {
+        metadata.isProhibitScrollLoad = false;
         return void 0;
       }
-      if (element.scrollTop <= 0) {
+      const scrollTop = container.scrollTop;
+      // const clientHeight = element.clientHeight;
+      if (scrollTop <= 10 && !metadata.isLoading) {
+        metadata.isLoading = true;
+        console.log('start loadPrevious');
         loadPrevious();
-        // 保持当前滚动位置
-        element.scrollTop = 1;
       }
     };
-    element.addEventListener('scroll', scrollWatcher);
+    container.addEventListener('scroll', scrollWatcher);
     return () => {
-      element.removeEventListener('scroll', scrollWatcher);
+      container.removeEventListener('scroll', scrollWatcher);
     };
   }, [loadPrevious]);
+  // 在 Loading 遮罩关闭前滚动至最底部
   useEffect(() => {
     if (!done) return void 0;
     const element = containerRef.current;
     if (!element) return void 0;
-    const scrollState = scrollStateRef.current;
     const list = element.querySelector('ul')!;
     const items = [...list.children];
     if (items.length == 0) return void 0;
-    let timer: number | undefined = void 0;
-    // let startTime = Date.now();
-    const resizeObs = new ResizeObserver(() => {
-      // const resizeObs = new ResizeObserver((entries) => {
-      //   const now = Date.now();
-      //   console.log(
-      //     'resize',
-      //     timer,
-      //     `${now - startTime}ms`,
-      //     entries.map((it) => it.target),
-      //   );
-      //   startTime = now;
+    let startTime = Date.now();
+    // 第三次滚动，在用户未主动滚动前还可尝试滚动至最底部，理论不会触发
+    // const resizeObs = new ResizeObserver(() => {
+    const resizeObs = new ResizeObserver((entries) => {
+      const now = Date.now();
+      console.log(
+        'resize',
+        `${now - startTime}ms`,
+        entries.map((it) => it.target),
+      );
+      startTime = now;
+      // scrollToBottom();
+    });
+    const start = Date.now();
+    // 第一次滚动，滚动至最底部
+    scrollToBottom();
+    // 第二次滚动和关闭 Loading 遮罩，当前批次的所有 Item 均高度已稳定（数据已加载）
+    loadCoordinator.waitForNextBatch().then(({ isTimeout }) => {
+      console.log(
+        'ready, isTimeout:',
+        isTimeout,
+        ' elapsed:',
+        Date.now() - start,
+      );
       scrollToBottom();
-      if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        timer = void 0;
-        scrollToBottom();
-        onReady();
-        resizeObs.disconnect();
-      }, 160);
+      onReady();
     });
     items.forEach((item) => resizeObs.observe(item));
-    const onScroll = () => {
-      if (scrollState.isProgrammaticScroll) {
-        scrollState.isProgrammaticScroll = false;
-        return void 0;
-      }
-      resizeObs.disconnect();
-      element.removeEventListener('scroll', onScroll);
-    };
-    element.addEventListener('scroll', onScroll);
     return () => {
       resizeObs.disconnect();
-      element.removeEventListener('scroll', onScroll);
-      // obs.disconnect();
     };
   }, [done, onReady, scrollToBottom]);
-  const reversedList = useMemo(() => [...list].reverse(), [list]);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -225,39 +248,42 @@ export const List: FC<{
       ref={containerRef}
       className={className}
     >
-      <div className="relative w-full h-full flex flex-col">
+      <div className="relative flex h-full w-full flex-col">
         {(() => {
           if (!done) return null;
           if (error)
             return (
               <Loading.Wrapper>
-                <div className="inline-flex flex-col items-center relative text-center text-gray-400">
+                <div className="relative inline-flex flex-col items-center text-center text-gray-400">
                   <AlertTriangleIcon
-                    className="w-9 h-9 stroke-palette-bright-orange opacity-50"
+                    className="stroke-palette-bright-orange h-9 w-9 opacity-50"
                     strokeWidth={1.5}
                   />
-                  <p className="block mt-4 capitalize">{String(error)}</p>
+                  <p className="mt-4 block capitalize">{String(error)}</p>
                 </div>
               </Loading.Wrapper>
             );
-          if (list.length == 0)
+          if (state.records.length == 0)
             return (
               <Loading.Wrapper>
-                <div className="inline-flex flex-col items-center relative text-center text-gray-400">
+                <div className="relative inline-flex flex-col items-center text-center text-gray-400">
                   <BirdIcon
-                    className="w-9 h-9 stroke-gray-400 opacity-50"
+                    className="h-9 w-9 stroke-gray-400 opacity-50"
                     strokeWidth={1.5}
                   />
-                  <span className="block mt-4 capitalize">{t`no items found.`}</span>
+                  <span className="mt-4 block capitalize">{t`no items found.`}</span>
                 </div>
               </Loading.Wrapper>
             );
           return (
             <>
               {loading && <Loading />}
-              <ul className={clsx('flex-1 pt-2 pb-8 transition-opacity')}>
-                {reversedList.map((it) => (
-                  <Item key={it.uid} it={it} />
+              <ul
+                id="records"
+                className={clsx('flex-1 pb-8 pt-2 transition-opacity')}
+              >
+                {state.records.map((it) => (
+                  <Item key={it.uid} data={it} />
                 ))}
               </ul>
               <UploadManager scrollToBottom={scrollToBottom} />

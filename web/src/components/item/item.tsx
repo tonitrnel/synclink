@@ -1,9 +1,8 @@
-import { FC, memo, useMemo } from 'react';
-import { EntityProvider } from './entity-provider.ts';
+import { forwardRef, HTMLAttributes, memo, useMemo, useRef } from 'react';
+import { UseEntity } from './hooks/use-entity.ts';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { IEntity } from '~/constants/types.ts';
 import dayjs from 'dayjs';
-import { t } from '@lingui/macro';
 import { clsx } from '~/utils/clsx.ts';
 import { FolderItem } from './components/folder.tsx';
 import { AudioItem } from './components/audio.tsx';
@@ -11,21 +10,31 @@ import { TextItem } from './components/text.tsx';
 import { UnknownItem } from './components/unknown.tsx';
 import { VideoItem } from './components/video.tsx';
 import { ImageItem } from './components/image.tsx';
+import { useLingui } from '@lingui/react';
+import { useComposedRefs } from '~/utils/hooks/use-compose-refs.ts';
+import { useIntersection } from './hooks/use-intersection.ts';
 import './item.less';
 
 dayjs.extend(relativeTime);
 
-export const Item: FC<{
-  it: IEntity;
-  className?: string;
-}> = memo(({ it, className }) => {
+const ItemImpl = forwardRef<
+  HTMLDivElement,
+  {
+    data: IEntity;
+    className?: string;
+  } & HTMLAttributes<HTMLDivElement>
+>(({ data, className, ...props }, ref) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const composedRefs = useComposedRefs(containerRef, ref);
+  const visible = useIntersection(containerRef);
+  const i18n = useLingui();
   const file = useMemo(() => {
-    const [category, format] = it.type.split('/');
+    const [category, format] = data.type.split('/');
     return {
       category,
       format,
     };
-  }, [it]);
+  }, [data]);
   const Render = useMemo(() => {
     switch (file.category) {
       case 'text':
@@ -48,12 +57,12 @@ export const Item: FC<{
     }
   }, [file.category, file.format]);
   const time = useMemo(() => {
-    const created = dayjs(it.created);
+    const created = dayjs(data.created);
     const diff = Math.abs(created.diff(dayjs(), 'days'));
     if (diff > 7) {
       return (
         <span>
-          <span className="block text-lg text-gray-700 font-bold">
+          <span className="block text-lg font-bold text-gray-700">
             {created.format('MMM DD ')}
           </span>
           <span className="block text-sm text-gray-600">
@@ -64,34 +73,31 @@ export const Item: FC<{
     } else {
       return <span className="text-gray-600">{created.fromNow()}</span>;
     }
-  }, [it.created]);
+  }, [data.created]);
   const from = useMemo(() => {
-    if (!it.ip || it.ip == '::1' || it.ip == '127.0.0.1')
+    if (!data.ip || data.ip == '::1' || data.ip == '127.0.0.1')
       return <span className="ml-2">shared from unknown</span>;
     return (
       <span className="ml-2">
-        <span className="text-gray-400">{t`shared from`}</span>
+        <span className="text-gray-400">{i18n._('shared from')}</span>
         <span className="ml-1 text-gray-500">
-          {it.ip_alias || it.ip || 'unknown'}
+          {data.ip_alias || data.ip || i18n._('unknown')}
         </span>
       </span>
     );
-  }, [it.ip, it.ip_alias]);
+  }, [i18n, data.ip, data.ip_alias]);
   return (
-    <EntityProvider value={it}>
-      <li
-        className={clsx('cedasync-item', className)}
-        data-uid={it.uid}
-        key={it.uid}
-      >
-        <div className="pad:mb-2 text-sm flex items-end bg-[#f6f8fa] px-3 pad:px-6 py-4">
+    <div ref={composedRefs} className={clsx('item', className)} {...props}>
+      <UseEntity value={data}>
+        <div className="flex items-end bg-[#f6f8fa] px-3 py-4 text-sm pad:mb-2 pad:px-6">
           {time}
           {from}
         </div>
-        <div className="flex-1 bg-white shadow-sm rounded p-5 px-3 pad:p-7 pad:pb-4 outline-gray-400">
-          <Render />
+        <div className="flex-1 rounded bg-white p-5 px-3 shadow-sm outline-gray-400 pad:p-7 pad:pb-4">
+          <Render visible={visible} />
         </div>
-      </li>
-    </EntityProvider>
+      </UseEntity>
+    </div>
   );
 });
+export const Item = memo(ItemImpl);

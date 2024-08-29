@@ -131,7 +131,7 @@ const TableHead: FC<{
             role="columnheader"
             key={col.key}
             className={clsx(
-              'border border-gray-100 bg-gray-50 p-3 text-left font-bold text-gray-700',
+              'z-10 border border-t-0 border-gray-100 bg-gray-50 p-3 text-left font-bold text-gray-700',
               scrollable && 'sticky top-0',
               col.className,
               col.headerClassName,

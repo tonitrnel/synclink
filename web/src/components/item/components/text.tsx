@@ -5,55 +5,47 @@ import {
   useState,
   useMemo,
   useCallback,
-  useRef,
   HTMLAttributes,
 } from 'react';
 import { useGetFileContent } from '~/endpoints';
 import { copy } from '~/utils/copy';
 import { withProduce } from '~/utils/with-produce';
-import { useEntityConsumer } from '../entity-provider';
+import { useEntity } from '../hooks/use-entity.ts';
 import { CustomMenuSlot, Menu } from './menu';
 import { Metadata } from './metadata';
 import { clsx } from '~/utils/clsx';
 import { useLingui } from '@lingui/react';
 import { openViewer } from '~/components/viewer-dialog';
-import { useIntersection } from '~/utils/hooks/use-intersection.ts';
+import { useCoordinator } from '../hooks/use-coordinator.ts';
+import { RenderProps } from './type.ts';
 
-export const TextItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
-  ({ className, ...props }) => {
-    const entity = useEntityConsumer();
-    const containerRef = useRef<HTMLDivElement>(null);
+/**
+ * 文本项
+ *
+ * @tips 高度未知
+ */
+export const TextItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
+  ({ visible, className, ...props }) => {
+    const entity = useEntity();
     const i18n = useLingui();
     const unconfirmed = entity.size > 4096;
-    const visible = useIntersection(containerRef);
     const {
       data: content,
       pending: loading,
+      done,
       error,
     } = useGetFileContent({
       path: {
         id: entity.uid,
       },
       enabled: !unconfirmed && visible,
+      keepDirtyOnNotEnabled: true,
     });
     const [{ expandable, expanded }, setExpanded] = useState(() => ({
       expandable: false,
       expanded: false,
     }));
-    // const handleDoubleClick = useCallback<
-    //   MouseEventHandler<HTMLParagraphElement>
-    // >((evt) => {
-    //   evt.preventDefault();
-    //   evt.stopPropagation();
-    //   const selection = window.getSelection();
-    //
-    //   if (selection) {
-    //     selection.removeAllRanges();
-    //     const range = document.createRange();
-    //     range.selectNodeContents(evt.currentTarget);
-    //     selection.addRange(range);
-    //   }
-    // }, []);
+    useCoordinator(entity.uid, !visible || done);
     const copyButton = useMemo<CustomMenuSlot>(
       () => ({
         key: 'copy',
@@ -73,9 +65,9 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
     const html = useMemo(() => {
       if (!content) return '';
       let text = content;
-      if (text.length > 256 && !expanded) {
+      if (text.length > 300 && !expanded) {
         withProduce(setExpanded, (draft) => void (draft.expandable = true));
-        text = text.substring(0, 256) + '...';
+        text = text.substring(0, 300) + '...';
       }
       {
         const textNode = document.createTextNode(text);
@@ -102,7 +94,7 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
       });
     }, [entity.name, entity.type, entity.uid]);
     return (
-      <div ref={containerRef} className={clsx('', className)} {...props}>
+      <div className={clsx('', className)} {...props}>
         {unconfirmed || (loading && !error) ? (
           <p className="mt-0 italic text-gray-600">
             <span>
@@ -127,7 +119,7 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
         ) : (
           <p
             className={clsx(
-              'mt-0 min-h-[32px] w-full whitespace-break-spaces break-words text-sm italic leading-relaxed text-gray-900',
+              'mt-0 min-h-[2rem] w-full whitespace-break-spaces break-words text-sm italic leading-relaxed text-gray-900',
             )}
             dangerouslySetInnerHTML={{ __html: html }}
           />

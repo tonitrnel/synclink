@@ -1,6 +1,7 @@
 import { RefObject, useLayoutEffect, useState } from 'react';
+import { lookupHTMLNode } from '~/utils/lookup-html-node.ts';
 
-let obs: IntersectionObserver;
+let obs: IntersectionObserver | null = null;
 const listeners = new WeakMap<
   HTMLElement,
   (entry: IntersectionObserverEntry) => void
@@ -13,36 +14,34 @@ const onIntersection: IntersectionObserverCallback = (entries) => {
   });
 };
 
-export const useIntersection = (
-  targetRef: RefObject<HTMLElement>,
-  once = true,
-): boolean => {
+export const useIntersection = (targetRef: RefObject<HTMLElement>): boolean => {
   const [visible, setVisible] = useState(false);
   useLayoutEffect(() => {
     const target = targetRef.current;
     if (!target) return void 0;
     if (!obs) {
       obs = new IntersectionObserver(onIntersection, {
-        root: document.body,
+        root: lookupHTMLNode(target, '.scroller'),
         rootMargin: '0px',
         threshold: 0.1,
       });
     }
-    // const startTime = Date.now();
+    // let startTime = Date.now();
     const release = () => {
       listeners.delete(target);
-      obs.unobserve(target);
+      obs?.unobserve(target);
     };
     const onIntersecting = (entry: IntersectionObserverEntry) => {
+      // const nowTime = Date.now();
       // console.log(
-      //   `onIntersecting, ${Date.now() - startTime}ms`,
+      //   `onIntersecting, ${nowTime - startTime}ms`,
       //   entry.isIntersecting,
       //   entry.intersectionRatio,
       //   entry.target,
       // );
+      // startTime = nowTime;
       if (entry.isIntersecting) {
         setVisible(true);
-        if (once) release();
       } else {
         setVisible(false);
       }
@@ -50,6 +49,6 @@ export const useIntersection = (
     listeners.set(target, onIntersecting);
     obs.observe(target);
     return release;
-  }, [targetRef, once]);
+  }, [targetRef]);
   return visible;
 };

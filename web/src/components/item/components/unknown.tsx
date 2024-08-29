@@ -1,22 +1,31 @@
 import { FC, HTMLAttributes, memo, useMemo } from 'react';
-import { useEntityConsumer } from '../entity-provider';
+import { useEntity } from '../hooks/use-entity.ts';
 import { Metadata } from './metadata';
 import { CustomMenuSlot, Menu } from './menu';
 import { openViewer, supportsFileViewer } from '~/components/viewer-dialog';
 import { EyeIcon } from 'icons';
 import { useLingui } from '@lingui/react';
 import { clsx } from '~/utils/clsx.ts';
+import { useCoordinator } from '../hooks/use-coordinator.ts';
+import { RenderProps } from './type.ts';
 
-export const UnknownItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
-  ({ className, ...props }) => {
-    const entity = useEntityConsumer();
+/**
+ * 未知项
+ *
+ * @tips 高度已知
+ */
+export const UnknownItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> =
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  memo(({ visible, className, ...props }) => {
+    const entity = useEntity();
     const i18n = useLingui();
+    useCoordinator(entity.uid, true);
     const previewButton = useMemo<CustomMenuSlot>(
       () => ({
         key: 'viewer',
         component: (
           <>
-            <EyeIcon className="w-4 h-4" />
+            <EyeIcon className="h-4 w-4" />
             <span>{i18n._('Preview')}</span>
           </>
         ),
@@ -31,10 +40,12 @@ export const UnknownItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
     );
     return (
       <div className={clsx('', className)} {...props}>
-        <div className="cedasync-item-header">
-          <p className="cedasync-item-title">{entity.name}</p>
+        <div className="item-header">
+          <p className="item-title truncate" title={entity.name}>
+            {entity.name}
+          </p>
         </div>
-        <div className="mt-4 flex justify-between items-center">
+        <div className="mt-4 flex items-center justify-between">
           <Metadata entity={entity} />
           <Menu
             entity={entity}
@@ -45,5 +56,4 @@ export const UnknownItem: FC<HTMLAttributes<HTMLDivElement>> = memo(
         </div>
       </div>
     );
-  },
-);
+  });

@@ -15,7 +15,6 @@ import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { Logger } from '~/utils/logger.ts';
 import { clsx } from '~/utils/clsx.ts';
 import { ImageValue, metadataParser } from './metadata-parser';
-import { useIntersection } from '~/utils/hooks/use-intersection.ts';
 import './audio-player.less';
 
 const logger = new Logger('AudioPlayer');
@@ -47,7 +46,8 @@ export const AudioPlayer: FC<{
   type?: string;
   title?: string;
   className?: string;
-}> = memo(({ src, type, title, className }) => {
+  visible?: boolean;
+}> = memo(({ visible = true, src, type, title, className }) => {
   const [state, setState] = useState<State>(() => ({
     id: Math.random().toString(36).substring(2),
     ready: false,
@@ -66,7 +66,6 @@ export const AudioPlayer: FC<{
   const [metadata, setMetadata] = useState<Metadata>(() => ({}));
   const audioRef = useRef<HTMLAudioElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const visible = useIntersection(containerRef);
   const controllers = useMemo(() => {
     return new (class {
       private enabledPointer = false;
@@ -198,7 +197,7 @@ export const AudioPlayer: FC<{
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return void 0;
-    const raw_document_title = document.title;
+    const originalTitle = document.title;
     const notify = () => {
       document.body.dispatchEvent(
         new CustomEvent('audio-playback-change', {
@@ -227,7 +226,7 @@ export const AudioPlayer: FC<{
         loading: true,
       }));
     audio.onended = () => {
-      document.title = raw_document_title;
+      document.title = originalTitle;
       setState((prev) => ({
         ...prev,
         paused: true,
@@ -243,7 +242,7 @@ export const AudioPlayer: FC<{
       notify();
     };
     audio.onpause = () => {
-      document.title = raw_document_title;
+      document.title = originalTitle;
       setState((prev) => ({
         ...prev,
         paused: true,
@@ -261,6 +260,9 @@ export const AudioPlayer: FC<{
         ...prev,
         loaded: audio.buffered.length > 0 ? audio.buffered.end(0) : 0,
       }));
+    return () => {
+      document.title = originalTitle;
+    };
   }, []);
   return (
     <div ref={containerRef} className={clsx('audio-player', className)}>
