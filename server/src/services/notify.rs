@@ -1,7 +1,7 @@
 use crate::common::ApiResult;
 use crate::extractors::ClientIp;
 use crate::state::AppState;
-use crate::utils::{Observable, Observer};
+use crate::utils::{guardable, Observable, Observer};
 use axum::{
     extract::State,
     http::HeaderMap,
@@ -123,7 +123,7 @@ pub async fn notify(
     // .map(|it| -> Result<sse::Event, BoxError> { Ok(it) })
     // .throttle(Duration::from_secs(1));
     // let combined_stream = stream::select(notify_stream, heart_stream);
-    let combined_stream = utils::guarded(notify_stream, guard);
+    let combined_stream = guardable(notify_stream, guard);
     let (combined_stream, stream_controller) = stream::abortable(combined_stream);
     let shutdown_signal = state.shutdown_signal.clone();
     // issue: https://github.com/hyperium/hyper/issues/2787
@@ -310,53 +310,5 @@ impl SSEBroadcastEvent {
 impl From<crate::models::file_indexing::IndexChangeAction> for SSEBroadcastEvent {
     fn from(value: crate::models::file_indexing::IndexChangeAction) -> Self {
         SSEBroadcastEvent::IndexUpdate(value)
-    }
-}
-
-mod utils {
-    use futures::Stream;
-    use pin_project_lite::pin_project;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
-    pub fn guarded<S, G>(stream: S, guard: G) -> GuardedStream<S, G>
-    where
-        S: Stream,
-    {
-        GuardedStream::new(stream, guard)
-    }
-    pin_project! {
-        #[derive(Debug, Clone)]
-        pub struct GuardedStream<S, G> {
-            #[pin]
-            inner: S,
-            guard: Option<G>,
-        }
-    }
-    impl<S, G> GuardedStream<S, G> {
-        fn new(stream: S, guard: G) -> Self {
-            Self {
-                inner: stream,
-                guard: Some(guard),
-            }
-        }
-    }
-    impl<S, G> Stream for GuardedStream<S, G>
-    where
-        S: Stream,
-        G: Unpin,
-    {
-        type Item = S::Item;
-        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            let mut this = self.project();
-            let r = Pin::new(&mut this.inner).poll_next(cx);
-            if let Poll::Ready(None) = r {
-                this.guard.take();
-            }
-            r
-        }
-        fn size_hint(&self) -> (usize, Option<usize>) {
-            self.inner.size_hint()
-        }
     }
 }

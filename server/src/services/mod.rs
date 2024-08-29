@@ -11,7 +11,7 @@ pub mod upload_part;
 mod upload_preflight;
 
 pub use authorize::{authorize, Claims};
-pub use beacon::beacon;
+pub use beacon::{beacon, log_tracing};
 pub use delete::delete;
 pub use get::{get, get_virtual_directory, get_virtual_file};
 pub use list::{get_metadata, list};

@@ -21,7 +21,11 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
         let shutdown_signal = shutdown_signal.clone();
         let dir = args.config.file_storage.parse_dir()?;
         join_set.spawn(async move {
-            let indexing = Arc::new(models::file_indexing::FileIndexing::new(dir).await);
+            let indexing = Arc::new(
+                models::file_indexing::FileIndexing::new(dir)
+                    .await
+                    .unwrap_or_else(|err| panic!("Failed to read index, reason = {err:?}")),
+            );
             let mut notify_manager = crate::services::NotifyManager::new();
             let socket_manager = Arc::new(crate::services::P2PSocketManager::new());
             notify_manager.register(Arc::downgrade(

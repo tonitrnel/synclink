@@ -17,7 +17,9 @@ pub fn build() -> Router<AppState> {
         .append_index_html_on_directories(true)
         .fallback(tower_http::services::ServeFile::new("public/index.html"));
     Router::new()
+        .route("/api/health", get(|| async { axum::http::StatusCode::OK }))
         .route("/api/beacon", post(services::beacon))
+        .route("/api/log-tracing", post(services::log_tracing))
         .route("/api/upload", post(services::upload))
         .route(
             "/api/upload-part/allocate",

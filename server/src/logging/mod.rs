@@ -32,22 +32,6 @@ pub fn registry_logs(
             }));
         layers.push(access_layer.boxed());
     }
-    // beacon_layer
-    'beacon_layer: {
-        if !enable_file_logging {
-            break 'beacon_layer;
-        }
-        let beacon_file = writer.create_file_writer(dir.join("beacon.log"))?;
-        let beacon_layer = tracing_subscriber::fmt::layer()
-            .with_ansi(false)
-            .with_timer(ChronoLocal::new("%F %X%.3f".to_string()))
-            .json()
-            .with_writer(beacon_file)
-            .with_filter(filter::filter_fn(|metadata| {
-                metadata.target() == "cedasync::services::beacon"
-            }));
-        layers.push(beacon_layer.boxed());
-    }
     // event_layer
     {
         let event_layer = tracing_subscriber::fmt::layer()

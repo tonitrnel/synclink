@@ -8,7 +8,11 @@ BUILD_DATE     := $(shell date '+%Y-%m-%d')
 RUSTC_VERSION  := $(shell rustc --version | awk '{print $$2}')
 SYSTEM_VERSION := $(shell lsb_release -si | tr -d '\n' && lsb_release -sr | cut -d. -f1)
 
-build: build-image image-tag
+DOCKER_REGISTRY := ghcr.io
+DOCKER_ORG      := tonitrnel
+DOCKER_IMAGE_NAME := $(DOCKER_REGISTRY)/$(DOCKER_ORG)/cedasync
+
+build: build-image
 	docker save -o ./cedasync_${PKG_VER}.img cedasync:$(PKG_VER)
 
 build-image:
@@ -39,13 +43,13 @@ build-tar-binding:
 	wasm-pack pack
 
 image-tag:
-	docker rmi --force ghcr.io/tonitrnel/cedasync:$(PKG_VER)
-	docker tag cedasync:$(PKG_VER) ghcr.io/tonitrnel/cedasync:$(PKG_VER)
+	docker rmi --force $(DOCKER_IMAGE_NAME):$(PKG_VER)
+	docker tag cedasync:$(PKG_VER) $(DOCKER_IMAGE_NAME):$(PKG_VER)
 
 image-push:
-	docker push ghcr.io/tonitrnel/cedasync:$(PKG_VER)
+	docker push $(DOCKER_IMAGE_NAME):$(PKG_VER)
 
-setup-cedasync-debug:
+run-debug-container:
 	docker run -d -it --name cedasync-debug \
 		-p 8080:8080 \
 		-v ./config/cedasync-config.toml:/etc/cedasync/config.toml \
@@ -53,4 +57,4 @@ setup-cedasync-debug:
 		-v ./server/target/release/cedasync:/app/cedasync \
 		-it debian /bin/bash
 	docker exec cedasync-debug sh -c "apt update && apt install heaptrack -y"
-	docker exec cedasync-debug sh -c "cd /app && heaptrack ./cedasync -c /etc/cedasync/config.toml"
+	#cd /app && heaptrack ./cedasync -c /etc/cedasync/config.toml

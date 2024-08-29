@@ -25,12 +25,12 @@ tracing-error = "0.2.0"
 anyhow = { version = "1.0.75", features = ["backtrace"] }
 thiserror = "1.0.50"
 infer = { version = "0.16.0", default-features = false }
-image = "0.24.7"
 simdutf8 = "0.1.4"
 tar = "0.4.41"
 pin-project-lite = "0.2.14"
 rand = "0.8.5"
 jsonwebtoken = "9.3.0"
+libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "b2bf38b08b5ab3d59719b352f32e8fdf08ce6dbb" }
 
 [profile.release]
 strip = true

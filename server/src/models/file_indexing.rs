@@ -55,7 +55,7 @@ pub struct WriteIndexArgs {
 }
 
 impl WriteIndexArgs {
-    async fn into_entity(self, dir: &PathBuf) -> Entity {
+    async fn into_entity(self, dir: &Path) -> Entity {
         let now = chrono::Local::now();
         let (name, ext) = if let Some(_name) = self.filename.as_ref() {
             let path = Path::new(_name);
@@ -90,7 +90,7 @@ impl WriteIndexArgs {
 }
 
 impl FileIndexing {
-    pub async fn new(path: impl AsRef<Path>) -> Self {
+    pub async fn new(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let path = path.as_ref().to_owned();
         if !&path.is_dir() {
             panic!("Error: Path '{:?}' is not a directory", path.as_os_str())
@@ -111,16 +111,36 @@ impl FileIndexing {
             .read_to_string(&mut index_content)
             .await
             .unwrap_or_else(|_| panic!("Error: Index read '{:?}' failed", index_path.as_os_str()));
-        let index: Index = toml::from_str(&index_content).unwrap_or_else(|err| {
+        let mut index: Index = toml::from_str(&index_content).unwrap_or_else(|err| {
             eprintln!("{:#?}", err);
             panic!("Error: Index parse failed")
         });
-        let path = index_path.parent().unwrap().to_path_buf();
-        Self {
+        let directory = index_path.parent().unwrap().to_path_buf();
+        let mut changed = false;
+        for item in &mut index.items {
+            if Image::is_support(&item.content_type) {
+                let metadata = item.metadata.take().and_then(|it| it.try_into_image());
+                let source_path = directory.join(item.get_resource());
+                let thumbnail_path = directory.join(format!("{}.thumbnail", item.get_resource()));
+                let metadata = Image::ensure_thumbnail(
+                    &source_path,
+                    &thumbnail_path,
+                    item.get_content_type(),
+                    metadata,
+                ).await?;
+                changed = true;
+                item.metadata = Some(EntityMetadata::Image(metadata));
+            }
+        }
+        let this = Self {
             index: Arc::new(Mutex::new(index)),
             index_file,
-            directory: path,
+            directory,
+        };
+        if changed {
+            this.sync_index_to_storage().await?;
         }
+        Ok(this)
     }
     /// Get BucketEntity
     pub fn get(&self, id: &Uuid) -> Option<Entity> {
@@ -229,6 +249,7 @@ impl FileIndexing {
         self.sync_all().await?;
         Ok(())
     }
+    #[inline]
     pub fn get_storage_dir(&self) -> &PathBuf {
         &self.directory
     }
@@ -309,19 +330,17 @@ impl FileIndexing {
     pub async fn prepare_related_assets(&self, entity: &mut Entity) -> anyhow::Result<()> {
         if Image::is_support(&entity.content_type) {
             let image = Image::new(
-                self.get_storage_dir().join(entity.get_resource()),
-                entity.content_type.to_owned(),
-            )
-            .await?;
-            entity.metadata = Some(EntityMetadata::Image(image.get_metadata()));
-            image
-                .generate_thumbnail(
-                    self.get_storage_dir()
-                        .join(format!("{}.thumbnail", entity.get_resource())),
-                    500,
-                    500,
-                )
-                .await?;
+                &self.get_storage_dir().join(entity.get_resource()),
+                &entity.content_type,
+            )?;
+            let metadata = image.generate_thumbnail(
+                &self
+                    .get_storage_dir()
+                    .join(format!("{}.thumbnail", entity.get_resource())),
+                500,
+                280
+            ).await?;
+            entity.metadata = Some(EntityMetadata::Image(metadata));
         }
         Ok(())
     }

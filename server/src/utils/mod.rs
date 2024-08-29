@@ -4,6 +4,7 @@ mod observer;
 mod session_manager;
 mod sparse_stream_reader;
 mod utc_to_i64;
+mod guardable_stream;
 
 use chrono::TimeZone;
 pub use decode_uri::*;
@@ -12,6 +13,7 @@ pub use observer::*;
 pub use session_manager::*;
 pub use sparse_stream_reader::*;
 pub use utc_to_i64::*;
+pub use guardable_stream::*;
 
 /// read last_modified from file metadata
 pub fn format_last_modified_from_metadata(metadata: &std::fs::Metadata) -> Option<String> {

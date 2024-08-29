@@ -1,8 +1,22 @@
-use chrono::{TimeZone, Utc};
-use serde::Deserialize;
+use crate::state::AppState;
+use crate::utils::guardable;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::{sse, IntoResponse, Sse};
+use axum::{debug_handler, BoxError};
+use futures::stream;
+use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+use std::time::Duration;
+use tokio::sync::{
+    mpsc::{self, Sender},
+    RwLock,
+};
+use tokio_stream::StreamExt;
 
-#[derive(Deserialize, Debug)]
-#[allow(unused)]
+static SSE_TX: LazyLock<RwLock<Option<Sender<ReportObject>>>> = LazyLock::new(|| RwLock::new(None));
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct SystemPart {
     #[serde(rename = "userAgent")]
     user_agent: String,
@@ -10,15 +24,13 @@ struct SystemPart {
     width: u32,
 }
 
-#[derive(Deserialize, Debug)]
-#[allow(unused)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct BuildPart {
     version: String,
     timestamp: u64,
 }
 
-#[derive(Deserialize, Debug)]
-#[allow(unused)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct LogPart {
     level: String,
     time: u64,
@@ -28,8 +40,7 @@ struct LogPart {
     stack: String,
 }
 
-#[derive(Deserialize, Debug)]
-#[allow(unused)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReportObject {
     logs: Vec<LogPart>,
     time: u64,
@@ -37,38 +48,60 @@ pub struct ReportObject {
     build: BuildPart,
 }
 
-pub async fn beacon(body: String) {
-    let body = serde_json::from_str::<ReportObject>(&body).unwrap();
-    print_beacon_logs(body)
+impl ReportObject {
+    fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
 }
 
-fn print_beacon_logs(report: ReportObject) {
-    let span = tracing::span!(
-        tracing::Level::INFO,
-        "beacon",
-        timestamp = Utc
-            .timestamp_millis_opt(report.build.timestamp as i64)
-            .map(|dt| dt.format("%F %T%.6fZ").to_string())
-            .unwrap(),
-        user_agent = report.system.user_agent
-    );
-    let _guard = span.enter();
-    for log in report.logs {
-        tracing::info!(
-            timestamp = Utc
-                .timestamp_millis_opt(log.time as i64)
-                .map(|dt| dt.format("%F %T%.6fZ").to_string())
-                .unwrap(),
-            level = log.level,
-            stack = log
-                .stack
-                .splitn(2, '\n')
-                .take(1)
-                .collect::<String>()
-                .trim_start_matches(' '),
-            "{}: {}",
-            log.name,
-            log.message,
-        )
+pub async fn beacon(body: String) {
+    let body = serde_json::from_str::<ReportObject>(&body).unwrap();
+    if let Some(tx) = SSE_TX.read().await.as_ref() {
+        let _ = tx.send(body).await;
     }
+}
+
+struct CleanGuard {}
+impl Drop for CleanGuard {
+    fn drop(&mut self) {
+        tokio::spawn(async move {
+            SSE_TX.write().await.take();
+        });
+    }
+}
+
+#[debug_handler]
+pub async fn log_tracing(State(state): State<AppState>) -> impl IntoResponse {
+    let rx = {
+        let mut global_tx = SSE_TX.write().await;
+        if global_tx.is_some() {
+            return StatusCode::LOCKED.into_response();
+        }
+        let (tx, rx) = mpsc::channel::<ReportObject>(8);
+        *global_tx = Some(tx);
+        rx
+    };
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).filter_map(
+        move |it| -> Option<Result<sse::Event, BoxError>> {
+            Some(Ok(sse::Event::default().data(it.to_json())))
+        },
+    );
+    let guard = CleanGuard {};
+    let stream = guardable(stream, guard);
+    let (stream, stream_controller) = stream::abortable(stream);
+    let shutdown_signal = state.shutdown_signal.clone();
+    // issue: https://github.com/hyperium/hyper/issues/2787
+    tokio::spawn(async move {
+        shutdown_signal.cancelled().await;
+        stream_controller.abort();
+    });
+    (
+        StatusCode::OK,
+        Sse::new(stream).keep_alive(
+            sse::KeepAlive::new()
+                .interval(Duration::from_secs(15))
+                .text("keep ಠ_ಠ"),
+        ),
+    )
+        .into_response()
 }
