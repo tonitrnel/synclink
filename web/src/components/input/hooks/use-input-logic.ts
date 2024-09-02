@@ -72,7 +72,10 @@ export const useInputLogic = (
               files,
             },
           });
-          if (!value) return void 0;
+          if (!value) {
+            console.log('upload canceled');
+            return void 0;
+          }
           try {
             await upload(value.entries, value.caption, value.tags);
           } catch (e) {

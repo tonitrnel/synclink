@@ -6,6 +6,7 @@ import { Loading } from '~/components/loading';
 import { useLingui } from '@lingui/react';
 import { Route, useLocation, useNavigate } from 'react-router-dom';
 import FileTransferPage from './file-transfer';
+import FileUploadPage from './file-upload';
 import ViewerPage from './viewer';
 import { AnimatedRoutes } from '~/components/animated-routes';
 import { ChevronLeftIcon } from 'icons';
@@ -78,6 +79,7 @@ export default function MobileHomePage() {
           </footer>
           <AnimatedRoutes>
             <Route path="/file-transfer" element={<FileTransferPage />} />
+            <Route path="/file-upload" element={<FileUploadPage />} />
             <Route path="/viewer" element={<ViewerPage />} />
           </AnimatedRoutes>
         </div>

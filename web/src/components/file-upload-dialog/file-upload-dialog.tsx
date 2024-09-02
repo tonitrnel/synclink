@@ -92,7 +92,7 @@ export const FileUploadImpl: FC<{
               />
             ))}
           </div>
-          <div className="mt-1 flex gap-2 text-sm">
+          <div className="mt-1 flex flex-wrap gap-2 text-sm">
             <div className="flex items-center gap-1">
               <span
                 className="inline-block h-1 w-2 bg-current"

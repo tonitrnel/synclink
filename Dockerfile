@@ -75,7 +75,7 @@ WORKDIR /app/tar
 RUN wasm-pack build
 
 # Web
-FROM node:alpine AS WebBuilder
+FROM node:20 AS WebBuilder
 
 WORKDIR /app
 
@@ -111,7 +111,7 @@ RUN apk add --update --no-cache  \
 
 COPY --from=ServerBuilder /app/target/release/cedasync .
 
-#COPY --from=WebBuilder /app/web/dist /app/public
+COPY --from=WebBuilder /app/web/dist /app/public
 
 COPY config/cedasync-config.toml /etc/cedasync/config.toml
 

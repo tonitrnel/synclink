@@ -16,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { openFileTransfer } from '~/components/file-transfer-dialog';
+import FileUploadPage from '~/pages/mobile/file-upload';
+import { useNavigate } from 'react-router-dom';
 
 export const MobileInput = forwardRef<
   HTMLTextAreaElement,
@@ -23,10 +25,30 @@ export const MobileInput = forwardRef<
 >(({ className, ...props }, ref) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composedRefs = useComposedRefs(textareaRef, ref);
+  const navigate = useNavigate();
   const { text, handlers, transmitting, transmittable } = useInputLogic(
     textareaRef,
-    async () => {
-      return void 0;
+    async ({ mode, filesOrEntries }) => {
+      await new Promise<void>((resolve, reject) => {
+        let ready = false;
+        const timer = window.setTimeout(() => {
+          if (ready) return void 0;
+          reject(new Error('Failed open upload page, reason: timeout'));
+        }, 1000);
+        FileUploadPage.signal.once('ready', () => {
+          ready = true;
+          window.clearTimeout(timer);
+          resolve();
+        });
+        navigate('/file-upload');
+      });
+      FileUploadPage.signal.emit('enter', {
+        mode,
+        filesOrEntries,
+      });
+      return new Promise((resolve) => {
+        FileUploadPage.signal.on('exit', resolve);
+      });
     },
   );
   const i18n = useLingui();

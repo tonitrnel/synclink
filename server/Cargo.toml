@@ -30,7 +30,7 @@ tar = "0.4.41"
 pin-project-lite = "0.2.14"
 rand = "0.8.5"
 jsonwebtoken = "9.3.0"
-libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "b2bf38b08b5ab3d59719b352f32e8fdf08ce6dbb" }
+libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "5667a5b0433157b05ba0461841f7bb865f84c4cb" }
 
 [profile.release]
 strip = true
