@@ -13,70 +13,535 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/components/item/item.tsx:109
+#. js-lingui-explicit-id
+#: src/components/dropzone/dropzone.tsx:236
+msgid "Drag and Drop file here"
+msgstr "Drag and Drop file here"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/notification-message.tsx:62
+#: src/components/file-transfer-dialog/p2p-file-receiver-provider.tsx:38
+msgid "The villagers want to share some mysterious documents with you"
+msgstr "The villagers want to share some mysterious documents with you"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/notification-message.tsx:67
+msgid "Do you want to receive it?"
+msgstr "Do you want to receive it?"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/notification-message.tsx:77
+msgid "Reject"
+msgstr "Reject"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/notification-message.tsx:85
+msgid "Accept"
+msgstr "Accept"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-receiver-provider.tsx:42
+msgid "Please confirm if you want to accept"
+msgstr "Please confirm if you want to accept"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:91
+#: src/components/input/desktop-input.tsx:109
+#: src/components/input/desktop-input.tsx:110
+#: src/pages/mobile/file-transfer/index.tsx:34
+msgid "Peer to peer file transfer"
+msgstr "Peer to peer file transfer"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:93
+msgid "Quickly share files with other client who open this page"
+msgstr "Quickly share files with other client who open this page"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:286
+msgid "Connect"
+msgstr "Connect"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:348
+msgid "Auto"
+msgstr "Auto"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:372
+msgid "User agent"
+msgstr "User agent"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:378
+msgid "Protocol"
+msgstr "Protocol"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:390
+msgid "Select a protocol"
+msgstr "Select a protocol"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:404
+msgid "Peer PIN"
+msgstr "Peer PIN"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:417
+msgid "Client"
+msgstr "Client"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:433
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1213
+#: src/components/ui/tree-table/tree-table.tsx:161
+msgid "No data"
+msgstr "No data"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:504
+msgid "Waiting for acceptance"
+msgstr "Waiting for acceptance"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:508
+msgid "Testing availability"
+msgstr "Testing availability"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:512
+msgid "Accepted, waiting to establish connection"
+msgstr "Accepted, waiting to establish connection"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:515
+msgid "The peer has refused"
+msgstr "The peer has refused"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:516
+msgid "Connection timeout"
+msgstr "Connection timeout"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:517
+msgid "Please enter the peer client PIN"
+msgstr "Please enter the peer client PIN"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:749
+msgid "Oh! An error has occurred"
+msgstr "Oh! An error has occurred"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:784
+msgid "Cancel"
+msgstr "Cancel"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1192
+msgid "Drag and Drop file here or"
+msgstr "Drag and Drop file here or"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1198
+msgid "Choose file"
+msgstr "Choose file"
+
+#. js-lingui-explicit-id
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1210
+msgid "History:"
+msgstr "History:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:58
+#: src/components/item/components/folder.tsx:132
+msgid "Name"
+msgstr "Name"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:65
+#: src/components/item/components/folder.tsx:139
+msgid "Size"
+msgstr "Size"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:70
+#: src/components/item/components/folder.tsx:149
+msgid "Last modified"
+msgstr "Last modified"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:79
+msgid "You can't upload the file because the disk has exceeded its quota"
+msgstr "You can't upload the file because the disk has exceeded its quota"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:101
+msgid "Reserved:"
+msgstr "Reserved:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:108
+msgid "Used:"
+msgstr "Used:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:115
+msgid "Planned use:"
+msgstr "Planned use:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:122
+msgid "Free:"
+msgstr "Free:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
+msgid "Folders:"
+msgstr "Folders:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:135
+msgid "File:"
+msgstr "File:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:138
+msgid "Total Size:"
+msgstr "Total Size:"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:146
+msgid "Caption"
+msgstr "Caption"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:154
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:170
+msgid "Optional"
+msgstr "Optional"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:160
+msgid "Add tags"
+msgstr "Add tags"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:211
+#: src/components/input/desktop-input.tsx:87
+#: src/components/input/desktop-input.tsx:88
+#: src/pages/mobile/file-upload/index.tsx:136
+msgid "Upload folder"
+msgstr "Upload folder"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:212
+#: src/pages/mobile/file-upload/index.tsx:137
+msgid "Upload files"
+msgstr "Upload files"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:215
+msgid "Check the files or folders to be upload"
+msgstr "Check the files or folders to be upload"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:241
+msgid "Discard"
+msgstr "Discard"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:249
+#: src/pages/mobile/file-upload/index.tsx:61
+msgid "Upload"
+msgstr "Upload"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:69
+msgid "Enter your message here..."
+msgstr "Enter your message here..."
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:76
+#: src/components/input/desktop-input.tsx:77
+#: src/components/input/mobile-input.tsx:89
+#: src/components/input/mobile-input.tsx:92
+msgid "Upload file"
+msgstr "Upload file"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:98
+#: src/components/input/desktop-input.tsx:99
+msgid "Paste"
+msgstr "Paste"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:122
+msgid "Clear"
+msgstr "Clear"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:133
+msgid "Send (Ctrl + Enter)"
+msgstr "Send (Ctrl + Enter)"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:140
+msgid "Sending"
+msgstr "Sending"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:144
+#: src/components/input/mobile-input.tsx:118
+msgid "Send"
+msgstr "Send"
+
+#. js-lingui-explicit-id
+#: src/components/input/mobile-input.tsx:69
+msgid "More"
+msgstr "More"
+
+#. js-lingui-explicit-id
+#: src/components/input/mobile-input.tsx:98
+#: src/components/input/mobile-input.tsx:101
+msgid "Direct transfer"
+msgstr "Direct transfer"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/folder.tsx:84
+msgid "Download success"
+msgstr "Download success"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/folder.tsx:144
+msgid "Type"
+msgstr "Type"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/folder.tsx:212
+#: src/components/item/components/unknown.tsx:29
+msgid "Preview"
+msgstr "Preview"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/folder.tsx:221
+#: src/components/item/components/menu.tsx:134
+msgid "Download"
+msgstr "Download"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/menu.tsx:146
+msgid "Share"
+msgstr "Share"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/menu.tsx:157
+msgid "Delete"
+msgstr "Delete"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/text.tsx:59
+msgid "Copy"
+msgstr "Copy"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/text.tsx:101
+msgid "The content of this text is a bit large, so it will not be actively load."
+msgstr "The content of this text is a bit large, so it will not be actively load."
+
+#. js-lingui-explicit-id
+#: src/components/item/components/text.tsx:112
+msgid "Load content in viewer"
+msgstr "Load content in viewer"
+
+#. js-lingui-explicit-id
+#: src/components/item/components/text.tsx:132
+msgid "Continue read"
+msgstr "Continue read"
+
+#. js-lingui-explicit-id
+#: src/components/item/item.tsx:82
+msgid "shared from"
+msgstr "shared from"
+
+#. js-lingui-explicit-id
+#: src/components/item/item.tsx:84
+msgid "unknown"
+msgstr "unknown"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:307
+msgid "Preparing"
+msgstr "Preparing"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:315
+msgid "Hash calculating:"
+msgstr "Hash calculating:"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:324
+msgid "In transit"
+msgstr "In transit"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:331
+msgid "Nearing complete"
+msgstr "Nearing complete"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:338
+msgid "Upload successfully"
+msgstr "Upload successfully"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:346
+msgid "Canceled."
+msgstr "Canceled."
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:362
+msgid "Total:"
+msgstr "Total:"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:365
+msgid "Length of data sent to server"
+msgstr "Length of data sent to server"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:366
+msgid "Transferred:"
+msgstr "Transferred:"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:369
+msgid "Hash calculation speed or upload speed"
+msgstr "Hash calculation speed or upload speed"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:370
+msgid "Speed:"
+msgstr "Speed:"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:373
+msgid "Duration time"
+msgstr "Duration time"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:374
+msgid "Duration:"
+msgstr "Duration:"
+
+#. js-lingui-explicit-id
+#: src/components/viewer-dialog/viewer-dialog.tsx:62
+msgid "Exit fullscreen"
+msgstr "Exit fullscreen"
+
+#. js-lingui-explicit-id
+#: src/components/viewer-dialog/viewer-dialog.tsx:63
+msgid "Enter fullscreen"
+msgstr "Enter fullscreen"
+
+#. js-lingui-explicit-id
+#: src/pages/desktop/index.tsx:46
+#: src/pages/mobile/index.tsx:67
+msgid "Receiving"
+msgstr "Receiving"
+
+#. js-lingui-explicit-id
+#: src/pages/mobile/index.tsx:39
+msgid "Back"
+msgstr "Back"
+
+#: src/components/item/components/menu.tsx:103
 msgid "can't share this file"
 msgstr "Can't share this file"
 
-#: src/components/input/input.tsx:127
+#: src/components/input/hooks/use-input-logic.ts:156
 msgid "cannot to paste such files"
 msgstr "Cannot to paste such files"
 
+#: src/components/ui/dialog/dialog.tsx:155
+msgid "Close"
+msgstr "Close"
+
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:509
+msgid "Connected, delay {0}ms"
+msgstr "Connected, delay {0}ms"
+
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:505
+msgid "Connecting, using {0} protocol"
+msgstr "Connecting, using {0} protocol"
+
 #: src/components/item/item.tsx:289
-msgid "continue read"
-msgstr "Continue read"
+#~ msgid "continue read"
+#~ msgstr "Continue read"
 
 #: src/components/item/item.tsx:229
-msgid "copy"
-msgstr "Copy"
+#~ msgid "copy"
+#~ msgstr "Copy"
 
 #: src/components/item/item.tsx:159
-msgid "delete"
-msgstr "Delete"
+#~ msgid "delete"
+#~ msgstr "Delete"
+
+#: src/utils/upload.ts:171
+msgid "directory already exists"
+msgstr "directory already exists"
 
 #: src/components/item/item.tsx:141
-msgid "download"
-msgstr "Download"
+#~ msgid "download"
+#~ msgstr "Download"
 
-#: src/components/list/list.tsx:342
+#: src/components/item/components/folder.tsx:99
+msgid "Download folder"
+msgstr "Download folder"
+
+#: src/components/list/list.tsx:261
 msgid "no items found."
 msgstr "No items found."
 
 #: src/components/input/input.tsx:454
-msgid "paste"
-msgstr "Paste"
+#~ msgid "paste"
+#~ msgstr "Paste"
 
-#: src/components/input/input.tsx:98
+#: src/components/input/hooks/use-input-logic.ts:124
 msgid "paste file is empty"
 msgstr "Paste file is empty"
 
 #: src/components/list/list.tsx:329
-msgid "receiving"
-msgstr "Receiving"
+#~ msgid "receiving"
+#~ msgstr "Receiving"
 
-#: src/utils/upload.ts:28
+#: src/utils/upload.ts:57
+#: src/utils/upload.ts:110
 msgid "resource already exists"
 msgstr "Resource already exists"
 
 #: src/components/input/input.tsx:399
 #: src/components/input/input.tsx:482
-msgid "send"
-msgstr "Send"
+#~ msgid "send"
+#~ msgstr "Send"
 
 #: src/components/input/input.tsx:478
-msgid "sending"
-msgstr "Sending"
+#~ msgid "sending"
+#~ msgstr "Sending"
 
 #: src/components/item/item.tsx:150
-msgid "share"
-msgstr "Share"
+#~ msgid "share"
+#~ msgstr "Share"
 
 #: src/components/item/item.tsx:474
-msgid "shared from"
-msgstr "shared from"
+#~ msgid "shared from"
+#~ msgstr "shared from"
 
 #: src/components/dropzone/dropzone.tsx:30
-msgid "unable to paste directory"
-msgstr "Unable to paste directory"
+#~ msgid "unable to paste directory"
+#~ msgstr "Unable to paste directory"
 
 #: src/components/item/item.tsx:160
 #~ msgid "unknown host"
@@ -84,5 +549,9 @@ msgstr "Unable to paste directory"
 
 #: src/components/input/input.tsx:379
 #: src/components/input/input.tsx:447
-msgid "upload"
-msgstr "Upload"
+#~ msgid "upload"
+#~ msgstr "Upload"
+
+#: src/components/viewer-dialog/viewer-dialog.tsx:49
+msgid "View the contents of file \"{filename}\""
+msgstr "View the contents of file \"{filename}\""

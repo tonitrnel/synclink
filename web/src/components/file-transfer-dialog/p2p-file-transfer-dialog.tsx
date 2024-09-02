@@ -54,6 +54,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from '../ui/input-opt';
+import { t } from '@lingui/macro';
 
 type Panel =
   | {
@@ -501,11 +502,13 @@ const ConnectionControl: FC<{
   const statusTexts = useMemo(
     () => ({
       [ConnectionStatus.WaitingForAcceptance]: i18n._('Waiting for acceptance'),
-      [ConnectionStatus.Connecting]: i18n._(
-        `Connecting, using ${state.protocol} protocol`,
-      ),
+      [ConnectionStatus.Connecting]: t(
+        i18n.i18n,
+      )`Connecting, using ${state.protocol} protocol`,
       [ConnectionStatus.TestingAvailability]: i18n._('Testing availability'),
-      [ConnectionStatus.Connected]: i18n._(`Connected, delay ${state.delay}ms`),
+      [ConnectionStatus.Connected]: t(
+        i18n.i18n,
+      )`Connected, delay ${state.delay}ms`,
       [ConnectionStatus.Accepted]: i18n._(
         'Accepted, waiting to establish connection',
       ),

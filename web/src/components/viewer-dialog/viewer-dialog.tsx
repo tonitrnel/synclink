@@ -7,6 +7,7 @@ import { useLingui } from '@lingui/react';
 import { MaximizeIcon, MinimizeIcon } from 'icons';
 import { clsx } from '~/utils/clsx';
 import { useSrc, useViewerLoader } from './hooks.ts';
+import { t } from '@lingui/macro';
 
 export const ViewerDialog: FC<
   {
@@ -45,7 +46,7 @@ export const ViewerDialog: FC<
           {filename}
         </Dialog.Title>
         <Dialog.Description className="sr-only">
-          {i18n._(`View the contents of file "${filename}"`)}
+          {t(i18n.i18n)`View the contents of file "${filename}"`}
         </Dialog.Description>
         <button
           className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
