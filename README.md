@@ -2,7 +2,7 @@
 
 Cedasync 是一个设计用于运行在 NAS、软路由等类似设备上的程序，目的是⽤于多个设备间的⽂本、图像和⽂件临时存储和共享。
 
-![screenshot1](./docs/screenshot1.png)
+![screenshots](./docs/screenshot1.png)
 
 ## 功能
 
@@ -23,7 +23,7 @@ Cedasync 是一个设计用于运行在 NAS、软路由等类似设备上的程�
 创建 data、logs 和 config 目录 和 配置文件
 
 ```shell
-mv CUSTOM_DIR
+mv <CUSTOM_DIR>
 mkdir data
 mkdir config
 mkdir logs
@@ -88,15 +88,13 @@ server {
 }
 ```
 
-## 技术栈
+## 本地运行
 
-- 前端：使用 [TypeScript](https://www.typescriptlang.org/) 和 [React](https://react.dev/) 构建
-- 后端：使用 [Rust](https://www.rust-lang.org/) 和 [Axum](https://github.com/tokio-rs/axum) 构建
+### 技术栈
 
-## 前提条件
-
-开发需要安装 [`NodeJS`](https://nodejs.org/en/download)
-和 [`Rust`](https://www.rust-lang.org/tools/install)、[`WASM-Pack`](https://rustwasm.github.io/wasm-pack)
+- 前端：[TypeScript](https://www.typescriptlang.org/) 和 [React](https://react.dev/) 使用 [Vite](https://vitejs.dev) 构建
+- 后端：[Rust](https://www.rust-lang.org/) 和 [Axum](https://github.com/tokio-rs/axum) 构建，图片使用 [libvips](https://github.com/libvips/libvips) 处理
+- WASM: [`WASM-Pack`](https://rustwasm.github.io/wasm-pack)
 
 ## 快速开始
 
@@ -114,9 +112,16 @@ git clone https://github.com/tonitrnel/cedasync
 # 进入 server 目录
 cd server
 cargo build
+# back project dir
+cd ../
 # 进入 WASM 目录
-cd ../wasm/sha256
+cd wasm/sha256
 wasm-pack build
+# back project dir
+cd ../../ 
+cd wasm/tar
+wasm-pack build
+cd ../../
 # 进入 web 目录
 cd ../../web
 npm install
@@ -129,13 +134,13 @@ npm install
 cd web
 npm run dev
 # 启动后端服务
-cd ../server
+cd server
 cargo run
 ```
 
 4. 在浏览器访问
 
-   [http://localhost:8081](http://localhost:8081)
+[http://localhost:8081](http://localhost:8081)
 
 ## 配置
 
