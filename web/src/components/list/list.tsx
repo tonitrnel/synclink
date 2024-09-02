@@ -22,6 +22,7 @@ import { withProduce } from '~/utils/with-produce.ts';
 import { notifyManager } from '~/utils/notify-manager.ts';
 import { useSnackbar } from '~/components/ui/snackbar';
 import { loadCoordinator } from '~/components/item/hooks/use-coordinator.ts';
+import { lookupHTMLNode } from '~/utils/lookup-html-node.ts';
 
 const logger = new Logger('cedasync');
 
@@ -56,6 +57,7 @@ export const List: FC<{
   const metadataRef = useRef({
     isProhibitScrollLoad: false,
     isLoading: false,
+    ready: false,
   });
   const snackbar = useSnackbar();
   const {
@@ -132,7 +134,7 @@ export const List: FC<{
       logger.info(`Updated ${records.length} records`);
       withProduce(setState, (draft) => {
         draft.total += records.length;
-        return draft.records.push(...records);
+        draft.records.push(...records);
       });
       await loadCoordinator.waitForNextBatch();
       scrollToBottom('smooth');
@@ -178,28 +180,12 @@ export const List: FC<{
       }),
     );
   }, [done, error, execute, refresh, scrollToBottom, snackbar]);
-  // 监视滚动位置，如果小于 10 则加载之前的数据
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return void 0;
+  const onLoadPreviousTrigger = useCallback(() => {
     const metadata = metadataRef.current;
-    const scrollWatcher = async () => {
-      if (metadata.isProhibitScrollLoad) {
-        metadata.isProhibitScrollLoad = false;
-        return void 0;
-      }
-      const scrollTop = container.scrollTop;
-      // const clientHeight = element.clientHeight;
-      if (scrollTop <= 10 && !metadata.isLoading) {
-        metadata.isLoading = true;
-        console.log('start loadPrevious');
-        loadPrevious();
-      }
-    };
-    container.addEventListener('scroll', scrollWatcher);
-    return () => {
-      container.removeEventListener('scroll', scrollWatcher);
-    };
+    if (metadata.isLoading || !metadata.ready) return void 0;
+    metadata.isLoading = true;
+    console.log('start loadPrevious');
+    loadPrevious();
   }, [loadPrevious]);
   // 在 Loading 遮罩关闭前滚动至最底部
   useEffect(() => {
@@ -209,19 +195,19 @@ export const List: FC<{
     const list = element.querySelector('ul')!;
     const items = [...list.children];
     if (items.length == 0) return void 0;
-    let startTime = Date.now();
+    // let startTime = Date.now();
     // 第三次滚动，在用户未主动滚动前还可尝试滚动至最底部，理论不会触发
     // const resizeObs = new ResizeObserver(() => {
-    const resizeObs = new ResizeObserver((entries) => {
-      const now = Date.now();
-      console.log(
-        'resize',
-        `${now - startTime}ms`,
-        entries.map((it) => it.target),
-      );
-      startTime = now;
-      // scrollToBottom();
-    });
+    // const resizeObs = new ResizeObserver((entries) => {
+    //   const now = Date.now();
+    //   console.log(
+    //     'resize',
+    //     `${now - startTime}ms`,
+    //     entries.map((it) => it.target),
+    //   );
+    //   startTime = now;
+    // scrollToBottom();
+    // });
     const start = Date.now();
     // 第一次滚动，滚动至最底部
     scrollToBottom();
@@ -235,10 +221,11 @@ export const List: FC<{
       );
       scrollToBottom();
       onReady();
+      metadataRef.current.ready = true;
     });
-    items.forEach((item) => resizeObs.observe(item));
+    // items.forEach((item) => resizeObs.observe(item));
     return () => {
-      resizeObs.disconnect();
+      // resizeObs.disconnect();
     };
   }, [done, onReady, scrollToBottom]);
   return (
@@ -278,6 +265,7 @@ export const List: FC<{
           return (
             <>
               {loading && <Loading />}
+              <LoadPreviousTrigger onTrigger={onLoadPreviousTrigger} />
               <ul
                 id="records"
                 className={clsx('flex-1 pb-8 pt-2 transition-opacity')}
@@ -294,3 +282,33 @@ export const List: FC<{
     </motion.div>
   );
 });
+
+const LoadPreviousTrigger: FC<{
+  onTrigger(): void;
+}> = ({ onTrigger: _onTrigger }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const onTrigger = useLatestFunc(_onTrigger);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return void 0;
+    let previousTime = 0;
+    const obs = new IntersectionObserver(
+      () => {
+        const now = Date.now();
+        if (now < previousTime + 1000) {
+          return void 0;
+        }
+        previousTime = now;
+        onTrigger();
+      },
+      {
+        root: lookupHTMLNode(el, '.scroller'),
+        rootMargin: '0px',
+        threshold: 0.1,
+      },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onTrigger]);
+  return <div ref={ref} className="invisible h-[1rem] w-full opacity-0" />;
+};
