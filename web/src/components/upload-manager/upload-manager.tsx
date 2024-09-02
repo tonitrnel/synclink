@@ -63,11 +63,11 @@ type TaskStage =
 const UploadManagerImpl: FC<{
   className?: string;
   scrollToBottom(): void;
-}> = memo(({ className, scrollToBottom }) => {
+}> = memo(({ className, scrollToBottom: _scrollToBottom }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tasks, setTasks] = useState<TaskState[]>(() => []);
   const tasksRef = useLatestRef(tasks);
-  const scrollToBottomRef = useLatestFunc(scrollToBottom);
+  const scrollToBottom = useLatestFunc(_scrollToBottom);
   const timers = useConstant(() => new Map<string, number>());
   const createManager = useMemo<(id: string) => UploadManager>(
     () => (id) =>
@@ -83,7 +83,7 @@ const UploadManagerImpl: FC<{
             draft.stage = 'COMPLETED';
           });
           document.body.dispatchEvent(new CustomEvent('refresh-stats'));
-          scrollToBottomRef();
+          scrollToBottom();
           const timer = window.setTimeout(() => {
             const index = tasksRef.current.findIndex((it) => it.id == id);
             if (index < 0) return void 0;
@@ -140,7 +140,7 @@ const UploadManagerImpl: FC<{
           });
         },
       }) satisfies UploadManager,
-    [scrollToBottomRef, tasksRef, timers],
+    [scrollToBottom, tasksRef, timers],
   );
   useEffect(() => {
     UploadManager.oneshot.setCallback((ref) => {
@@ -157,13 +157,12 @@ const UploadManagerImpl: FC<{
       withProduce(setTasks, (draft) => {
         draft.push(task);
       });
-      scrollToBottomRef();
       return createManager(id);
     });
     return () => {
       UploadManager.oneshot.clearCallback();
     };
-  }, [createManager, scrollToBottomRef]);
+  }, [createManager]);
   const handleCancel = useCallback(
     (id: string) => {
       const index = tasksRef.current.findIndex((it) => it.id == id);
@@ -193,11 +192,19 @@ const UploadManagerImpl: FC<{
     },
     [tasksRef, timers],
   );
+  const handleReady = useCallback(() => {
+    scrollToBottom();
+  }, [scrollToBottom]);
   return (
     <div ref={containerRef} className={clsx('px-1', className)}>
       <AnimatePresence>
         {tasks.map((task) => (
-          <Task key={task.id} {...task} onCancel={handleCancel} />
+          <Task
+            key={task.id}
+            {...task}
+            onCancel={handleCancel}
+            onReady={handleReady}
+          />
         ))}
       </AnimatePresence>
     </div>
@@ -207,6 +214,7 @@ const UploadManagerImpl: FC<{
 const Task: FC<
   TaskState & {
     onCancel(id: string): void;
+    onReady(): void;
   }
 > = memo(
   ({
@@ -219,6 +227,7 @@ const Task: FC<
     hash_computing_speed,
     reason,
     onCancel,
+    onReady,
   }) => {
     const i18n = useLingui();
     const [now, setNow] = useState(() => Date.now());
@@ -272,11 +281,12 @@ const Task: FC<
           opacity: 0,
           x: 10,
         }}
-        className="relative p-4 border border-solid border-palette-ocean-blue bg-gray-100 rounded-lg"
+        onAnimationComplete={onReady}
+        className="border-palette-ocean-blue relative rounded-lg border border-solid bg-gray-100 p-4"
       >
-        <div className="flex items-center justify-between gap-2 h-20">
-          <div className="flex relative flex-col flex-1 h-full py-2 box-border">
-            <div className="flex flex-1 justify-between mt-1">
+        <div className="flex h-20 items-center justify-between gap-2">
+          <div className="relative box-border flex h-full flex-1 flex-col py-2">
+            <div className="mt-1 flex flex-1 justify-between">
               <div className="flex-1">
                 <span className="font-semibold text-gray-600">
                   {data?.filename ?? '--'}
@@ -284,11 +294,11 @@ const Task: FC<
               </div>
               <div>
                 <button onClick={() => onCancel(id)}>
-                  <XIcon className="w-5 h-5 stroke-gray-500 hover:stroke-gray-800" />
+                  <XIcon className="h-5 w-5 stroke-gray-500 hover:stroke-gray-800" />
                 </button>
               </div>
             </div>
-            <div className="w-full h-5 text-sm text-gray-400 italic flex items-center">
+            <div className="flex h-5 w-full items-center text-sm italic text-gray-400">
               {(() => {
                 switch (stage) {
                   case 'PREPARE':
@@ -339,15 +349,15 @@ const Task: FC<
                 }
               })()}
             </div>
-            <div className="w-full h-1 bg-blue-500 bg-opacity-20 mt-1">
+            <div className="mt-1 h-1 w-full bg-blue-500 bg-opacity-20">
               <div
-                className="max-w-full w-12 bg-blue-500 h-full"
+                className="h-full w-12 max-w-full bg-blue-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
         </div>
-        <div className="flex gap-1 py-2 font-mono text-gray-500 text-sm slash-splitter slash-splitter">
+        <div className="slash-splitter slash-splitter flex gap-1 py-2 font-mono text-sm text-gray-500">
           <span title="Length of data to be send">
             {i18n._('Total:')} {formatBytes(data?.total || 0)}
           </span>
