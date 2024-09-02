@@ -5,7 +5,12 @@ use crate::state::AppState;
 use crate::utils::decode_uri;
 use axum::body::BodyDataStream;
 use axum::extract::Query;
-use axum::{extract::{Request, State}, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Request, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;
@@ -186,8 +191,11 @@ pub async fn upload(
             tags,
         })
         .await?;
-    state
+    if let Err(err) = state
         .notify_manager
-        .send(IndexChangeAction::AddItem(uid).into())?;
+        .send(IndexChangeAction::AddItem(uid).into())
+    {
+        tracing::error!(reason = ?err, "Failed dispatch add item event to notify manager");
+    };
     Ok((StatusCode::CREATED, Json(uid)).into_response())
 }
