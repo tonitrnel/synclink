@@ -29,6 +29,7 @@ interface State {
   loading: boolean;
   error: boolean;
   duration: number;
+  is_non_music: boolean;
   pointer: {
     pos: number;
     show: boolean;
@@ -43,7 +44,7 @@ interface Metadata {
 
 export const AudioPlayer: FC<{
   src: string;
-  type?: string;
+  type: string;
   title?: string;
   className?: string;
   visible?: boolean;
@@ -58,6 +59,7 @@ export const AudioPlayer: FC<{
     loop: false,
     loading: false,
     error: false,
+    is_non_music: false,
     pointer: {
       pos: 0,
       show: false,
@@ -172,28 +174,36 @@ export const AudioPlayer: FC<{
       objectURL = URL.createObjectURL(file);
       return objectURL;
     };
-    metadataParser(src)
-      .then((tags) => {
-        if (!tags) return void 0;
-        // console.log(`"${tags.title}"`, isNonUTF8(tags.title || ''));
-        setMetadata({
-          title: tags.title || void 0,
-          artist: tags.artist || void 0,
-          cover: tags.image
-            ? readCover(tags.image, tags.album || 'Album cover')
-            : void 0,
+    if (['audio/mp3', 'audio/flac', 'audio/ogg'].includes(type)) {
+      metadataParser(src)
+        .then((tags) => {
+          if (!tags) return void 0;
+          // console.log(`"${tags.title}"`, isNonUTF8(tags.title || ''));
+          setMetadata({
+            title: tags.title || void 0,
+            artist: tags.artist || void 0,
+            cover: tags.image
+              ? readCover(tags.image, tags.album || 'Album cover')
+              : void 0,
+          });
+        }, logger.error)
+        .finally(() => {
+          setState((state) => ({
+            ...state,
+            ready: true,
+          }));
         });
-      }, logger.error)
-      .finally(() => {
-        setState((state) => ({
-          ...state,
-          ready: true,
-        }));
-      });
+    } else {
+      setState((state) => ({
+        ...state,
+        ready: true,
+        is_non_music: true,
+      }));
+    }
     return () => {
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
-  }, [src, visible]);
+  }, [src, type, visible]);
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return void 0;
@@ -276,14 +286,20 @@ export const AudioPlayer: FC<{
       >
         <source src={src} type={type} />
       </audio>
-      <div
-        className="audio-left"
-        style={{ animationPlayState: state.paused ? 'paused' : 'running' }}
-      >
-        {metadata.cover && (
-          <img className="album-cover" src={metadata.cover} alt="album cover" />
-        )}
-      </div>
+      {!state.is_non_music && (
+        <div
+          className="audio-left"
+          style={{ animationPlayState: state.paused ? 'paused' : 'running' }}
+        >
+          {metadata.cover && (
+            <img
+              className="album-cover"
+              src={metadata.cover}
+              alt="album cover"
+            />
+          )}
+        </div>
+      )}
       <div className="audio-right">
         <div>
           <span className="audio-title">

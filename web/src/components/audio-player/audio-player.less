@@ -119,7 +119,10 @@
 .audio-player .audio-button {
   background-color: transparent;
   margin: 0 10px 0 2px;
-  @apply w-5 h-5 p-0 border-none cursor-pointer;
+  @apply h-4 w-4 cursor-pointer border-none p-0 text-gray-600;
+  &:hover {
+    @apply text-gray-900;
+  }
 }
 
 .audio-player .audio-icon {
