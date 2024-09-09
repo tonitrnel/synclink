@@ -113,12 +113,16 @@ export const Menu: FC<{
         }),
       [snackbar],
     );
-    const onDownload = useCallback(() => {
-      downloadFromURL(
-        `${__ENDPOINT__}/api/file/${entity.uid}?raw`,
-        entity.name,
-      );
-    }, [entity.name, entity.uid]);
+    const onDownload = useCallback(
+      (evt: MouseEvent<HTMLElement>) => {
+        evt.preventDefault();
+        downloadFromURL(
+          `${__ENDPOINT__}/api/file/${entity.uid}?raw`,
+          entity.name,
+        );
+      },
+      [entity.name, entity.uid],
+    );
     const slots = useMemo<CustomMenuSlot[]>(() => {
       return [
         ...slotsProp.filter(
