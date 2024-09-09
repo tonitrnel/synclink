@@ -25,6 +25,7 @@ import { RenderProps } from './type.ts';
  * @tips 高度未知
  */
 export const TextItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ({ visible, className, ...props }) => {
     const entity = useEntity();
     const i18n = useLingui();
@@ -38,14 +39,14 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
       path: {
         id: entity.uid,
       },
-      enabled: !unconfirmed && visible,
+      enabled: !unconfirmed,
       keepDirtyOnNotEnabled: true,
     });
     const [{ expandable, expanded }, setExpanded] = useState(() => ({
       expandable: false,
       expanded: false,
     }));
-    useCoordinator(entity.uid, !visible || done);
+    useCoordinator(entity.uid, unconfirmed || done);
     const copyButton = useMemo<CustomMenuSlot>(
       () => ({
         key: 'copy',
