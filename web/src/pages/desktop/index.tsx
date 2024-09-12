@@ -50,7 +50,7 @@ export default function DesktopHomePage() {
           )}
           <List
             onReady={onReady}
-            className="scroller desktop:px-30 absolute bottom-0 left-0 right-0 top-0 box-border h-full w-full overflow-y-scroll px-4 pad:px-20"
+            className="scroller desktop:px-30 normal-scrollbar absolute bottom-0 left-0 right-0 top-0 box-border h-full w-full overflow-y-scroll px-4 pad:px-20"
           />
         </main>
         <footer

@@ -96,7 +96,10 @@ const TreeTableImpl = <T,>(
   }, []);
   return (
     <div
-      className={clsx(scrollHeight && 'overflow-y-scroll', className)}
+      className={clsx(
+        scrollHeight && 'normal-scrollbar overflow-y-auto',
+        className,
+      )}
       style={{ maxHeight: scrollHeight }}
     >
       <table
@@ -131,7 +134,7 @@ const TableHead: FC<{
             role="columnheader"
             key={col.key}
             className={clsx(
-              'z-10 border border-t-0 border-gray-100 bg-gray-50 p-3 text-left font-bold text-gray-700',
+              'z-10 border border-t-0 border-gray-100 bg-gray-50 p-3 text-left text-sm font-bold text-gray-700',
               scrollable && 'sticky top-0',
               col.className,
               col.headerClassName,

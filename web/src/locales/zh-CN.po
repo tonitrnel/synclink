@@ -14,6 +14,16 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/components/list/list.tsx:328
+msgid "Load previous"
+msgstr "加载之前"
+
+#. js-lingui-explicit-id
+#: src/components/list/list.tsx:328
+msgid "No more"
+msgstr "没有了"
+
+#. js-lingui-explicit-id
 #: src/components/dropzone/dropzone.tsx:236
 msgid "Drag and Drop file here"
 msgstr "拖拽文件放置于此"
@@ -179,57 +189,58 @@ msgstr "你无法上传文件因为磁盘容量不足"
 
 #. js-lingui-explicit-id
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:101
-msgid "Reserved:"
-msgstr "保留："
-
-#. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:108
 msgid "Used:"
 msgstr "已使用："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:115
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:108
 msgid "Planned use:"
 msgstr "计划使用："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:122
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:115
 msgid "Free:"
 msgstr "剩余："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:124
 msgid "Folders:"
 msgstr "文件夹："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:135
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:124
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:128
+msgid "items"
+msgstr "项"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:128
 msgid "File:"
 msgstr "文件："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:138
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
 msgid "Total Size:"
 msgstr "总大小："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:146
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:139
 msgid "Caption"
 msgstr "说明"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:154
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:170
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:147
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:163
 msgid "Optional"
 msgstr "可选"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:160
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:153
 msgid "Add tags"
 msgstr "添加标签"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:211
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:204
 #: src/components/input/desktop-input.tsx:87
 #: src/components/input/desktop-input.tsx:88
 #: src/pages/mobile/file-upload/index.tsx:136
@@ -237,23 +248,23 @@ msgid "Upload folder"
 msgstr "上传文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:212
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:205
 #: src/pages/mobile/file-upload/index.tsx:137
 msgid "Upload files"
 msgstr "上传文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:215
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:208
 msgid "Check the files or folders to be upload"
 msgstr "检查要上传的文件或文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:241
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:234
 msgid "Discard"
 msgstr "丢弃"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:249
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:242
 #: src/pages/mobile/file-upload/index.tsx:61
 msgid "Upload"
 msgstr "上传"
@@ -327,37 +338,37 @@ msgstr "预览"
 
 #. js-lingui-explicit-id
 #: src/components/item/components/folder.tsx:221
-#: src/components/item/components/menu.tsx:134
+#: src/components/item/components/menu.tsx:138
 msgid "Download"
 msgstr "下载"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/menu.tsx:146
+#: src/components/item/components/menu.tsx:150
 msgid "Share"
 msgstr "分享"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/menu.tsx:157
+#: src/components/item/components/menu.tsx:161
 msgid "Delete"
 msgstr "删除"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:59
+#: src/components/item/components/text.tsx:60
 msgid "Copy"
 msgstr "复制"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:101
+#: src/components/item/components/text.tsx:102
 msgid "The content of this text is a bit large, so it will not be actively load."
 msgstr "该文本内容有点大，因此不会主动加载。"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:112
+#: src/components/item/components/text.tsx:113
 msgid "Load content in viewer"
 msgstr "在查看器中加载内容"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:132
+#: src/components/item/components/text.tsx:133
 msgid "Continue read"
 msgstr "继续阅读"
 
@@ -437,12 +448,12 @@ msgid "Duration:"
 msgstr "持续："
 
 #. js-lingui-explicit-id
-#: src/components/viewer-dialog/viewer-dialog.tsx:62
+#: src/components/viewer-dialog/viewer-dialog.tsx:70
 msgid "Exit fullscreen"
 msgstr "退出全屏"
 
 #. js-lingui-explicit-id
-#: src/components/viewer-dialog/viewer-dialog.tsx:63
+#: src/components/viewer-dialog/viewer-dialog.tsx:71
 msgid "Enter fullscreen"
 msgstr "进入全屏"
 
@@ -456,6 +467,11 @@ msgstr "接收中"
 #: src/pages/mobile/index.tsx:39
 msgid "Back"
 msgstr "返回"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:101
+#~ msgid "Reserved:"
+#~ msgstr "保留："
 
 #: src/components/item/components/menu.tsx:103
 msgid "can't share this file"
@@ -501,7 +517,7 @@ msgstr "文件夹已经存在"
 msgid "Download folder"
 msgstr "下载文件夹"
 
-#: src/components/list/list.tsx:261
+#: src/components/list/list.tsx:262
 msgid "no items found."
 msgstr "未找到任何记录"
 
@@ -552,6 +568,6 @@ msgstr "资源已存在"
 #~ msgid "upload"
 #~ msgstr "上传"
 
-#: src/components/viewer-dialog/viewer-dialog.tsx:49
+#: src/components/viewer-dialog/viewer-dialog.tsx:57
 msgid "View the contents of file \"{filename}\""
 msgstr "查看文件 \"{filename}\" 的内容"

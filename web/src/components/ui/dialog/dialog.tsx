@@ -65,7 +65,7 @@ const DialogImpl: FC<
                 className={clsx(
                   'flex flex-col',
                   fullscreen && 'h-full w-full',
-                  'gap-4 border bg-background p-5 shadow',
+                  'border bg-background shadow',
                   // 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                   // 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                   // 'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -141,7 +141,7 @@ const DialogHeader = ({
   return (
     <div
       className={clsx(
-        'flex min-h-[1.5rem] items-center justify-between text-center sm:text-left',
+        'border-b-solid flex min-h-[1.5rem] items-center justify-between border-b border-b-gray-300 px-4 py-3 text-center sm:text-left',
         className,
       )}
       {...props}
@@ -149,8 +149,8 @@ const DialogHeader = ({
       <div>{left}</div>
       <div className="flex gap-2">
         {right}
-        <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-          <XIcon className="h-5 w-5" />
+        <DialogPrimitive.Close className="relative rounded-sm p-0.5 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <XIcon className="h-4 w-4" />
           <span className="sr-only">
             <Trans>Close</Trans>
           </span>
@@ -190,7 +190,7 @@ const DialogTitle = forwardRef<
 const DialogContent: FC<PropsWithChildren<HTMLAttributes<HTMLDivElement>>> = ({
   className,
   ...props
-}) => <div className={clsx('flex-1', className)} {...props} />;
+}) => <div className={clsx('flex-1 p-4', className)} {...props} />;
 
 const DialogDescription = forwardRef<
   ElementRef<typeof DialogPrimitive.Description>,

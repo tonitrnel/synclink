@@ -14,6 +14,16 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/components/list/list.tsx:328
+msgid "Load previous"
+msgstr "Load previous"
+
+#. js-lingui-explicit-id
+#: src/components/list/list.tsx:328
+msgid "No more"
+msgstr "No more"
+
+#. js-lingui-explicit-id
 #: src/components/dropzone/dropzone.tsx:236
 msgid "Drag and Drop file here"
 msgstr "Drag and Drop file here"
@@ -179,57 +189,58 @@ msgstr "You can't upload the file because the disk has exceeded its quota"
 
 #. js-lingui-explicit-id
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:101
-msgid "Reserved:"
-msgstr "Reserved:"
-
-#. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:108
 msgid "Used:"
 msgstr "Used:"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:115
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:108
 msgid "Planned use:"
 msgstr "Planned use:"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:122
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:115
 msgid "Free:"
 msgstr "Free:"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:124
 msgid "Folders:"
 msgstr "Folders:"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:135
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:124
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:128
+msgid "items"
+msgstr "items"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:128
 msgid "File:"
 msgstr "File:"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:138
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
 msgid "Total Size:"
 msgstr "Total Size:"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:146
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:139
 msgid "Caption"
 msgstr "Caption"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:154
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:170
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:147
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:163
 msgid "Optional"
 msgstr "Optional"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:160
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:153
 msgid "Add tags"
 msgstr "Add tags"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:211
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:204
 #: src/components/input/desktop-input.tsx:87
 #: src/components/input/desktop-input.tsx:88
 #: src/pages/mobile/file-upload/index.tsx:136
@@ -237,23 +248,23 @@ msgid "Upload folder"
 msgstr "Upload folder"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:212
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:205
 #: src/pages/mobile/file-upload/index.tsx:137
 msgid "Upload files"
 msgstr "Upload files"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:215
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:208
 msgid "Check the files or folders to be upload"
 msgstr "Check the files or folders to be upload"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:241
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:234
 msgid "Discard"
 msgstr "Discard"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:249
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:242
 #: src/pages/mobile/file-upload/index.tsx:61
 msgid "Upload"
 msgstr "Upload"
@@ -327,37 +338,37 @@ msgstr "Preview"
 
 #. js-lingui-explicit-id
 #: src/components/item/components/folder.tsx:221
-#: src/components/item/components/menu.tsx:134
+#: src/components/item/components/menu.tsx:138
 msgid "Download"
 msgstr "Download"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/menu.tsx:146
+#: src/components/item/components/menu.tsx:150
 msgid "Share"
 msgstr "Share"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/menu.tsx:157
+#: src/components/item/components/menu.tsx:161
 msgid "Delete"
 msgstr "Delete"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:59
+#: src/components/item/components/text.tsx:60
 msgid "Copy"
 msgstr "Copy"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:101
+#: src/components/item/components/text.tsx:102
 msgid "The content of this text is a bit large, so it will not be actively load."
 msgstr "The content of this text is a bit large, so it will not be actively load."
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:112
+#: src/components/item/components/text.tsx:113
 msgid "Load content in viewer"
 msgstr "Load content in viewer"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:132
+#: src/components/item/components/text.tsx:133
 msgid "Continue read"
 msgstr "Continue read"
 
@@ -437,12 +448,12 @@ msgid "Duration:"
 msgstr "Duration:"
 
 #. js-lingui-explicit-id
-#: src/components/viewer-dialog/viewer-dialog.tsx:62
+#: src/components/viewer-dialog/viewer-dialog.tsx:70
 msgid "Exit fullscreen"
 msgstr "Exit fullscreen"
 
 #. js-lingui-explicit-id
-#: src/components/viewer-dialog/viewer-dialog.tsx:63
+#: src/components/viewer-dialog/viewer-dialog.tsx:71
 msgid "Enter fullscreen"
 msgstr "Enter fullscreen"
 
@@ -456,6 +467,11 @@ msgstr "Receiving"
 #: src/pages/mobile/index.tsx:39
 msgid "Back"
 msgstr "Back"
+
+#. js-lingui-explicit-id
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:101
+#~ msgid "Reserved:"
+#~ msgstr "Reserved:"
 
 #: src/components/item/components/menu.tsx:103
 msgid "can't share this file"
@@ -501,7 +517,7 @@ msgstr "directory already exists"
 msgid "Download folder"
 msgstr "Download folder"
 
-#: src/components/list/list.tsx:261
+#: src/components/list/list.tsx:262
 msgid "no items found."
 msgstr "No items found."
 
@@ -552,6 +568,6 @@ msgstr "Resource already exists"
 #~ msgid "upload"
 #~ msgstr "Upload"
 
-#: src/components/viewer-dialog/viewer-dialog.tsx:49
+#: src/components/viewer-dialog/viewer-dialog.tsx:57
 msgid "View the contents of file \"{filename}\""
 msgstr "View the contents of file \"{filename}\""

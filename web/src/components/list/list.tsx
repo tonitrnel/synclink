@@ -23,6 +23,7 @@ import { notifyManager } from '~/utils/notify-manager.ts';
 import { useSnackbar } from '~/components/ui/snackbar';
 import { loadCoordinator } from '~/components/item/hooks/use-coordinator.ts';
 import { lookupHTMLNode } from '~/utils/lookup-html-node.ts';
+import { useLingui } from '@lingui/react';
 
 const logger = new Logger('cedasync');
 
@@ -97,12 +98,12 @@ export const List: FC<{
     const scrollTop = container.scrollTop;
     const scrollHeight = container.scrollHeight;
     loadCoordinator.waitForNextBatch().then(() => {
-      const _scrollTop = container.scrollTop;
+      // const _scrollTop = container.scrollTop;
       const _scrollHeight = container.scrollHeight;
-      console.log(
-        `finish loadPrevious\nscrollTop: ${scrollTop} > ${_scrollTop} > ${_scrollHeight - scrollHeight + scrollTop}`,
-        `scrollHeight: ${scrollHeight} > ${_scrollHeight}`,
-      );
+      // console.log(
+      //   `finish loadPrevious\nscrollTop: ${scrollTop} > ${_scrollTop} > ${_scrollHeight - scrollHeight + scrollTop}`,
+      //   `scrollHeight: ${scrollHeight} > ${_scrollHeight}`,
+      // );
       container.scrollTo({
         top: _scrollHeight - scrollHeight + scrollTop,
         behavior: 'instant',
@@ -184,7 +185,7 @@ export const List: FC<{
     const metadata = metadataRef.current;
     if (metadata.isLoading || !metadata.ready) return void 0;
     metadata.isLoading = true;
-    console.log('start loadPrevious');
+    // console.log('start loadPrevious');
     loadPrevious();
   }, [loadPrevious]);
   // 在 Loading 遮罩关闭前滚动至最底部
@@ -193,6 +194,10 @@ export const List: FC<{
     const element = containerRef.current;
     if (!element) return void 0;
     const list = element.querySelector('ul')!;
+    if (!list) {
+      onReady();
+      return void 0;
+    }
     const items = [...list.children];
     if (items.length == 0) return void 0;
     // let startTime = Date.now();
@@ -208,17 +213,17 @@ export const List: FC<{
     //   startTime = now;
     // scrollToBottom();
     // });
-    const start = Date.now();
+    // const start = Date.now();
     // 第一次滚动，滚动至最底部
     scrollToBottom();
     // 第二次滚动和关闭 Loading 遮罩，当前批次的所有 Item 均高度已稳定（数据已加载）
-    loadCoordinator.waitForNextBatch().then(({ isTimeout }) => {
-      console.log(
-        'ready, isTimeout:',
-        isTimeout,
-        ' elapsed:',
-        Date.now() - start,
-      );
+    loadCoordinator.waitForNextBatch().then(() => {
+      // console.log(
+      //   'ready, isTimeout:',
+      //   isTimeout,
+      //   ' elapsed:',
+      //   Date.now() - start,
+      // );
       scrollToBottom();
       onReady();
       metadataRef.current.ready = true;
@@ -265,7 +270,10 @@ export const List: FC<{
           return (
             <>
               {loading && <Loading />}
-              <LoadPreviousTrigger onTrigger={onLoadPreviousTrigger} />
+              <LoadPreviousTrigger
+                onTrigger={onLoadPreviousTrigger}
+                hasMore={previousPage !== undefined}
+              />
               <ul
                 id="records"
                 className={clsx('flex-1 pb-8 pt-2 transition-opacity')}
@@ -285,9 +293,11 @@ export const List: FC<{
 
 const LoadPreviousTrigger: FC<{
   onTrigger(): void;
-}> = ({ onTrigger: _onTrigger }) => {
+  hasMore: boolean;
+}> = ({ onTrigger: _onTrigger, hasMore }) => {
   const ref = useRef<HTMLDivElement>(null);
   const onTrigger = useLatestFunc(_onTrigger);
+  const i18n = useLingui();
   useEffect(() => {
     const el = ref.current;
     if (!el) return void 0;
@@ -310,5 +320,16 @@ const LoadPreviousTrigger: FC<{
     obs.observe(el);
     return () => obs.disconnect();
   }, [onTrigger]);
-  return <div ref={ref} className="invisible h-[1rem] w-full opacity-0" />;
+  return (
+    <div
+      ref={ref}
+      className={clsx(
+        'pointer-events-none absolute left-0 top-0 w-full py-4 text-center text-sm text-gray-300',
+        hasMore && 'invisible opacity-0',
+      )}
+      onClick={onTrigger}
+    >
+      {hasMore ? i18n._('Load previous') : i18n._('No more')}
+    </div>
+  );
 };

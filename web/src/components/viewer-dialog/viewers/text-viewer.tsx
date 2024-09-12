@@ -4,7 +4,7 @@ import { ViewerProps } from './type';
 export const TextViewer: FC<ViewerProps> = ({ src, onReady, onError }) => {
   const [content, setContent] = useState('');
   useEffect(() => {
-    console.log("text src", src);
+    // console.log('text src', src);
     fetch(src).then(
       async (res) => {
         setContent(await res.text());
@@ -14,7 +14,7 @@ export const TextViewer: FC<ViewerProps> = ({ src, onReady, onError }) => {
     );
   }, [onError, onReady, src]);
   return (
-    <p className="w-full whitespace-break-spaces break-words text-gray-900 mt-0 min-h-[32px] leading-relaxed p-2 max-h-[360px]">
+    <p className="mt-0 min-h-[32px] w-full whitespace-break-spaces break-words bg-background p-2 leading-relaxed text-gray-900">
       {content}
     </p>
   );

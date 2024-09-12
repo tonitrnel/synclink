@@ -59,7 +59,12 @@ class NotifyManager extends EventBus<
       return await new Promise((resolve, reject) => {
         const eventSource = new EventSource(`${__ENDPOINT__}/api/notify`);
         eventSource.onmessage = this.handleMessage;
+        const timer = window.setTimeout(() => {
+          eventSource.close();
+          reject(new Error('Connection timeout'));
+        }, 1600);
         eventSource.onopen = () => {
+          window.clearTimeout(timer);
           this.once('CLIENT_ID', (value) => {
             const [id, pin] = value.split(';');
             this.clientId = id;
@@ -74,6 +79,7 @@ class NotifyManager extends EventBus<
           console.debug('sse connected');
         };
         eventSource.onerror = () => {
+          window.clearTimeout(timer);
           eventSource.close();
           if (
             eventSource.readyState == eventSource.CONNECTING ||

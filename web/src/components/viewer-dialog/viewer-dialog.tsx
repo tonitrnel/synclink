@@ -40,22 +40,30 @@ export const ViewerDialog: FC<
   const Viewer = useViewerLoader({ extname, filename, mimetype });
   const src = useSrc(resourceId, subResourceId);
   return (
-    <Dialog visible={visible} fullscreen={fullscreen} onClose={onClose}>
-      <Dialog.Header className="-mt-2">
-        <Dialog.Title className="max-w-[240px] truncate capitalize">
+    <Dialog
+      visible={visible}
+      fullscreen={fullscreen}
+      onClose={onClose}
+      className="~border ~bg-background ~shadow"
+    >
+      <Dialog.Header className="~border-b text-white">
+        <Dialog.Title
+          className="~text-lg max-w-full truncate text-sm"
+          title={filename}
+        >
           {filename}
         </Dialog.Title>
         <Dialog.Description className="sr-only">
           {t(i18n.i18n)`View the contents of file "${filename}"`}
         </Dialog.Description>
         <button
-          className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          className="rounded-sm p-0.5 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&>svg]:stroke-[3px]"
           onClick={toggleFullscreen}
         >
           {fullscreen ? (
-            <MinimizeIcon className="h-5 w-5 p-0.5" />
+            <MinimizeIcon className="h-4 w-4 p-0.5" />
           ) : (
-            <MaximizeIcon className="h-5 w-5 p-0.5" />
+            <MaximizeIcon className="h-4 w-4 p-0.5" />
           )}
           <span className="sr-only">
             {fullscreen
@@ -64,13 +72,13 @@ export const ViewerDialog: FC<
           </span>
         </button>
       </Dialog.Header>
-      <Dialog.Content
-        className={clsx(
-          'overflow-y-auto p-0',
-          fullscreen ? 'w-full' : 'w-[560px]',
-        )}
-      >
-        <section className="relative h-full min-h-[18rem]">
+      <Dialog.Content className="~p min-h-0 overflow-hidden rounded">
+        <section
+          className={clsx(
+            'mini-scrollbar relative overflow-y-auto',
+            fullscreen ? 'h-full max-h-full w-full' : 'max-h-[80vh] w-[48rem]',
+          )}
+        >
           {!state.ready && (
             <Loading.Wrapper>
               <Loading />

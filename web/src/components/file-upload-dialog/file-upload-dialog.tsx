@@ -92,14 +92,7 @@ export const FileUploadImpl: FC<{
               />
             ))}
           </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-sm">
-            <div className="flex items-center gap-1">
-              <span
-                className="inline-block h-1 w-2 bg-current"
-                style={{ color: stats[0].color }}
-              />
-              <span>{`${i18n._('Reserved:')} ${stats[0].size}(${stats[0].value}%)`}</span>
-            </div>
+          <div className="mt-2 flex flex-wrap gap-4 text-sm">
             <div className="flex items-center gap-1">
               <span
                 className="inline-block h-1 w-2 bg-current"
@@ -112,7 +105,7 @@ export const FileUploadImpl: FC<{
                 className="inline-block h-1 w-2 bg-current"
                 style={{ color: stats[2].color }}
               />
-              <span>{`${i18n._('Planned use:')} ${stats[2].size}(^${stats[2].value}%)`}</span>
+              <span>{`${i18n._('Planned use:')} ${stats[2].size}(${stats[2].value}%)`}</span>
             </div>
             <div className="flex items-center gap-1">
               <span
@@ -125,14 +118,14 @@ export const FileUploadImpl: FC<{
         </div>
       )}
       <div className="my-4 py-2">
-        <p className="mb-4 flex gap-1 font-bold">
+        <p className="mb-4 flex gap-1 text-sm font-bold">
           {mode == 'directory' && (
             <span className="text-palette-ocean-blue">
-              {i18n._('Folders:')} {dirCount} items
+              {i18n._('Folders:')} {dirCount} {i18n._('items')}
             </span>
           )}
           <span className="text-palette-deep-green">
-            {i18n._('File:')} {fileCount} items
+            {i18n._('File:')} {fileCount} {i18n._('items')}
           </span>
           <span className="text-palette-bright-orange">
             {i18n._('Total Size:')} {stats?.[2].size || '-'}
@@ -143,7 +136,7 @@ export const FileUploadImpl: FC<{
       <div className="my-4 py-2">
         <div className="mt-2">
           <label htmlFor="file-caption">
-            <span className="font-bold">{i18n._('Caption')}</span>
+            <span className="text-sm font-bold">{i18n._('Caption')}</span>
           </label>
           <div className="py-2">
             <Input
@@ -157,7 +150,7 @@ export const FileUploadImpl: FC<{
         </div>
         <div className="mt-2">
           <label htmlFor="file-tags">
-            <span className="font-bold">{i18n._('Add tags')}</span>
+            <span className="text-sm font-bold">{i18n._('Add tags')}</span>
           </label>
           <div className="w-full py-2">
             <TagInput
@@ -203,7 +196,7 @@ export const FileUploadDialog: FC<{
     <Dialog
       visible={visible}
       onClose={onCancel}
-      className="w-[48rem] bg-white p-8"
+      className="w-[48rem] bg-white p-4"
     >
       <div className="flex items-center justify-between">
         <Dialog.Title>
@@ -215,7 +208,7 @@ export const FileUploadDialog: FC<{
           {i18n._('Check the files or folders to be upload')}
         </Dialog.Description>
       </div>
-      <Dialog.Content>
+      <Dialog.Content className="~p">
         <main className="overflow-auto px-1">
           <FileUploadImpl
             mode={mode}

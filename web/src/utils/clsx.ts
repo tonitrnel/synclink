@@ -3,17 +3,18 @@ type ValidClasses = string | { [classes: string]: boolean | undefined };
 export const clsx = (
   ...classes: (ValidClasses | undefined | null | false)[]
 ): string => {
-  return classes
-    .filter((it): it is ValidClasses => Boolean(it))
-    .map((it) => {
-      if (typeof it !== 'object') return it;
-      return Object.entries(it)
-        .filter(([, v]) => Boolean(v))
-        .map(([k]) => k);
-    })
-    .flat()
-    .join(' ')
-    .replace(/\s+/g, ' ');
+  return mtc(
+    ...classes
+      .filter((it): it is ValidClasses => Boolean(it))
+      .map((it) => {
+        if (typeof it !== 'object') return it;
+        return Object.entries(it)
+          .filter(([, v]) => Boolean(v))
+          .map(([k]) => k);
+      })
+      .flat()
+      .map((it) => String(it).trim()),
+  );
 };
 
 type ClassVariantConfigurations = Record<string, Record<string, string>>;
@@ -115,4 +116,69 @@ export const clsv = <T extends ClassVariantConfigurations>(
     cache.set(cacheKey, clsx(basicClasses, compoundClasses));
     return clsx(base, cache.get(cacheKey));
   };
+};
+
+const MTC_WHITELIST = [
+  'p',
+  'px',
+  'py',
+  'm',
+  'mx',
+  'my',
+  'ml',
+  'mb',
+  'mt',
+  'mr',
+  'l',
+  'left',
+  'top',
+  'right',
+  'bottom',
+  'gap',
+];
+
+/**
+ * 一个简单的 TailwindCSS 名称冲突合并函数
+ *
+ * 特性1：根据横线分割，相同前缀的（最后一个横线前的字面量视作 prefix），后面的将覆盖前面的类名
+ *
+ * 特性2：如果以 `~` 开头的类目将移除前面相匹配（startsWith）的类型
+ *
+ * @param classes 要合并的多个类名
+ */
+export const mtc = (...classes: string[]): string => {
+  const finalClasses = new Map<string, string>();
+
+  for (const classGroup of classes) {
+    const individualClasses = classGroup.split(/\s+/);
+
+    for (const className of individualClasses) {
+      if (className.startsWith('~')) {
+        const [prefix] = lastSplitOnce(className.slice(1), '-');
+        if (MTC_WHITELIST.includes(prefix)) {
+          finalClasses.delete(prefix);
+        } else {
+          finalClasses.delete(className.slice(1));
+        }
+      } else {
+        const [prefix] = lastSplitOnce(className, '-');
+        // 如果后续存在相同前缀的类名，将会用新地覆盖旧的
+        if (MTC_WHITELIST.includes(prefix)) {
+          finalClasses.set(prefix, className);
+        } else {
+          finalClasses.set(className, className);
+        }
+      }
+    }
+  }
+
+  return Array.from(finalClasses.values()).join(' ');
+};
+
+const lastSplitOnce = (str: string, sep: string): [string, string] => {
+  const indexOf = str.lastIndexOf(sep);
+  // -1: flex, 0: -mr-3
+  return indexOf < 0
+    ? [str, '']
+    : [str.substring(0, indexOf), str.substring(indexOf + 1)];
 };

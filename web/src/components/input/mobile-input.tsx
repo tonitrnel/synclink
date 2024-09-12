@@ -94,7 +94,7 @@ export const MobileInput = forwardRef<
               <DropdownMenuItem
                 key="Direct transfer"
                 onClick={() => openFileTransfer({ mode: 'sender' })}
-                className="flex items-center gap-1 [&>svg]:text-gray-600"
+                className="flex items-center gap-1 p-2 [&>svg]:text-gray-600"
                 aria-label={i18n._('Direct transfer')}
               >
                 <ArrowLeftRightIcon className="h-4 w-4" />

@@ -157,7 +157,7 @@ export const useFileUploadLogic = ({
       },
       {
         key: 'usedSpace',
-        color: '#1e40af',
+        color: '#52525b',
         value: usedSpacePct,
         size: formatBytes(data.disk_usage),
       },

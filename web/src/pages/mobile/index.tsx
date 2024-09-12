@@ -20,7 +20,6 @@ const Header: FC = memo(() => {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
-  const i18n = useLingui();
   const gotoHome = useCallback(() => {
     if (history.length > 0) {
       navigate(-1);
@@ -32,15 +31,14 @@ const Header: FC = memo(() => {
     <header className="relative z-20 flex h-[3.428rem] w-full justify-center border-b border-b-gray-200 bg-background p-2 px-4 shadow">
       {!isHome && (
         <button
-          className="absolute left-4 flex select-none items-center rounded px-1 py-2 active:bg-gray-200"
+          className="absolute left-4 my-1 flex select-none items-center rounded p-1 active:bg-gray-200"
           onClick={gotoHome}
         >
-          <ChevronLeftIcon className="mr-2 h-5 w-5" />
-          <span className="pr-2">{i18n._('Back')}</span>
+          <ChevronLeftIcon className="h-6 w-6" />
         </button>
       )}
       <div className="flex h-full items-center gap-2">
-        <LogoIcon className="h-14 w-14" />
+        <LogoIcon className="h-10 w-10 opacity-80" />
         {/*<h1 className="pt-1 text-lg font-bold">Cedasync</h1>*/}
       </div>
     </header>

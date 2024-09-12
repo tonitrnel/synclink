@@ -87,13 +87,18 @@ const ItemImpl = forwardRef<
     );
   }, [i18n, data.ip, data.ip_alias]);
   return (
-    <div ref={composedRefs} className={clsx('item', className)} {...props}>
+    <div
+      ref={composedRefs}
+      className={clsx('item', className)}
+      data-uid={data.uid}
+      {...props}
+    >
       <UseEntity value={data}>
         <div className="flex items-end bg-[#f6f8fa] px-3 py-4 text-sm pad:mb-2 pad:px-6">
           {time}
           {from}
         </div>
-        <div className="flex-1 rounded bg-white p-5 px-3 shadow-sm outline-gray-400 pad:p-7 pad:pb-4">
+        <div className="flex-1 rounded bg-white p-5 px-3 shadow-sm outline-gray-400 pad:p-7 pad:py-4">
           <Render visible={visible} />
         </div>
       </UseEntity>
