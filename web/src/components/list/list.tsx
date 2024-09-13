@@ -16,7 +16,7 @@ import { Loading } from '~/components/loading';
 import { t } from '@lingui/macro';
 import { motion } from 'framer-motion';
 import { useLatestFunc } from '@painted/shared';
-import { useGetList } from '~/endpoints';
+import { useGetList, useGetTextCollection } from '~/endpoints';
 import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
 import { notifyManager } from '~/utils/notify-manager.ts';
@@ -33,7 +33,7 @@ interface State {
     size: number;
   };
   total: number;
-  records: IEntity[];
+  records: (IEntity & { content?: string })[];
   beforeTime: number;
 }
 
@@ -73,7 +73,36 @@ export const List: FC<{
       per_page: state.pagination.size,
       before: state.beforeTime,
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      const textCollection = data.data.filter(
+        (it) => it.type.startsWith('text/') && it.size < 4096,
+      ) as State['records'];
+      if (textCollection.length > 0) {
+        const textCollectionContents = await useGetTextCollection({
+          body: { uuids: textCollection.map((it) => it.uid) },
+          serializers: {
+            response: async (res) => {
+              const lengths = res.headers
+                .get('x-collection-lengths')!
+                .split(',')
+                .map(Number);
+              const buffer = new Uint8Array(await res.arrayBuffer());
+              const textDecoder = new TextDecoder();
+              let start = 0;
+              return lengths.map((len) => {
+                const part = textDecoder.decode(
+                  buffer.subarray(start, start + len),
+                );
+                start += len;
+                return part;
+              });
+            },
+          },
+        });
+        for (let i = 0; i < textCollection.length; ++i) {
+          textCollection[i].content = textCollectionContents[i];
+        }
+      }
       withProduce(setState, (draft) => {
         draft.total = data.total;
         draft.records.unshift(...data.data.toReversed());

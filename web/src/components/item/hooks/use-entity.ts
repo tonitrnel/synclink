@@ -1,7 +1,9 @@
 import { createContext, createElement, FC, ReactNode, useContext } from 'react';
 import { IEntity } from '~/constants/types.ts';
 
-const __ENTITY_CONTEXT__ = createContext<IEntity | null>(null);
+const __ENTITY_CONTEXT__ = createContext<
+  (IEntity & { content?: string }) | null
+>(null);
 export const UseEntity: FC<{ value: IEntity; children: ReactNode }> = ({
   value,
   children,

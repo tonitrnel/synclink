@@ -29,9 +29,9 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
   ({ visible, className, ...props }) => {
     const entity = useEntity();
     const i18n = useLingui();
-    const unconfirmed = entity.size > 4096;
+    const unconfirmed = entity.size > 4096 && entity.content === undefined;
     const {
-      data: content,
+      data: content = entity.content,
       pending: loading,
       done,
       error,
@@ -39,14 +39,17 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
       path: {
         id: entity.uid,
       },
-      enabled: !unconfirmed,
+      enabled: !unconfirmed && entity.content === undefined,
       keepDirtyOnNotEnabled: true,
     });
     const [{ expandable, expanded }, setExpanded] = useState(() => ({
       expandable: false,
       expanded: false,
     }));
-    useCoordinator(entity.uid, unconfirmed || done);
+    useCoordinator(
+      entity.uid,
+      unconfirmed || done || entity.content !== undefined,
+    );
     const copyButton = useMemo<CustomMenuSlot>(
       () => ({
         key: 'copy',

@@ -45,6 +45,13 @@ export const useGetFileContent = createHttpFactory('GET:/api/file/{id}')
   .apply<'Response', string>()
   .doQueryRequest();
 
+export const useGetTextCollection = createHttpFactory(
+  'POST:/api/text-collection',
+)
+  .apply<'Response', string>()
+  .apply<'Body', { uuids: string[] }>()
+  .doRequest();
+
 export const useGetStats = createHttpFactory('GET:/api/stats')
   .apply<
     'Response',
