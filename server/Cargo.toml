@@ -1,6 +1,6 @@
 [package]
 name = "cedasync"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,7 +30,7 @@ tar = "0.4.41"
 pin-project-lite = "0.2.14"
 rand = "0.8.5"
 jsonwebtoken = "9.3.0"
-libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "5667a5b0433157b05ba0461841f7bb865f84c4cb" }
+libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "c411ef3eab8ed078f8bf03e1f542fbc4e4cb9c2a" }
 
 [profile.release]
 strip = true

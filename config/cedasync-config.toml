@@ -11,7 +11,7 @@ storage_path = "storage"
 # logger
 [logs]
 level = "info"
-#storage_path = "logs"
+#storage_path = "logs" # deafult /var/log/cedasync
 #enable_file_logging = true # default false
 
 # Authorize

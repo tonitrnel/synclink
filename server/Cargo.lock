@@ -204,7 +204,7 @@ checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
 
 [[package]]
 name = "cedasync"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -729,7 +729,7 @@ checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 [[package]]
 name = "libvips"
 version = "1.7.0"
-source = "git+https://github.com/tonitrnel/libvips-rust-bindings?rev=5667a5b0433157b05ba0461841f7bb865f84c4cb#5667a5b0433157b05ba0461841f7bb865f84c4cb"
+source = "git+https://github.com/tonitrnel/libvips-rust-bindings?rev=c411ef3eab8ed078f8bf03e1f542fbc4e4cb9c2a#c411ef3eab8ed078f8bf03e1f542fbc4e4cb9c2a"
 dependencies = [
  "num-derive",
  "num-traits",

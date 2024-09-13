@@ -190,7 +190,7 @@ impl NotifyManager {
     pub fn add_client(&self, id: Uuid, conn: SSEConnection) {
         let mut guard = self.connections.lock().unwrap();
         guard.insert(id, conn);
-        tracing::debug!("add_client, connection len {:?}", guard.len());
+        tracing::trace!("add_client, connection len {:?}", guard.len());
         if guard.len() <= 1 {
             return;
         }
@@ -207,7 +207,7 @@ impl NotifyManager {
             }
         });
         guard.remove(id);
-        tracing::debug!("remove_client, connection len {:?}", guard.len());
+        tracing::trace!("remove_client, connection len {:?}", guard.len());
         if guard.is_empty() {
             return;
         }
