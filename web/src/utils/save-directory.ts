@@ -42,7 +42,9 @@ export const saveDirectoryFromTarStream = async (
           // console.log(
           //   `write directory, name: "${header.name}" path: "${header.path}"`,
           // );
-          const path = header.path.slice(0, -1);
+          const path = header.path.endsWith('/')
+            ? header.path.slice(0, -1)
+            : header.path;
           const parent = path.split('/').slice(0, -1).join('/') || '/';
           if (!handleMap.has(parent)) {
             throw new Error('missing parent directory');
