@@ -39,6 +39,7 @@ pub fn build() -> Router<AppState> {
         .route("/api/sse/connections", get(services::sse_connections))
         .route("/api/stats", get(services::stats))
         .route("/api/clean-dump", get(services::clean_dump))
+        .route("/api/text-collection", post(services::get_text_collection))
         .route("/api/file/:uuid", delete(services::delete))
         .route("/api/file/:uuid", get(services::get))
         .route("/api/directory/:uuid", get(services::get_virtual_directory))

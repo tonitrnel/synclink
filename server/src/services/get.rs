@@ -2,6 +2,7 @@ use std::ops::Range;
 use std::path::PathBuf;
 
 use anyhow::Context;
+use axum::http::StatusCode;
 use axum::{
     body::Body,
     extract::{Path, Query, State},
@@ -9,8 +10,11 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use futures::{stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 use tar::{Archive, EntryType};
+use tokio::fs;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncWriteExt};
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
@@ -20,8 +24,7 @@ use crate::extractors::Header;
 use crate::state::AppState;
 use crate::utils::{
     format_last_modified_from_metadata, format_last_modified_from_u64, format_ranges,
-    guess_mimetype_from_bytes, parse_range_from_str, Boundaries,
-    SparseStreamReader,
+    guess_mimetype_from_bytes, parse_range_from_str, Boundaries, SparseStreamReader,
 };
 
 #[derive(Deserialize)]
@@ -164,6 +167,73 @@ fn add_extension(path: &PathBuf, extension: impl AsRef<std::path::Path>) -> Path
         None => path.set_extension(extension.as_ref()),
     };
     path
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct UuidRequest {
+    uuids: Vec<Uuid>,
+}
+
+pub async fn get_text_collection(
+    State(state): State<AppState>,
+    Json(UuidRequest { uuids }): Json<UuidRequest>,
+) -> impl IntoResponse {
+    let collection = {
+        let indexing = state.indexing;
+        let mut collection = Vec::with_capacity(uuids.len());
+        for uuid in uuids.iter() {
+            if !indexing.has(uuid) {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    format!("The resource id {} could not be found.", uuid),
+                )
+                    .into_response();
+            }
+            let entity = indexing.get(&uuid).unwrap();
+            if !entity.get_content_type().starts_with("text/") {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    format!("The resource content {} is non-text.", uuid),
+                )
+                    .into_response();
+            }
+            let path = indexing.get_storage_dir().join(entity.get_resource());
+            collection.push((path, entity))
+        }
+        collection
+    };
+    let total = collection.iter().fold(0, |acc, it| acc + it.1.get_size());
+    let lengths = collection
+        .iter()
+        .enumerate()
+        .fold(String::new(), |mut acc, (i, it)| {
+            if i == 0 {
+                write!(&mut acc, "{}", it.1.get_size()).unwrap();
+            } else {
+                write!(&mut acc, ",{}", it.1.get_size()).unwrap();
+            }
+            acc
+        });
+    let response_header = vec![
+        (
+            header::HeaderName::from_static("x-collection-lengths"),
+            lengths,
+        ),
+        (header::CONTENT_LENGTH, total.to_string()),
+        (
+            header::CONTENT_TYPE,
+            "text/plain; charset=utf-8".to_string(),
+        ),
+    ];
+    let stream = stream::iter(collection)
+        .filter_map(|(path, ..)| async move { Some(fs::read(path).await) })
+        .into_stream();
+    (
+        axum::response::AppendHeaders(response_header),
+        Body::from_stream(stream),
+    )
+        .into_response()
 }
 
 pub async fn get_virtual_directory(
