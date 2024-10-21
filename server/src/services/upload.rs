@@ -78,8 +78,7 @@ async fn handle_archive(
     {
         let mut file = std::fs::OpenOptions::new()
             .read(true)
-            .open(&preallocation.path)
-            .unwrap();
+            .open(&preallocation.path)?;
         let mut archive = Archive::new(&mut file);
         let clean = || {
             if let Err(err) = std::fs::remove_file(&preallocation.path) {
@@ -100,7 +99,7 @@ async fn handle_archive(
             }
             let mut buf = [0; 4096];
             loop {
-                let n = entry.read(&mut buf).unwrap();
+                let n = entry.read(&mut buf)?;
                 if n == 0 {
                     break;
                 }
@@ -118,7 +117,7 @@ pub struct UploadHeaderDto {
     content_type: Option<String>,
     content_length: u64,
     user_agent: String,
-    x_content_sha256: String,
+    x_content_sha256: Option<String>,
     x_raw_filename: Option<String>,
 }
 
@@ -141,7 +140,7 @@ pub async fn upload(
     let caption = query.caption.clone().unwrap_or_default();
     let content_length = header.content_length;
     let content_type = header.content_type.clone();
-    let content_hash = header.x_content_sha256.to_lowercase();
+    let content_hash = header.x_content_sha256.clone().map(|it| it.to_lowercase());
     let filename = header
         .x_raw_filename
         .clone()
@@ -151,7 +150,8 @@ pub async fn upload(
     let user_agent = header.user_agent.clone();
 
     // Check hash exists, if it exists, then cancel upload and return uuid
-    if let Some(uuid) = state.indexing.has_hash(&content_hash) {
+    if let Some(uuid) = content_hash.as_ref().and_then(|content_hash| state.indexing.has_hash(content_hash))
+    {
         return Err(ApiError::DuplicateFile(uuid));
     }
     let (uid, size, hash) = {
@@ -170,7 +170,7 @@ pub async fn upload(
         } else {
             handle_file(stream, preallocation).await?
         };
-        if hash.as_str() != content_hash {
+        if content_hash.is_some() && Some(&hash) != content_hash.as_ref() {
             preallocation.cleanup().await;
             return Err(ApiError::HashMismatch);
         }
