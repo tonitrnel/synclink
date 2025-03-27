@@ -8,7 +8,7 @@ import {
   XCircleIcon,
 } from 'icons';
 import { clsv } from '~/utils/clsx.ts';
-import { isFunction } from '@painted/shared';
+import { isFunction } from '@ptdgrp/shared-react';
 
 const snackbarVariants = clsv(
   'flex items-start shadow-xl gap-2 leading-none rounded-lg border border-solid border-[#00000046] text-sm [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-white',
@@ -91,14 +91,14 @@ export const Snackbar: FC<
         animate="animate"
         exit="exit"
         layout
-        className="relative pointer-events-auto list-none"
+        className="pointer-events-auto relative list-none"
       >
         <div id={id} className={snackbarVariants({ size, variant })}>
           {icon}
-          <div className="flex-1 mx-1">
+          <div className="mx-1 flex-1">
             {title ? (
               <>
-                <p className="leading-none mb-1">{title}</p>
+                <p className="mb-1 leading-none">{title}</p>
                 <p className="leading-normal text-gray-200">{message}</p>
               </>
             ) : (
@@ -136,7 +136,7 @@ export const SnackbarContainer: FC<{
   items: { key: string; originalProps: Omit<SnackbarProps, 'key'> }[];
 }> = ({ items, onExit }) => {
   return (
-    <ol className="fixed left-[50%] translate-x-[-50%] top-8 box-border flex items-center flex-col-reverse pointer-events-none gap-2 w-[80vw] pad:w-auto z-[9999]">
+    <ol className="pointer-events-none fixed left-[50%] top-8 z-[9999] box-border flex w-[80vw] translate-x-[-50%] flex-col-reverse items-center gap-2 pad:w-auto">
       <AnimatePresence mode="popLayout" onExitComplete={onExit}>
         {items.map((it) => (
           <Snackbar key={it.key} id={it.key!} {...it.originalProps} />

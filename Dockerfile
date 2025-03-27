@@ -93,8 +93,8 @@ FROM alpine:3.20
 
 WORKDIR /app
 
-RUN mkdir "/etc/cedasync"
-RUN mkdir "/var/log/cedasync"
+RUN mkdir "/etc/ephemera"
+RUN mkdir "/var/log/ephemera"
 
 COPY --from=ServerBuilder /usr/local/lib /usr/local/lib
 
@@ -109,18 +109,18 @@ RUN apk add --update --no-cache  \
     libwebp \
     libwebpmux libwebpdemux lcms2 tiff
 
-COPY --from=ServerBuilder /app/target/release/cedasync .
+COPY --from=ServerBuilder /app/target/release/ephemera .
 
 COPY --from=WebBuilder /app/web/dist /app/public
 
-COPY config/cedasync-config.toml /etc/cedasync/config.toml
+COPY config/ephemera.conf /etc/ephemera/ephemera.conf
 
-COPY debian/etc/logrotate.d/cedasync /etc/logrotate.d/cedasync
+COPY debian/etc/logrotate.d/ephemera /etc/logrotate.d/ephemera
 
 EXPOSE 8080
 
-RUN chmod +x ./cedasync
+RUN chmod +x ./ephemera
 
-ENTRYPOINT ["./cedasync"]
+ENTRYPOINT ["./ephemera"]
 
-CMD ["-c", "/etc/cedasync/config.toml"]
+CMD ["-c", "/etc/ephemera/ephemera.conf"]

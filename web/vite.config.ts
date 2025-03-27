@@ -5,6 +5,7 @@ import svgr from '@svgr/rollup';
 import { lingui } from '@lingui/vite-plugin';
 import wasm from 'vite-plugin-wasm';
 import top_await from 'vite-plugin-top-level-await';
+import { VitePWA as pwa } from 'vite-plugin-pwa';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -47,7 +48,7 @@ export default defineConfig(async ({ command }) => {
   const project = await parseProject();
   return {
     define: {
-      __ENDPOINT__: command == 'build' ? '""' : '"http://synclink.ptdg.dev"',
+      __ENDPOINT__: command == 'build' ? '""' : '"http://localhost:8080"',
       __VERSION__: JSON.stringify(project.version),
       __BUILD_TIMESTAMP__: Date.now(),
     },
@@ -59,6 +60,9 @@ export default defineConfig(async ({ command }) => {
       }),
       svgr(),
       lingui(),
+      pwa({
+        registerType: 'autoUpdate',
+      }),
     ],
     resolve: {
       alias: await parseTSAlias(),
@@ -67,7 +71,7 @@ export default defineConfig(async ({ command }) => {
       port: 8081,
       strictPort: true,
       proxy: {
-        '/api': 'http://127.0.0.1:8080',
+        '/api': 'http://localhost:8080',
       },
     },
     worker: {

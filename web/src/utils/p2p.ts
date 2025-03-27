@@ -178,6 +178,7 @@ export class P2PRtc extends RTCImpl {
   }
 
   public async createSender() {
+    console.log('create sender channel');
     const channel = this.conn.createDataChannel('default', {
       ordered: false,
       maxRetransmits: 0,
@@ -186,28 +187,49 @@ export class P2PRtc extends RTCImpl {
     const offer = await this.conn.createOffer();
     await this.sendSignaling([0, offer]);
     await this.conn.setLocalDescription(offer);
-    this.init();
+    await this.init();
   }
 
   public async createReceiver(offer: RTCSessionDescriptionInit) {
+    console.log('create receiver channel');
     this.conn.addEventListener('datachannel', this.ondatachannel);
     await this.conn.setRemoteDescription(offer);
     const answer = await this.conn.createAnswer();
     await this.sendSignaling([0, answer]);
     await this.conn.setLocalDescription(answer);
-    this.init();
+    await this.init();
   }
 
   private async init() {
-    // this.conn.addEventListener('')
     // 处理 WebRTC 各种事件
+    this.conn.addEventListener('icecandidateerror', (evt) => {
+      console.error(`icecandidateerror`, evt);
+    });
+    this.conn.addEventListener('connectionstatechange', (evt) => {
+      console.log('connectionstatechange', this.conn.connectionState, evt);
+    });
+    this.conn.addEventListener('iceconnectionstatechange', (evt) => {
+      console.log(
+        `iceconnectionstatechange`,
+        evt,
+        this.conn.iceConnectionState,
+      );
+    });
+    this.conn.addEventListener('icegatheringstatechange', (evt) => {
+      console.log(`icegatheringstatechange`, evt, this.conn.iceGatheringState);
+    });
+    this.conn.addEventListener('signalingstatechange', (evt) => {
+      console.log(`signalingstatechange`, evt, this.conn.signalingState);
+    });
   }
 
   public async setAnswer(answer: RTCSessionDescriptionInit) {
+    console.log('setAnswer');
     await this.conn.setRemoteDescription(answer);
   }
 
   public async addIceCandidate(candidate: RTCIceCandidate) {
+    console.log('addIceCandidate');
     await this.conn.addIceCandidate(candidate);
   }
 
@@ -229,7 +251,7 @@ export class P2PRtc extends RTCImpl {
   private initRecvChannel = async (channel: RTCDataChannel) => {
     channel.binaryType = 'arraybuffer';
     channel.addEventListener('open', () => {
-      console.log('receive chanel opened');
+      console.log('receiver chanel opened');
     });
     channel.addEventListener('close', () => {
       console.log('receive chanel closed');
@@ -242,7 +264,7 @@ export class P2PRtc extends RTCImpl {
     });
     channel.addEventListener('message', this.onmessage);
     channel.addEventListener('error', (evt) => {
-      console.error('WebRTC DataChannel error', evt, channel);
+      console.error('WebRTC Receiver DataChannel error', evt, channel);
       this.emit('CONNECTION_ERROR', {
         source: evt,
         message: 'WebRTC DataChannel error',
@@ -260,10 +282,10 @@ export class P2PRtc extends RTCImpl {
   private initSenderChannel = async (channel: RTCDataChannel) => {
     channel.binaryType = 'arraybuffer';
     channel.addEventListener('open', () => {
-      console.log('send chanel opened');
+      console.log('sender chanel opened');
     });
     channel.addEventListener('close', () => {
-      console.log('send chanel closed');
+      console.log('sender chanel closed');
       if (!this.established) return void 0;
       this.emit('CONNECTION_CLOSE', {
         code: 1007,
@@ -273,7 +295,7 @@ export class P2PRtc extends RTCImpl {
     });
     channel.addEventListener('message', this.onmessage);
     channel.addEventListener('error', (evt) => {
-      console.error('WebRTC DataChannel error', evt, channel);
+      console.error('WebRTC Sender DataChannel error', evt, channel);
       this.emit('CONNECTION_ERROR', {
         source: evt,
         message: 'WebRTC DataChannel error',

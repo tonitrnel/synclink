@@ -39,7 +39,7 @@ const Header: FC = memo(() => {
       )}
       <div className="flex h-full items-center gap-2">
         <LogoIcon className="h-10 w-10 opacity-80" />
-        {/*<h1 className="pt-1 text-lg font-bold">Cedasync</h1>*/}
+        {/*<h1 className="pt-1 text-lg font-bold">Ephemera</h1>*/}
       </div>
     </header>
   );

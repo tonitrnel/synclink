@@ -5,7 +5,7 @@ import { i18n } from '@lingui/core';
 import { SnackbarProvider } from '~/components/ui/snackbar';
 import { TooltipProvider } from '~/components/ui/tooltip';
 import { Toaster } from '~/components/ui/toast';
-import { createHttpClient, HttpClientProvider } from '@painted/http';
+import { createHttpClient, HttpClientProvider } from '@ptdgrp/http-react';
 import { Routes } from '~/routes';
 import dayjs from 'dayjs';
 import { dayjsLocales } from '~/locales/dayjs-shim.ts';

@@ -1,9 +1,9 @@
 use crate::common::{ApiError, ApiResult};
 use crate::config;
+use axum::Json;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use axum::{async_trait, Json};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
@@ -12,7 +12,10 @@ pub struct Claims {
     exp: usize,
 }
 static SECRET: LazyLock<Option<&'static str>> = LazyLock::new(|| {
-    config::CONFIG.authorize.as_ref().map(|it| it.secret.as_str())
+    config::CONFIG
+        .authorize
+        .as_ref()
+        .map(|it| it.secret.as_str())
 });
 static KEYS: LazyLock<Option<Keys>> = LazyLock::new(|| SECRET.map(|it| Keys::new(it.as_bytes())));
 
@@ -29,10 +32,9 @@ impl Keys {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Claims
 where
-    S: Send,
+    S: Send + Sync,
 {
     type Rejection = ApiError;
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
@@ -48,7 +50,7 @@ where
                     Ok(data) => data.claims,
                     Err(_err) => return Err(ApiError::Unauthorized),
                 };
-            return Ok(claims);
+            Ok(claims)
         } else {
             Ok(Claims { exp: 0 })
         }

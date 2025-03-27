@@ -13,7 +13,7 @@ import { t } from '@lingui/macro';
 import { IGNORE_FILE_TYPE } from '~/constants';
 import { FilesOrEntries } from '~/constants/types.ts';
 import { useSnackbar } from '~/components/ui/snackbar';
-import { useLatestFunc, useLatestRef } from '@painted/shared';
+import { useLatestFunc, useLatestRef } from '@ptdgrp/shared-react';
 import { Logger } from '~/utils/logger.ts';
 
 const logger = new Logger('Input');

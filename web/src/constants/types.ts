@@ -1,4 +1,4 @@
-import { InferSType } from '@painted/http';
+import { InferSType } from '@ptdgrp/http-react';
 import { useGetList } from '~/endpoints';
 import { FC } from 'react';
 

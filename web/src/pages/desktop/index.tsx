@@ -36,7 +36,7 @@ export default function DesktopHomePage() {
         {!isDesktop && (
           <header className="relative z-10 flex items-center justify-center gap-2 border-b border-b-gray-200 shadow">
             <LogoIcon className="h-12 w-12" />
-            <h1 className="pt-2 font-bold">Cedasync</h1>
+            <h1 className="pt-2 font-bold">Ephemera</h1>
           </header>
         )}
         <main className="relative flex-1">

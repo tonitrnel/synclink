@@ -33,18 +33,18 @@ pub fn build() -> Router<AppState> {
             "/api/upload-part/abort",
             delete(services::upload_part::abort),
         )
-        .route("/api/upload-part/:uuid", put(services::upload_part::append))
+        .route("/api/upload-part/{uuid}", put(services::upload_part::append))
         .route("/api/upload-preflight", head(services::upload_preflight))
         .route("/api/notify", get(services::notify))
         .route("/api/sse/connections", get(services::sse_connections))
         .route("/api/stats", get(services::stats))
         .route("/api/clean-dump", get(services::clean_dump))
         .route("/api/text-collection", post(services::get_text_collection))
-        .route("/api/file/:uuid", delete(services::delete))
-        .route("/api/file/:uuid", get(services::get))
-        .route("/api/directory/:uuid", get(services::get_virtual_directory))
+        .route("/api/file/{uuid}", delete(services::delete))
+        .route("/api/file/{uuid}", get(services::get))
+        .route("/api/directory/{uuid}", get(services::get_virtual_directory))
         .route(
-            "/api/directory/:uuid/*path",
+            "/api/directory/{uuid}/{*path}",
             get(services::get_virtual_file),
         )
         .route("/api/p2p/create", post(services::create_request))
@@ -53,7 +53,7 @@ pub fn build() -> Router<AppState> {
         .route("/api/p2p/signaling", post(services::signaling))
         .route("/api/p2p/socket", get(services::socket))
         .route("/api/authorize", post(services::authorize))
-        .route("/api/:uuid", get(services::get_metadata))
+        .route("/api/{uuid}", get(services::get_metadata))
         .route("/api", get(services::list))
         .layer(middleware::from_extractor::<services::Claims>())
         .fallback_service(static_files_service)

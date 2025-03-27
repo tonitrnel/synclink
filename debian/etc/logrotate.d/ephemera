@@ -1,4 +1,4 @@
-/var/log/cedasync/*.log {
+/var/log/ephemera/*.log {
         hourly
         missingok
         rotate 12
@@ -8,8 +8,8 @@
         create 644 root root
         sharedscripts
         postrotate
-                if [ -f /var/run/cedasync.pid ]; then
-                        kill -USR1 `cat /var/run/cedasync.pid`
+                if [ -f /var/run/ephemera.pid ]; then
+                        kill -USR1 `cat /var/run/ephemera.pid`
                 fi
         endscript
 }

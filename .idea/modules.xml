@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/synclink.iml" filepath="$PROJECT_DIR$/.idea/synclink.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/ephemera.iml" filepath="$PROJECT_DIR$/.idea/ephemera.iml" />
     </modules>
   </component>
 </project>

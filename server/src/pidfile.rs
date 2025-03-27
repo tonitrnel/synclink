@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::Path;
 use std::{fs, process};
 
-static PID_FILE: &str = "/var/run/cedasync.pid";
+static PID_FILE: &str = "/var/run/ephemera.pid";
 
 pub struct Pidfile {}
 

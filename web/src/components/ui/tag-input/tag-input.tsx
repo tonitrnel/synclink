@@ -1,4 +1,4 @@
-import { useLatestRef } from '@painted/shared';
+import { useLatestRef } from '@ptdgrp/shared-react';
 import { XIcon } from 'icons';
 import {
   ChangeEvent,
@@ -100,7 +100,7 @@ export const TagInput: FC<
           onKeyDown={onKeyDown}
           onChange={onChange}
           disabled={value.length >= max}
-          className={value.length >= max ? "hidden" : undefined}
+          className={value.length >= max ? 'hidden' : undefined}
         />
       </div>
     );
@@ -120,7 +120,7 @@ const TagList: FC<{
           <XIcon
             role="button"
             aria-label="remove tag"
-            className="w-4 h-4"
+            className="h-4 w-4"
             onClick={() => onRemove(it)}
           />
         </div>

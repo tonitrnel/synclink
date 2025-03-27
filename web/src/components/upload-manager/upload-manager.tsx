@@ -12,7 +12,7 @@ import { formatBytes } from '~/utils/format-bytes.ts';
 import { calculateDuration } from '~/utils/calculate-duration.ts';
 import { XIcon } from 'icons';
 import { withProduce } from '~/utils/with-produce.ts';
-import { useLatestRef, useLatestFunc, useConstant } from '@painted/shared';
+import { useLatestRef, useLatestFunc, useConstant } from '@ptdgrp/shared-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMediaQuery } from '~/utils/hooks/use-media-query.ts';
 import { useLingui } from '@lingui/react';

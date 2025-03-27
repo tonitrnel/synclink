@@ -1,5 +1,5 @@
-import { createHttpFactory } from '@painted/http';
-import type { InferSType } from '@painted/http';
+import { createHttpFactory } from '@ptdgrp/http-react';
+import type { InferSType } from '@ptdgrp/http-react';
 
 export const useGetList = createHttpFactory('GET:/api')
   .apply<

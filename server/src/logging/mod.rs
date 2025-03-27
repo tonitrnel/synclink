@@ -13,7 +13,7 @@ pub fn registry_logs(
     dir: Option<PathBuf>,
 ) -> anyhow::Result<()> {
     let mut layers = Vec::new();
-    let dir = dir.unwrap_or_else(|| PathBuf::from("/var/log/cedasync"));
+    let dir = dir.unwrap_or_else(|| PathBuf::from("/var/log/ephemera"));
     let enable_file_logging = super::config::CONFIG.logs.enable_file_logging;
     // access_layer
     'access_layer: {
@@ -28,7 +28,7 @@ pub fn registry_logs(
             .compact()
             .with_writer(access_file)
             .with_filter(filter::filter_fn(|metadata| {
-                metadata.target() == "cedasync::routes"
+                metadata.target() == "ephemera::routes"
             }));
         layers.push(access_layer.boxed());
     }
@@ -63,7 +63,7 @@ pub fn registry_logs(
                 metadata.level() <= &level
                     && metadata
                         .module_path()
-                        .map(|it| it.starts_with("cedasync::") || it == "cedasync")
+                        .map(|it| it.starts_with("ephemera::") || it == "ephemera")
                         .unwrap_or(false)
             }));
         layers.push(generic_layer.boxed());

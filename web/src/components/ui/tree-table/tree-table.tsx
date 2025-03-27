@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { TreeNode } from '../tree/tree';
 import { clsx } from '~/utils/clsx';
-import { isFunction } from '@painted/shared';
+import { isFunction } from '@ptdgrp/shared-react';
 import { ChevronRightIcon } from 'icons';
 import { withProduce } from '~/utils/with-produce';
 import { useLingui } from '@lingui/react';

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-types,@typescript-eslint/no-explicit-any */
 
 import { FC, useCallback, useEffect, useReducer, useRef } from 'react';
-import { useLatestFunc } from '@painted/shared';
+import { useLatestFunc } from '@ptdgrp/shared-react';
 import { ExtractProps } from '~/constants/types.ts';
 
 type Fn = (...args: any[]) => any;
@@ -30,9 +30,7 @@ export type CloseFn<
   Props extends { onClose?: Fn },
   R,
   CloseFunc extends Fn = NonNullable<Props['onClose']>,
-> = CloseFunc extends Fn
-  ? (...args: Parameters<CloseFunc>) => R
-  : Fn;
+> = CloseFunc extends Fn ? (...args: Parameters<CloseFunc>) => R : Fn;
 
 export interface DialogOptions<Props extends {}, R> {
   onClose?: CloseFn<Props, R>;
@@ -54,7 +52,7 @@ interface MetadataRef {
 export const useDialog = <
   C extends FC<any>,
   P extends ExtractProps<C> = ExtractProps<C>,
-  R = void
+  R = void,
 >(
   Component: C,
   options?: DialogOptions<P, R>,

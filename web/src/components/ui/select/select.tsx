@@ -75,7 +75,7 @@ const SelectScrollDownButton = forwardRef<
 SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName;
 
-const APPEND_TO = document.querySelector('#root')!;
+const APPEND_TO = document.querySelector('main')!;
 
 const SelectContent = forwardRef<
   ElementRef<typeof SelectPrimitive.Content>,

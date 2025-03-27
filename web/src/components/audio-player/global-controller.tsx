@@ -1,7 +1,7 @@
 import { FC, useCallback, useEffect, useState } from 'react';
 import { clsx } from '~/utils/clsx.ts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useConstant } from '@painted/shared';
+import { useConstant } from '@ptdgrp/shared-react';
 import { MusicIcon } from 'icons';
 
 export const AudioGlobalController: FC<{
@@ -15,7 +15,7 @@ export const AudioGlobalController: FC<{
         const id = evt.detail as string;
         if (!id) return void 0;
         const audio = document.body.querySelector(
-          `audio[data-audio-id="${id}"]`
+          `audio[data-audio-id="${id}"]`,
         ) as HTMLAudioElement;
         if (!audio) return void 0;
         if (audio.paused) {
@@ -35,7 +35,7 @@ export const AudioGlobalController: FC<{
   const stopAll = useCallback(() => {
     for (const id of audioIds) {
       const audio = document.body.querySelector(
-        `audio[data-audio-id="${id}"]`
+        `audio[data-audio-id="${id}"]`,
       ) as HTMLAudioElement;
       if (!audio) continue;
       audio.pause();
@@ -53,11 +53,11 @@ export const AudioGlobalController: FC<{
           className={clsx(
             className,
             'text-white',
-            playing ? 'inline-flex' : 'none'
+            playing ? 'inline-flex' : 'none',
           )}
           onClick={stopAll}
         >
-          <MusicIcon className="w-6 h-6 stroke-current" />
+          <MusicIcon className="h-6 w-6 stroke-current" />
         </motion.button>
       )}
     </AnimatePresence>

@@ -1,7 +1,7 @@
 [package]
-name = "cedasync"
-version = "0.3.2"
-edition = "2021"
+name = "ephemera"
+version = "0.4.0"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,22 +13,22 @@ uuid = { version = "1.6.0", features = ["v4", "serde"] }
 sha2 = "0.10.6"
 toml = "0.8.8"
 futures = "0.3.29"
-axum = { version = "0.7.5", features = ["default", "multipart", "macros", "ws"] }
+axum = { version = "0.8.1", features = ["default", "multipart", "macros", "ws"] }
 tokio = { version = "1.26.0", features = ["full"] }
 tokio-util = { version = "0.7.8", features = ["io"] }
 tokio-stream = { version = "0.1.14", features = ["sync"] }
-tower = "0.4.13"
-tower-http = { version = "0.5.2", features = ["cors", "trace", "fs"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["cors", "trace", "fs"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["default", "chrono", "json"] }
 tracing-error = "0.2.0"
 anyhow = { version = "1.0.75", features = ["backtrace"] }
-thiserror = "1.0.50"
-infer = { version = "0.16.0", default-features = false }
+thiserror = "2.0.12"
+infer = { version = "0.19.0", default-features = false }
 simdutf8 = "0.1.4"
 tar = "0.4.41"
 pin-project-lite = "0.2.14"
-rand = "0.8.5"
+rand = "0.9.0"
 jsonwebtoken = "9.3.0"
 libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "c411ef3eab8ed078f8bf03e1f542fbc4e4cb9c2a" }
 

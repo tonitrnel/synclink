@@ -15,7 +15,7 @@ import { XIcon } from 'icons';
 import { clsx } from '~/utils/clsx.ts';
 import { Trans } from '@lingui/macro';
 import { AnimatePresence, motion, Variants } from 'framer-motion';
-import { isNumber, isString } from '@painted/shared';
+import { isNumber, isString } from '@ptdgrp/shared-react';
 
 const DialogRoot = DialogPrimitive.Root;
 
@@ -27,7 +27,7 @@ export interface DialogProps {
   className?: string;
 }
 
-const APPEND_TO = document.querySelector('#root');
+const APPEND_TO = document.querySelector('#main');
 const MotionDialogContent = motion(DialogPrimitive.Content);
 
 const DialogImpl: FC<

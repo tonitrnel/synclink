@@ -15,7 +15,7 @@ import { Logger } from '~/utils/logger.ts';
 import { Loading } from '~/components/loading';
 import { t } from '@lingui/macro';
 import { motion } from 'framer-motion';
-import { useLatestFunc } from '@painted/shared';
+import { useLatestFunc } from '@ptdgrp/shared-react';
 import { useGetList, useGetTextCollection } from '~/endpoints';
 import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
@@ -25,7 +25,7 @@ import { loadCoordinator } from '~/components/item/hooks/use-coordinator.ts';
 import { lookupHTMLNode } from '~/utils/lookup-html-node.ts';
 import { useLingui } from '@lingui/react';
 
-const logger = new Logger('cedasync');
+const logger = new Logger('ephemera');
 
 interface State {
   pagination: {

@@ -1,4 +1,3 @@
-use axum::async_trait;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, StatusCode};
@@ -28,7 +27,6 @@ where
     }
 }
 
-#[async_trait]
 impl<T, S> FromRequestParts<S> for Header<T>
 where
     T: DeserializeOwned,

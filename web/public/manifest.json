@@ -1,7 +1,7 @@
 {
-  "short_name": "Cedasync",
-  "name": "Cedasync",
-  "description": "Quickly sync text, images and files across devices",
+  "short_name": "Ephemera",
+  "name": "Ephemera",
+  "description": "Temporary Storage & Direct Transfer",
   "icons": [
     {
       "src": "/maskable_icon.png",

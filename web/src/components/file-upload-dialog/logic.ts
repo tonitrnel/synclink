@@ -1,6 +1,6 @@
 import { DirEntry, FilesOrEntries } from '~/constants/types.ts';
 import { useCallback, useMemo, useState } from 'react';
-import { useLatestRef } from '@painted/shared';
+import { useLatestRef } from '@ptdgrp/shared-react';
 import { useGetStats } from '~/endpoints';
 import { withProduce } from '~/utils/with-produce.ts';
 import { TreeNode } from '~/components/ui/tree';

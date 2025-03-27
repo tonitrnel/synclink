@@ -1,6 +1,8 @@
-import type { LinguiConfig } from '@lingui/conf';
+import { defineConfig } from "@lingui/cli";
 
-export default {
+
+export default defineConfig({
+  sourceLocale: "en",
   locales: ['en-US', 'zh-CN'],
   catalogs: [
     {
@@ -8,4 +10,4 @@ export default {
       include: ['src'],
     },
   ],
-} satisfies LinguiConfig;
+});

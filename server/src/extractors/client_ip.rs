@@ -1,4 +1,3 @@
-use axum::async_trait;
 use axum::extract::{ConnectInfo, FromRequestParts};
 use axum::http::request::Parts;
 use std::convert::Infallible;
@@ -7,7 +6,6 @@ use std::net::SocketAddr;
 #[derive(Clone, Debug)]
 pub struct ClientIp(pub Option<String>);
 
-#[async_trait]
 impl<S> FromRequestParts<S> for ClientIp
 where
     S: Send + Sync,

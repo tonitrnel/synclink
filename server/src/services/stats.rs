@@ -111,7 +111,7 @@ async fn load_memory_usage(_: u32) -> anyhow::Result<u64> {
 }
 
 pub async fn clean_dump(State(state): State<AppState>) -> ApiResult<Json<Value>> {
-    let tmp_dir = std::env::temp_dir().join("cedasync");
+    let tmp_dir = std::env::temp_dir().join("ephemera");
     let storage_dir = state.indexing.get_storage_dir();
     let exists_ids = state.indexing.map_clone(|items| {
         items

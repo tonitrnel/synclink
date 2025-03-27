@@ -18,14 +18,14 @@ use std::sync::Arc;
 
 fn print_banner() {
     tracing::info!("");
-    tracing::info!(r#"        _____           _          _____                     "#);
-    tracing::info!(r#"       / ____|         | |        / ____|                    "#);
-    tracing::info!(r#"      | |      ___   __| |  __ _ | (___   _   _  _ __    ___ "#);
-    tracing::info!(r#"      | |     / _ \ / _` | / _` | \___ \ | | | || '_ \  / __|"#);
-    tracing::info!(r#"      | |____|  __/| (_| || (_| | ____) || |_| || | | || (__ "#);
-    tracing::info!(r#"       \_____|\___| \__,_| \__,_||_____/  \__, ||_| |_| \___|"#);
-    tracing::info!(r#"                                           __/ |             "#);
-    tracing::info!(r#"                                          |___/              "#);
+    tracing::info!(r#"  ______         _                                        "#);
+    tracing::info!(r#" |  ____|       | |                                       "#);
+    tracing::info!(r#" | |__    _ __  | |__    ___  _ __ ___    ___  _ __  __ _ "#);
+    tracing::info!(r#" |  __|  | '_ \ | '_ \  / _ \| '_ ` _ \  / _ \| '__|/ _` |"#);
+    tracing::info!(r#" | |____ | |_) || | | ||  __/| | | | | ||  __/| |  | (_| |"#);
+    tracing::info!(r#" |______|| .__/ |_| |_| \___||_| |_| |_| \___||_|   \__,_|"#);
+    tracing::info!(r#"         | |                                              "#);
+    tracing::info!(r#"         |_|                                              "#);
     tracing::info!("");
 }
 
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     print_banner();
     #[cfg(all(not(debug_assertions), target_os = "linux"))]
     tracing::info!(
-        "cedasync {version} ({commit_id} {build_date}) built with docker{docker_version}, {system_version}, rustc{rustc_version}",
+        "Ephemera {version} ({commit_id} {build_date}) built with docker{docker_version}, {system_version}, rustc{rustc_version}",
         build_date = env!("BUILD_DATE"),
         version = env!("CARGO_PKG_VERSION"),
         commit_id = env!("COMMIT_ID"),
@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         rustc_version = env!("RUSTC_VERSION"),
         system_version = env!("SYSTEM_VERSION"),
     );
-    tracing::info!("listening on http://{}", listener.local_addr().unwrap());
+    tracing::info!("listening on http://{}", listener.local_addr()?);
     match server::run_until_done(
         ServerArgs {
             config,
@@ -69,10 +69,10 @@ async fn main() -> anyhow::Result<()> {
     .await
     {
         Ok(()) => {
-            println!("cedasync stopping...")
+            println!("Ephemera stopping...")
         }
         Err(err) => {
-            eprintln!("cedasync has encountered an error: {}", err);
+            eprintln!("Ephemera has encountered an error: {}", err);
             return Err(err);
         }
     }

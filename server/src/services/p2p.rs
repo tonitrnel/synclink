@@ -293,7 +293,7 @@ async fn handle_socket(
     };
     sender
         .send(Message::Binary(
-            [PacketFlag::ConnectionReady as u8].to_vec(),
+            [PacketFlag::ConnectionReady as u8].to_vec().into(),
         ))
         .await
         .with_context(|| "Could not send connection ready event")?;
@@ -302,7 +302,7 @@ async fn handle_socket(
     if alive == 2 {
         let packet = [PacketFlag::ConnectionEstablished as u8];
         sender
-            .send(Message::Binary(packet.to_vec()))
+            .send(Message::Binary(packet.to_vec().into()))
             .await
             .with_context(|| "Could not send connection established event")?;
         socket_manager
@@ -334,7 +334,7 @@ async fn handle_socket(
                 //         }
                 //     }
                 // };
-                if sender.send(Message::Binary(packet)).await.is_err() {
+                if sender.send(Message::Binary(packet.into())).await.is_err() {
                     break;
                 }
             }
@@ -344,7 +344,7 @@ async fn handle_socket(
         let mut recv_task = tokio::spawn(async move {
             while let Some(Ok(Message::Binary(bytes))) = receiver.next().await {
                 if bytes[0] < 0xF0 {
-                    let _ = socket_manager.send(bytes, &receiver_id);
+                    let _ = socket_manager.send(bytes.to_vec(), &receiver_id);
                     continue;
                 }
                 // handle reserve event

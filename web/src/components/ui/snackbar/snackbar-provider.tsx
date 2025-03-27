@@ -5,7 +5,7 @@ import {
   SnackbarProps,
 } from './context.ts';
 import { withProduce } from '~/utils/with-produce.ts';
-import { useLatestRef } from '@painted/shared';
+import { useLatestRef } from '@ptdgrp/shared-react';
 import { SnackbarContainer } from './snackbar.tsx';
 
 export const SnackbarProvider: FC<

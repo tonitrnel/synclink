@@ -1,6 +1,8 @@
-# Cedasync
+# Ephemera
 
-Cedasync 是一个设计用于运行在 NAS、软路由等类似设备上的程序，目的是⽤于多个设备间的⽂本、图像和⽂件临时存储和共享。
+Ephemera: Store Temporarily, Transfer Instantly
+
+Ephemera 是一个设计用于运行在 NAS、软路由等类似设备上的程序，目的是⽤于临时存储来自多个设备的⽂本、图像、⽂件或通过 WebRTC 或 WebSocket 进行直接传输。
 
 ![screenshots](./docs/screenshot1.png)
 
@@ -27,20 +29,19 @@ mv <CUSTOM_DIR>
 mkdir data
 mkdir config
 mkdir logs
-echo "" > ./config/cedasync.conf
+echo "" > ./config/ephemera.conf
 ```
 
-配置文件参考 [cedasync-config.toml](./config/cedasync-config.toml)
+配置文件参考 [ephemera.conf.example](./config/ephemera.conf.example)
 
 ```shell
 docker run -d \
-        --name cedasync \
-        --network ptdg-network \
+        --name ephemera \
         --restart always \
         -v /<CUSTOM_DIR>/data:/app/storage \
-        -v /<CUSTOM_DIR>/config/cedasync.conf:/etc/cedasync/config.toml \
-        -v /<CUSTOM_DIR>/logs:/var/log/cedasync \
-        ghcr.io/tonitrnel/cedasync:0.3.0
+        -v /<CUSTOM_DIR>/config/ephemera.conf:/etc/ephemera/config.toml \
+        -v /<CUSTOM_DIR>/logs:/var/log/ephemera \
+        ghcr.io/tonitrnel/ephemera:0.4.0
 ```
 
 ### Nginx 配置参考
@@ -103,7 +104,7 @@ server {
 1. 克隆项目代码
 
 ```bash
-git clone https://github.com/tonitrnel/cedasync
+git clone https://github.com/tonitrnel/ephemera
 ```
 
 2. 安装依赖
@@ -144,7 +145,7 @@ cargo run
 
 ## 配置
 
-应用程序的配置位于 `config/cedasync-config.toml` 文件中。您可以根据需要修改其参数
+应用程序的配置位于 `config/ephemera.toml` 文件中。您可以根据需要修改其参数
 
 ## 贡献
 

@@ -75,7 +75,7 @@ for (const relationPath of Object.keys(PAGE_MAP)) {
     ),
   });
 }
-
+console.log(routeMap)
 export const Routes = () => {
   return (
     <Suspense>

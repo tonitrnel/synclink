@@ -36,7 +36,7 @@ import { withProduce } from '~/utils/with-produce';
 import { clsx } from '~/utils/clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { formatBytes } from '~/utils/format-bytes';
-import { useLatestRef } from '@painted/shared';
+import { useLatestRef } from '@ptdgrp/shared-react';
 import {
   createRemainingTimeCalculator,
   createTransmissionRateCalculator,
@@ -621,11 +621,13 @@ const ConnectionControl: FC<{
               const webrtc = new P2PRtc(metadata.requestId, metadata.clientId);
               await webrtc.createSender();
               conn = webrtc;
+              console.log('conn instance', conn);
             }
             break;
           }
           case 'websocket': {
             conn = new P2PSocket(metadata.requestId, metadata.clientId!);
+            console.log('conn instance', conn);
           }
         }
         conn?.once('CONNECTION_READY', () => {
@@ -641,6 +643,7 @@ const ConnectionControl: FC<{
             const webrtc = new P2PRtc(metadata.requestId, metadata.clientId);
             await webrtc.createReceiver(value[1]);
             conn = webrtc;
+            console.log('conn instance', conn);
             conn.once('CONNECTION_READY', () => {
               console.log('CONNECTION_READY');
               testAvailability();

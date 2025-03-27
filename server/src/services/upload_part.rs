@@ -38,7 +38,7 @@ pub struct ConcatenateQueryParams {
 
 /// allocate disk resource
 async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
-    let path = std::env::temp_dir().join("cedasync");
+    let path = std::env::temp_dir().join("ephemera");
     if !path.exists() {
         fs::create_dir(&path)
             .await
@@ -93,7 +93,7 @@ where
     S: Stream<Item = Result<axum::body::Bytes, E>> + 'static + Send + Unpin,
     E: Into<axum::BoxError>,
 {
-    let path = std::env::temp_dir().join("cedasync");
+    let path = std::env::temp_dir().join("ephemera");
     let path = path.join(format!("{}.tmp", uid));
     let mut file = fs::OpenOptions::new()
         .write(true)
@@ -140,7 +140,7 @@ async fn exec_concatenate(
     use sha2::{Digest, Sha256};
     use tokio_util::io::ReaderStream;
 
-    let path = std::env::temp_dir().join("cedasync");
+    let path = std::env::temp_dir().join("ephemera");
     let temp = path.join(format!("{}.tmp", uid));
     let file = fs::OpenOptions::new()
         .read(true)
@@ -235,7 +235,7 @@ fn get_device_id(_path: &path::Path) -> anyhow::Result<u64> {
 /// cleanup uploaded chunks
 async fn exec_cleanup(uid: &Uuid) -> anyhow::Result<()> {
     let path = std::env::temp_dir()
-        .join("cedasync")
+        .join("ephemera")
         .join(format!("{}.tmp", uid));
     fs::remove_file(&path)
         .await
