@@ -7,27 +7,23 @@ use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-static ROOT_DIR: OnceLock<PathBuf> = OnceLock::new();
-static UPTIME: OnceLock<u64> = OnceLock::new();
-
-pub fn root_dir() -> &'static PathBuf {
-    ROOT_DIR.get_or_init(|| std::env::current_dir().unwrap())
-}
-
-static CONFIG: OnceLock<Config> = OnceLock::new();
-
-pub fn load() -> &'static Config {
-    CONFIG.get_or_init(|| Config::from_config_file().unwrap())
-}
-
-pub fn uptime() -> u64 {
-    let start = UPTIME.get().unwrap_or(&0);
+static ROOT_DIR: LazyLock<PathBuf> = LazyLock::new(|| std::env::current_dir().unwrap());
+static UPTIME: LazyLock<u64> = LazyLock::new(|| {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|it| it.as_secs() - start)
+        .unwrap()
+        .as_secs()
+});
+
+pub static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::from_config_file().unwrap());
+
+pub fn uptime() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|it| it.as_secs() - UPTIME.clone())
         .unwrap_or(0)
 }
 
@@ -43,12 +39,6 @@ pub(crate) struct Config {
 impl Config {
     pub fn from_config_file() -> anyhow::Result<Self> {
         let path = Config::parse_config_file_path();
-        UPTIME.get_or_init(|| {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        });
         if !path.is_file() {
             return Err(anyhow!(
                 "Error: Configuration file not found or invalid.\n\

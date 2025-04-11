@@ -29,6 +29,7 @@ interface State {
   loading: boolean;
   error: boolean;
   duration: number;
+  is_non_music: boolean;
   pointer: {
     pos: number;
     show: boolean;
@@ -43,10 +44,11 @@ interface Metadata {
 
 export const AudioPlayer: FC<{
   src: string;
-  type?: string;
+  type: string;
   title?: string;
   className?: string;
-}> = memo(({ src, type, title, className }) => {
+  visible?: boolean;
+}> = memo(({ visible = true, src, type, title, className }) => {
   const [state, setState] = useState<State>(() => ({
     id: Math.random().toString(36).substring(2),
     ready: false,
@@ -57,13 +59,15 @@ export const AudioPlayer: FC<{
     loop: false,
     loading: false,
     error: false,
+    is_non_music: false,
     pointer: {
       pos: 0,
       show: false,
     },
   }));
   const [metadata, setMetadata] = useState<Metadata>(() => ({}));
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const controllers = useMemo(() => {
     return new (class {
       private enabledPointer = false;
@@ -156,47 +160,59 @@ export const AudioPlayer: FC<{
     })();
   }, []);
   useEffect(() => {
+    if (!visible) return void 0;
+    const container = containerRef.current!;
+    if (container.hasAttribute('data-metadata-loaded')) return void 0;
+    container.setAttribute('data-metadata-loaded', '');
     let objectURL: string | void = void 0;
     const readCover = (image: ImageValue, ost: string) => {
       const file = new File(
         [image.data as ArrayBuffer],
         `${ost}-${image.description}`,
-        { type: image.mime || 'image/png' }
+        { type: image.mime || 'image/png' },
       );
       objectURL = URL.createObjectURL(file);
       return objectURL;
     };
-    metadataParser(src)
-      .then((tags) => {
-        if (!tags) return void 0;
-        // console.log(`"${tags.title}"`, isNonUTF8(tags.title || ''));
-        setMetadata({
-          title: tags.title || void 0,
-          artist: tags.artist || void 0,
-          cover: tags.image
-            ? readCover(tags.image, tags.album || 'Album cover')
-            : void 0,
+    if (['audio/mp3', 'audio/flac', 'audio/ogg'].includes(type)) {
+      metadataParser(src)
+        .then((tags) => {
+          if (!tags) return void 0;
+          // console.log(`"${tags.title}"`, isNonUTF8(tags.title || ''));
+          setMetadata({
+            title: tags.title || void 0,
+            artist: tags.artist || void 0,
+            cover: tags.image
+              ? readCover(tags.image, tags.album || 'Album cover')
+              : void 0,
+          });
+        }, logger.error)
+        .finally(() => {
+          setState((state) => ({
+            ...state,
+            ready: true,
+          }));
         });
-      }, logger.error)
-      .finally(() => {
-        setState((state) => ({
-          ...state,
-          ready: true,
-        }));
-      });
+    } else {
+      setState((state) => ({
+        ...state,
+        ready: true,
+        is_non_music: true,
+      }));
+    }
     return () => {
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
-  }, [src]);
+  }, [src, type, visible]);
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return void 0;
-    const raw_document_title = document.title;
+    const originalTitle = document.title;
     const notify = () => {
       document.body.dispatchEvent(
         new CustomEvent('audio-playback-change', {
           detail: audio.dataset['audioId'],
-        })
+        }),
       );
     };
     audio.ondurationchange = () =>
@@ -220,7 +236,7 @@ export const AudioPlayer: FC<{
         loading: true,
       }));
     audio.onended = () => {
-      document.title = raw_document_title;
+      document.title = originalTitle;
       setState((prev) => ({
         ...prev,
         paused: true,
@@ -236,7 +252,7 @@ export const AudioPlayer: FC<{
       notify();
     };
     audio.onpause = () => {
-      document.title = raw_document_title;
+      document.title = originalTitle;
       setState((prev) => ({
         ...prev,
         paused: true,
@@ -254,9 +270,12 @@ export const AudioPlayer: FC<{
         ...prev,
         loaded: audio.buffered.length > 0 ? audio.buffered.end(0) : 0,
       }));
+    return () => {
+      document.title = originalTitle;
+    };
   }, []);
   return (
-    <div className={clsx('audio-player', className)}>
+    <div ref={containerRef} className={clsx('audio-player', className)}>
       {!state.ready && <div className="audio-skeleton" />}
       <audio
         ref={audioRef}
@@ -267,14 +286,20 @@ export const AudioPlayer: FC<{
       >
         <source src={src} type={type} />
       </audio>
-      <div
-        className="audio-left"
-        style={{ animationPlayState: state.paused ? 'paused' : 'running' }}
-      >
-        {metadata.cover && (
-          <img className="album-cover" src={metadata.cover} alt="album cover" />
-        )}
-      </div>
+      {!state.is_non_music && (
+        <div
+          className="audio-left"
+          style={{ animationPlayState: state.paused ? 'paused' : 'running' }}
+        >
+          {metadata.cover && (
+            <img
+              className="album-cover"
+              src={metadata.cover}
+              alt="album cover"
+            />
+          )}
+        </div>
+      )}
       <div className="audio-right">
         <div>
           <span className="audio-title">
@@ -401,6 +426,6 @@ const pad = (str: number) => {
 
 const mmss = (duration: number) => {
   return `${pad(Math.floor(duration / 60) | 0)}:${pad(
-    Math.floor(duration % 60) | 0
+    Math.floor(duration % 60) | 0,
   )}`;
 };

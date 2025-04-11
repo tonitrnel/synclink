@@ -1,0 +1,22 @@
+# HTTP Server
+[server]
+host = "::"
+port = 8080
+
+# File storage
+[file_storage]
+storage_path = "storage"
+#quota = "10g" # default "1g"
+
+# logger
+[logs]
+level = "info"
+#storage_path = "logs" # deafult /var/log/cedasync
+#enable_file_logging = true # default false
+
+# Authorize
+#[authorize]
+#secret = ""
+
+#[device_ip_tags]
+#"192.168.1.1" = "My computer"

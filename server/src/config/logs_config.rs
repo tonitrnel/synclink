@@ -1,14 +1,16 @@
-use crate::config::root_dir;
 use anyhow::Context;
 use serde::{Deserialize, Deserializer};
 use std::path::PathBuf;
 use tracing::Level;
+use crate::config::ROOT_DIR;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct LogsConfig {
     #[serde(deserialize_with = "level_deserialize")]
     pub level: Level,
     pub storage_path: Option<String>,
+    #[serde(default)]
+    pub enable_file_logging: bool,
 }
 
 impl LogsConfig {
@@ -18,7 +20,7 @@ impl LogsConfig {
             let path = if path.is_absolute() {
                 path
             } else {
-                root_dir().join(path)
+                ROOT_DIR.join(path)
             };
             Ok(Some(path.canonicalize().with_context(|| {
                 format!("Failed to parse logs directory. {:?}", path)

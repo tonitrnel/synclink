@@ -7,9 +7,10 @@ module.exports = {
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
-  plugins: ['react-refresh'],
+  plugins: ['react-refresh', 'lingui'],
   rules: {
     'react-refresh/only-export-components': 'warn',
-    '@typescript-eslint/no-non-null-assertion': 'off'
+    '@typescript-eslint/no-non-null-assertion': 'off',
+    'no-constant-condition': 'off'
   }
 };

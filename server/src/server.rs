@@ -1,12 +1,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use crate::config::Config;
+use crate::logging::LogWriter;
+use crate::utils::{Observable, Observer};
+use crate::{models, routes, state};
 use tokio::{net::TcpListener, signal, task::JoinSet};
 use tokio_util::sync::CancellationToken;
-
-use crate::config::Config;
-use crate::logs::LogWriter;
-use crate::{models, routes, state};
 
 pub struct ServerArgs<'a> {
     pub logs: Arc<LogWriter>,
@@ -21,11 +21,20 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
         let shutdown_signal = shutdown_signal.clone();
         let dir = args.config.file_storage.parse_dir()?;
         join_set.spawn(async move {
-            let (tx, _) = tokio::sync::broadcast::channel(8);
-            let indexing = Arc::new(models::file_indexing::FileIndexing::new(dir).await);
+            let indexing = Arc::new(
+                models::file_indexing::FileIndexing::new(dir)
+                    .await
+                    .unwrap_or_else(|err| panic!("Failed to read index, reason = {err:?}")),
+            );
+            let mut notify_manager = crate::services::NotifyManager::new();
+            let socket_manager = Arc::new(crate::services::P2PSocketManager::new());
+            notify_manager.register(Arc::downgrade(
+                &(Arc::clone(&socket_manager) as Arc<dyn Observer<uuid::Uuid>>),
+            ));
             let state = state::AppState {
                 indexing,
-                broadcast: tx,
+                notify_manager: Arc::new(notify_manager),
+                socket_manager,
                 shutdown_signal: shutdown_signal.clone(),
             };
             let routes = routes::build().with_state(state);
@@ -76,9 +85,9 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
     }
     while let Some(r) = join_set.join_next().await {
         if shutdown_signal.is_cancelled() {
-            println!("shutdown_signal is_cancelled, shutdown all set");
+            // println!("shutdown_signal is_cancelled, shutdown all set");
             join_set.shutdown().await;
-            println!("start terminal log");
+            // println!("start terminal log");
             args.logs.terminal();
             break;
         }

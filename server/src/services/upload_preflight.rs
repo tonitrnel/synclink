@@ -1,6 +1,3 @@
-use crate::errors::ApiResponse;
-use crate::extractors::Headers;
-use crate::state::AppState;
 use axum::extract::Query;
 use axum::{
     extract::State,
@@ -9,20 +6,27 @@ use axum::{
 };
 use serde::Deserialize;
 
+use crate::common::ApiResult;
+use crate::extractors::Header;
+use crate::state::AppState;
+
 #[derive(Deserialize, Debug)]
-pub struct PreflightQuery {
+pub struct PreflightQueryDto {
     size: u64,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct PreflightHeaderDto {
+    x_content_sha256: String,
 }
 
 pub async fn upload_preflight(
     State(state): State<AppState>,
-    query: Query<PreflightQuery>,
-    headers: Headers,
-) -> ApiResponse<impl IntoResponse> {
-    let content_hash = headers
-        .get("x-content-sha256")
-        .try_as_string()?
-        .to_lowercase();
+    query: Query<PreflightQueryDto>,
+    header: Header<PreflightHeaderDto>,
+) -> ApiResult<impl IntoResponse> {
+    let content_hash = header.x_content_sha256.to_lowercase();
     if let Some(uid) = state.indexing.has_hash(&content_hash) {
         return Ok((
             StatusCode::CONFLICT,
@@ -30,9 +34,9 @@ pub async fn upload_preflight(
         )
             .into_response());
     }
-    if let Err(_err) = state.indexing.check_file_size_limit(query.size) {
-        return Ok(StatusCode::PAYLOAD_TOO_LARGE.into_response());
-    }
+    // if let Err(_err) = state.indexing.check_file_size_limit(query.size) {
+    //     return Ok(StatusCode::PAYLOAD_TOO_LARGE.into_response());
+    // }
     if let Err(_err) = state.indexing.check_storage_quota_exceeded(query.size) {
         return Ok(StatusCode::INSUFFICIENT_STORAGE.into_response());
     }

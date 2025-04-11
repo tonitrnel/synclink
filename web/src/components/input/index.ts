@@ -1,1 +1,2 @@
-export * from './input.tsx';
+export { DesktopInput } from './desktop-input';
+export { MobileInput } from './mobile-input';

@@ -10,6 +10,14 @@ pub enum EntityMetadata {
     Image(ImageMetadata),
 }
 
+impl EntityMetadata {
+    pub fn try_into_image(self) -> Option<ImageMetadata> {
+        match self {
+            EntityMetadata::Image(metadata) => Some(metadata),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Entity {
     /// assigned uid
@@ -48,11 +56,12 @@ pub struct Entity {
     pub(super) metadata: Option<EntityMetadata>,
 }
 
-#[allow(unused)]
 impl Entity {
+    #[inline]
     pub fn get_uid(&self) -> &Uuid {
         &self.uid
     }
+    #[inline]
     pub fn get_filename(&self) -> String {
         if self.content_type == "text/plain" && self.ext.is_none() {
             format!("{}.txt", self.name)
@@ -60,61 +69,76 @@ impl Entity {
             self.name.to_string()
         }
     }
+    #[inline]
     pub fn get_resource(&self) -> String {
         match &self.ext {
             Some(ext) => format!("{}.{}", self.uid, ext),
             None => self.uid.to_string(),
         }
     }
+    #[inline]
     pub fn get_hash(&self) -> &str {
         &self.hash
     }
+    #[inline]
     pub fn get_name(&self) -> &str {
         &self.name
     }
+    #[inline]
     pub fn get_size(&self) -> &u64 {
         &self.size
     }
+    #[inline]
     pub fn get_tags(&self) -> &[String] {
         &self.tags
     }
+    #[inline]
     pub fn get_caption(&self) -> &str {
         &self.caption
     }
+    #[inline]
     pub fn get_content_type(&self) -> &str {
         &self.content_type
     }
+    #[inline]
     pub fn get_created(&self) -> &i64 {
         &self.created
     }
+    #[inline]
     pub fn get_modified(&self) -> &Option<i64> {
         &self.modified
     }
+    #[inline]
     pub fn get_created_date(&self) -> String {
         utils::i64_to_utc(&self.created).unwrap()
     }
+    #[inline]
     pub fn get_modified_date(&self) -> Option<String> {
         self.modified.map(|t| utils::i64_to_utc(&t).unwrap())
     }
+    #[inline]
     pub fn get_extension(&self) -> &Option<String> {
         &self.ext
     }
+    #[inline]
     pub fn get_ip(&self) -> &Option<String> {
         &self.ip
     }
+    #[inline]
     pub fn get_ip_alias(&self) -> Option<&String> {
-        let device_ip_tags = &config::load().device_ip_tags;
+        let device_ip_tags = &config::CONFIG.device_ip_tags;
         self.ip
             .as_ref()
             .zip(device_ip_tags.as_ref())
             .and_then(|(ip, tags)| tags.get(ip))
     }
+    #[inline]
     pub fn get_metadata(&self) -> &Option<EntityMetadata> {
         &self.metadata
     }
     pub fn serialize_and_write(&self, writer: &mut String, key: &str) -> anyhow::Result<()> {
-        writeln!(writer, "[[{}]]", key);
-        write!(writer, "{}", toml::to_string(&self)?);
+        writeln!(writer, "[[{}]]", key)?;
+        write!(writer, "{}", toml::to_string(&self)?)?;
         if let Some(metadata) = &self.metadata {
             let s = toml::to_string(metadata)?;
             #[allow(clippy::write_literal)]

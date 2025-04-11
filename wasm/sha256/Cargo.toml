@@ -3,11 +3,11 @@ name = "sha256-binding"
 version = "0.1.0"
 edition = "2021"
 description = "Rust sha2 SHA-256 WASM binding"
-repository = "https://github.com/tonitrnel/synclink"
+repository = "https://github.com/tonitrnel/cedasync"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wasm-bindgen = "0.2.86"
+wasm-bindgen = "0.2.92"
 sha2 = "0.10.6"
 
 [lib]

@@ -1,23 +1,23 @@
-import { defineConfig } from 'vite';
+import { defineConfig, UserConfig } from 'vite';
 import type { CompilerOptions } from 'typescript';
 import react from '@vitejs/plugin-react-swc';
-import svgr from 'vite-plugin-svgr';
+import svgr from '@svgr/rollup';
 import { lingui } from '@lingui/vite-plugin';
 import wasm from 'vite-plugin-wasm';
 import top_await from 'vite-plugin-top-level-await';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const __PROJECT = process.cwd();
+const __PROJECT__ = process.cwd();
 const parseProject = async () => {
-  return fs
-    .readFile(path.join(__PROJECT, '/package.json'))
-    .then<{ version: string }>((buf) => JSON.parse(buf.toString()));
+  return fs.readFile(path.join(__PROJECT__, '/package.json')).then<{
+    version: string;
+  }>((buf) => JSON.parse(buf.toString()));
 };
 const parseTSAlias = async () => {
   try {
     const { baseUrl = '.', paths = {} }: CompilerOptions = await fs
-      .readFile(path.join(__PROJECT, '/tsconfig.json'))
+      .readFile(path.join(__PROJECT__, '/tsconfig.json'))
       .then((r) => {
         const content = r
           .toString()
@@ -28,17 +28,17 @@ const parseTSAlias = async () => {
     return Object.keys(paths).reduce(
       (alias, key) => {
         alias[key.toString().replace('/*', '')] = path.join(
-          __PROJECT,
+          __PROJECT__,
           baseUrl,
-          paths[key][0]?.replace('/*', '')
+          paths[key][0]?.replace('/*', ''),
         );
         return alias;
       },
-      { '@': path.join(__PROJECT, 'src') } as Record<string, string>
+      { '@': path.join(__PROJECT__, 'src') } as Record<string, string>,
     );
   } catch (e) {
     console.error('[Vite] Parse tsconfig failed, return empty alias', e);
-    return {};
+    process.exit(1);
   }
 };
 
@@ -47,9 +47,9 @@ export default defineConfig(async ({ command }) => {
   const project = await parseProject();
   return {
     define: {
-      __ENDPOINT: command == 'build' ? '""' : '"http://localhost:8080"',
-      __VERSION: JSON.stringify(project.version),
-      __BUILD_TIMESTAMP: Date.now(),
+      __ENDPOINT__: command == 'build' ? '""' : '"http://synclink.ptdg.dev"',
+      __VERSION__: JSON.stringify(project.version),
+      __BUILD_TIMESTAMP__: Date.now(),
     },
     plugins: [
       wasm(),
@@ -67,11 +67,11 @@ export default defineConfig(async ({ command }) => {
       port: 8081,
       strictPort: true,
       proxy: {
-        '/api': 'http://localhost:8080',
+        '/api': 'http://127.0.0.1:8080',
       },
     },
     worker: {
-      plugins: [wasm(), top_await()],
+      plugins: () => [wasm(), top_await()],
     },
-  };
+  } satisfies UserConfig;
 });

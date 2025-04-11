@@ -1,8 +1,8 @@
-use crate::errors::{ApiResponse, ErrorKind, InternalError};
-use crate::extractors::{ClientIp, Headers};
+use crate::common::{ApiError, ApiResult, InternalError};
+use crate::extractors::{ClientIp, Header};
 use crate::models::file_indexing::{IndexChangeAction, WriteIndexArgs};
 use crate::state::AppState;
-use crate::utils::decode_uri;
+use crate::utils::{decode_uri, SessionManager};
 use anyhow::Context;
 use axum::{
     extract::{Query, Request, State},
@@ -11,11 +11,11 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::io::{Read, SeekFrom};
 use std::path;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 use tar::Archive;
 use tokio::fs;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -27,15 +27,7 @@ struct Session {
     start: u64,
 }
 
-type Sessions = HashMap<Uuid, Session>;
-
-static SHARED_SESSIONS: OnceLock<Arc<Mutex<Sessions>>> = OnceLock::new();
-#[derive(Deserialize, Debug)]
-pub struct QueryParams {
-    id: Option<Uuid>,
-    pos: Option<u64>,
-    size: Option<u64>,
-}
+static SHARED_SESSIONS: LazyLock<Arc<SessionManager<Uuid, Session>>> = LazyLock::new(|| SessionManager::new(Duration::from_secs(300)));
 
 #[derive(Deserialize, Debug)]
 pub struct ConcatenateQueryParams {
@@ -44,36 +36,9 @@ pub struct ConcatenateQueryParams {
     caption: Option<String>,
 }
 
-impl QueryParams {
-    fn id(&self) -> Result<Uuid, ErrorKind> {
-        self.id
-            .ok_or_else(|| ErrorKind::QueryFieldMissing("id".to_string()))
-    }
-    fn pos(&self) -> Result<u64, ErrorKind> {
-        self.pos
-            .ok_or_else(|| ErrorKind::QueryFieldMissing("pos".to_string()))
-    }
-    fn size(&self) -> Result<u64, ErrorKind> {
-        self.size
-            .ok_or_else(|| ErrorKind::QueryFieldMissing("size".to_string()))
-    }
-}
-
-fn access_shared_sessions() -> anyhow::Result<MutexGuard<'static, Sessions>> {
-    match SHARED_SESSIONS
-        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
-        .lock()
-    {
-        Ok(guard) => Ok(guard),
-        Err(err) => {
-            anyhow::bail!("sessions lock failed, reason {:?}", err)
-        }
-    }
-}
-
 /// allocate disk resource
 async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
-    let path = std::env::temp_dir().join("synclink");
+    let path = std::env::temp_dir().join("cedasync");
     if !path.exists() {
         fs::create_dir(&path)
             .await
@@ -82,7 +47,8 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     };
     let (uid, start, path) = {
-        if let Some((uid, session)) = access_shared_sessions()?
+        if let Some((uid, session)) = SHARED_SESSIONS
+            .guard()
             .iter()
             .find(|(_, it)| it.hash == hash)
         {
@@ -116,7 +82,7 @@ async fn exec_allocate(size: u64, hash: String) -> anyhow::Result<(Uuid, u64)> {
             })?;
     }
     if start == 0 {
-        access_shared_sessions()?.insert(uid, Session { hash, start: 0 });
+        SHARED_SESSIONS.insert(uid, Session { hash, start: 0 });
     }
     Ok((uid, start))
 }
@@ -127,7 +93,7 @@ where
     S: Stream<Item = Result<axum::body::Bytes, E>> + 'static + Send + Unpin,
     E: Into<axum::BoxError>,
 {
-    let path = std::env::temp_dir().join("synclink");
+    let path = std::env::temp_dir().join("cedasync");
     let path = path.join(format!("{}.tmp", uid));
     let mut file = fs::OpenOptions::new()
         .write(true)
@@ -158,7 +124,7 @@ where
                 path: path.to_owned(),
             })?;
     }
-    if let Some(it) = access_shared_sessions()?.get_mut(uid) {
+    if let Some(it) = SHARED_SESSIONS.guard().get_mut(uid) {
         it.start = end;
     }
     Ok(())
@@ -174,7 +140,7 @@ async fn exec_concatenate(
     use sha2::{Digest, Sha256};
     use tokio_util::io::ReaderStream;
 
-    let path = std::env::temp_dir().join("synclink");
+    let path = std::env::temp_dir().join("cedasync");
     let temp = path.join(format!("{}.tmp", uid));
     let file = fs::OpenOptions::new()
         .read(true)
@@ -219,7 +185,7 @@ async fn exec_concatenate(
         .unwrap_or_default();
     let path = storage_path.join(format!("{}{}", uid, ext));
     move_tmp_file(&temp, &path).await?;
-    access_shared_sessions()?.remove(uid);
+    SHARED_SESSIONS.remove(uid);
     Ok((path, size, format!("{:x}", hasher.finalize())))
 }
 
@@ -269,26 +235,33 @@ fn get_device_id(_path: &path::Path) -> anyhow::Result<u64> {
 /// cleanup uploaded chunks
 async fn exec_cleanup(uid: &Uuid) -> anyhow::Result<()> {
     let path = std::env::temp_dir()
-        .join("synclink")
+        .join("cedasync")
         .join(format!("{}.tmp", uid));
     fs::remove_file(&path)
         .await
         .with_context(|| InternalError::DeleteFileError {
             path: path.to_owned(),
         })?;
-    access_shared_sessions()?.remove(uid);
+    SHARED_SESSIONS.remove(uid);
     Ok(())
+}
+#[derive(Deserialize, Debug)]
+pub struct AllocateQueryDto {
+    size: u64,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct AllocateHeaderDto {
+    x_content_sha256: String,
 }
 
 pub async fn allocate(
     State(state): State<AppState>,
-    headers: Headers,
-    query: Query<QueryParams>,
-) -> ApiResponse<impl IntoResponse> {
-    let content_hash = headers
-        .get("x-content-sha256")
-        .try_as_string()?
-        .to_lowercase();
+    header: Header<AllocateHeaderDto>,
+    query: Query<AllocateQueryDto>,
+) -> ApiResult<impl IntoResponse> {
+    let content_hash = header.x_content_sha256.to_lowercase();
     if let Some(uuid) = state.indexing.has_hash(&content_hash) {
         return Ok((
             StatusCode::CONFLICT,
@@ -296,20 +269,24 @@ pub async fn allocate(
         )
             .into_response());
     }
-    let size = query.size()?;
+    let size = query.size;
     let (uid, start) = exec_allocate(size, content_hash).await?;
     Ok((StatusCode::CREATED, format!("{uid};{start}")).into_response())
 }
 
+#[derive(Deserialize, Debug)]
+pub struct AppendQueryDto {
+    pos: u64,
+}
 pub async fn append(
     axum::extract::Path(id): axum::extract::Path<Uuid>,
-    query: Query<QueryParams>,
+    query: Query<AppendQueryDto>,
     request: Request,
-) -> ApiResponse<impl IntoResponse> {
-    let pos = query.pos()?;
+) -> ApiResult<impl IntoResponse> {
+    let pos = query.pos;
     let current_start_position = {
         // Reduce the scope of the lock
-        access_shared_sessions()?.get(&id).map(|it| it.start)
+        SHARED_SESSIONS.get(&id).map(|it| it.start)
     };
 
     // Check for duplicate chunk
@@ -321,12 +298,21 @@ pub async fn append(
     Ok(Json("ok!"))
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct ConcatenateHeaderDto {
+    content_type: Option<String>,
+    user_agent: String,
+    x_content_sha256: String,
+    x_raw_filename: Option<String>,
+}
+
 pub async fn concatenate(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
-    headers: Headers,
+    header: Header<ConcatenateHeaderDto>,
     query: Query<ConcatenateQueryParams>,
-) -> ApiResponse<impl IntoResponse> {
+) -> ApiResult<impl IntoResponse> {
     let id = query.id;
     let tags = query
         .tags
@@ -338,21 +324,17 @@ pub async fn concatenate(
         })
         .unwrap_or_default();
     let caption = query.caption.clone().unwrap_or_default();
-    if !access_shared_sessions()?.contains_key(&id) {
+    if !SHARED_SESSIONS.contains_key(&id) {
         return Ok(Json("ok!"));
     }
-    let content_type = headers.get("content-type").try_as_string().ok();
-    let content_hash = headers
-        .get("x-content-sha256")
-        .try_as_string()?
-        .to_lowercase();
-    let filename = headers
-        .get("x-raw-filename")
-        .try_as_string()
-        .ok()
-        .map(|it| decode_uri(&it).map_err(ErrorKind::from))
+    let content_type = header.content_type.clone();
+    let content_hash = header.x_content_sha256.to_lowercase();
+    let filename = header
+        .x_raw_filename
+        .as_ref()
+        .map(|it| decode_uri(it).map_err(ApiError::from))
         .transpose()?;
-    let user_agent = headers.get("user-agent").try_as_string().ok();
+    let user_agent = &header.user_agent;
     let (path, size, hash) = exec_concatenate(
         state.indexing.get_storage_dir(),
         &id,
@@ -367,13 +349,13 @@ pub async fn concatenate(
         fs::remove_file(&path)
             .await
             .with_context(|| InternalError::DeleteFileError { path })?;
-        return Err(ErrorKind::HashMismatch);
+        return Err(ApiError::HashMismatch);
     }
     state
         .indexing
         .write(WriteIndexArgs {
             uid: id,
-            user_agent,
+            user_agent: Some(user_agent.to_owned()),
             filename,
             content_type,
             hash,
@@ -383,14 +365,20 @@ pub async fn concatenate(
             tags,
         })
         .await?;
-    if let Err(err) = state.broadcast.send(IndexChangeAction::AddItem(id)) {
+    if let Err(err) = state
+        .notify_manager
+        .send(IndexChangeAction::AddItem(id).into())
+    {
         tracing::warn!(%err, "{}", InternalError::BroadcastIndexChangeError(format!("add {} action", id)));
     }
     Ok(Json("ok!"))
 }
 
-pub async fn abort(query: Query<QueryParams>) -> ApiResponse<impl IntoResponse> {
-    let id = query.id()?;
-    exec_cleanup(&id).await?;
+#[derive(Deserialize, Debug)]
+pub struct AbortQueryDto {
+    id: Uuid,
+}
+pub async fn abort(query: Query<AbortQueryDto>) -> ApiResult<impl IntoResponse> {
+    exec_cleanup(&query.id).await?;
     Ok(Json("ok!"))
 }

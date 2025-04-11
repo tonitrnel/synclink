@@ -1,32 +1,31 @@
 @import 'photoswipe/dist/photoswipe.css';
 
 /* Item */
-.synclink-item {
-  @apply relative mt-10;
+.item {
+  @apply relative mt-4 pad:mt-10;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 @media screen and (max-width: 780px) {
-  .synclink-item {
+  .item {
     margin-bottom: 0;
   }
 }
 
-.synclink-item:last-of-type {
-  border-bottom: none;
-}
-
-.synclink-item-title {
+.item-title {
   @apply mt-0 font-semibold;
 }
 
-.synclink-item-link {
+.item-link {
   -webkit-appearance: none;
   border: none;
   background-color: transparent;
   font-family: inherit;
   cursor: pointer;
   padding: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   @apply text-gray-600;
 
@@ -45,6 +44,6 @@
 }
 /* Preview Item */
 
-.synclink-item-preview {
+.item-preview {
   max-width: 100%;
 }

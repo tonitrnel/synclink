@@ -1,9 +1,9 @@
-const __CACHE_NAME = 'media';
-const __CHANNEL = 'messages';
-const __PREFIX = '/shared_media/';
+const __CACHE_NAME__ = 'media';
+const __CHANNEL__ = 'messages';
+const __PREFIX__ = '/shared_media/';
 
 const broadcastChannel =
-  'BroadcastChannel' in self ? new BroadcastChannel(__CHANNEL) : null;
+  'BroadcastChannel' in self ? new BroadcastChannel(__CHANNEL__) : null;
 
 // This event is fired when a user has taken action in the browser to remove
 // an item that was previously added to the content index.
@@ -13,7 +13,7 @@ self.addEventListener('contentdelete', (event) => {
   const cacheKey = event.id;
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(__CACHE_NAME);
+      const cache = await caches.open(__CACHE_NAME__);
       await cache.delete(cacheKey);
     })()
   );
@@ -35,7 +35,7 @@ self.addEventListener('fetch', (fetchEvent) => {
         const formData = await fetchEvent.request.formData();
         const keys = [...formData.keys()].join(', ');
         const mediaFiles = formData.getAll('media');
-        const cache = await caches.open(__CACHE_NAME);
+        const cache = await caches.open(__CACHE_NAME__);
         const now = Date.now();
         for (const [i, mediaFile] of mediaFiles.entries()) {
           if (!mediaFile.name) {
@@ -43,7 +43,7 @@ self.addEventListener('fetch', (fetchEvent) => {
             continue;
           }
           const cacheKey = new URL(
-            `${__PREFIX}${now}-${i
+            `${__PREFIX__}${now}-${i
               .toString(16)
               .padStart(6, '0')}-${encodeURIComponent(mediaFile.name)}`,
             self.location
@@ -55,8 +55,8 @@ self.addEventListener('fetch', (fetchEvent) => {
                 'content-length': mediaFile.size,
                 'content-type': mediaFile.type,
                 'last-modified': new Date(mediaFile.lastModified).toGMTString(),
-                'x-raw-filename': encodeURIComponent(mediaFile.name),
-              },
+                'x-raw-filename': encodeURIComponent(mediaFile.name)
+              }
             })
           );
         }

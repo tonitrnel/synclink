@@ -51,12 +51,12 @@ class Report {
         width: window.innerWidth,
       },
       build: {
-        version: __VERSION,
-        timestamp: __BUILD_TIMESTAMP,
+        version: __VERSION__,
+        timestamp: __BUILD_TIMESTAMP__,
       },
     };
     this.lastReportTime = now;
-    navigator.sendBeacon(`${__ENDPOINT}/api/beacon`, JSON.stringify(report));
+    navigator.sendBeacon(`${__ENDPOINT__}/api/beacon`, JSON.stringify(report));
   }
 
   static launch() {
@@ -116,7 +116,10 @@ class Report {
 export class Logger {
   private readonly level: LogLevel;
 
-  constructor(public readonly name: string, level?: LogLevel) {
+  constructor(
+    public readonly name: string,
+    level?: LogLevel,
+  ) {
     if (!level) {
       const _level = localStorage.getItem('__LOG_LEVEL') || void 0;
       if (_level && Reflect.has(LogLevel, _level)) {

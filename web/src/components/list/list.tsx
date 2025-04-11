@@ -9,358 +9,356 @@ import {
 } from 'react';
 import { AlertTriangleIcon, BirdIcon } from 'icons';
 import { UploadManager } from '~/components/upload-manager';
-import { SynclinkItem } from '~/components/item';
+import { Item } from '~/components/item';
 import { IEntity } from '~/constants/types.ts';
 import { Logger } from '~/utils/logger.ts';
 import { Loading } from '~/components/loading';
 import { t } from '@lingui/macro';
-import { wait } from '~/utils/wait.ts';
 import { motion } from 'framer-motion';
 import { useLatestFunc } from '@painted/shared';
-import { useGetList } from '~/endpoints';
+import { useGetList, useGetTextCollection } from '~/endpoints';
 import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
+import { notifyManager } from '~/utils/notify-manager.ts';
+import { useSnackbar } from '~/components/ui/snackbar';
+import { loadCoordinator } from '~/components/item/hooks/use-coordinator.ts';
+import { lookupHTMLNode } from '~/utils/lookup-html-node.ts';
+import { useLingui } from '@lingui/react';
 
-const logger = new Logger('synclink');
+const logger = new Logger('cedasync');
 
-interface Pagination {
-  page: number;
-  size: number;
+interface State {
+  pagination: {
+    page: number;
+    size: number;
+  };
+  total: number;
+  records: (IEntity & { content?: string })[];
+  beforeTime: number;
 }
 
-type SseMessage =
-  | {
-      type: 'ADD' | 'DELETE';
-      uid: string;
-    }
-  | {
-      type: 'HEART';
-      time: number;
-    };
-
 const getEntity = async (uid: string) => {
-  return fetch(`${__ENDPOINT}/api/${uid}`).then<IEntity>((res) => res.json());
+  return fetch(`${__ENDPOINT__}/api/${uid}`).then<IEntity>((res) => res.json());
 };
-const __TIME = Date.now();
-
+const __BEFORE_TIME__ = Date.now();
 export const List: FC<{
   className?: string;
-}> = memo(({ className }) => {
+  onReady(): void;
+}> = memo(({ className, onReady }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [pagination, setPagination] = useState<Pagination>(() => ({
-    page: 1,
-    size: 10,
+  const [state, setState] = useState<State>(() => ({
+    pagination: {
+      page: 1,
+      size: 10,
+    },
+    total: 0,
+    records: [],
+    beforeTime: __BEFORE_TIME__,
   }));
-  const [total, setTotal] = useState(0);
-  const [list, setList] = useState<IEntity[]>([]);
-  const [scrollReady, setScrollReday] = useState(false);
-  const prohibitScrollLoadRef = useRef(false);
+  const metadataRef = useRef({
+    isProhibitScrollLoad: false,
+    isLoading: false,
+    ready: false,
+  });
+  const snackbar = useSnackbar();
   const {
     done,
     error,
     pending: loading,
     refresh,
+    execute,
   } = useGetList({
     query: {
-      page: pagination.page,
-      per_page: pagination.size,
-      before: __TIME,
+      page: state.pagination.page,
+      per_page: state.pagination.size,
+      before: state.beforeTime,
     },
-    onSuccess: (data) => {
-      setTotal(data.total);
-      const ids = new Set(list.map((it) => it.uid));
-      setList(
-        list.concat((data.data as IEntity[]).filter((it) => !ids.has(it.uid)))
-      );
+    onSuccess: async (data) => {
+      const textCollection = data.data.filter(
+        (it) => it.type.startsWith('text/') && it.size < 4096,
+      ) as State['records'];
+      if (textCollection.length > 0) {
+        const textCollectionContents = await useGetTextCollection({
+          body: { uuids: textCollection.map((it) => it.uid) },
+          serializers: {
+            response: async (res) => {
+              const lengths = res.headers
+                .get('x-collection-lengths')!
+                .split(',')
+                .map(Number);
+              const buffer = new Uint8Array(await res.arrayBuffer());
+              const textDecoder = new TextDecoder();
+              let start = 0;
+              return lengths.map((len) => {
+                const part = textDecoder.decode(
+                  buffer.subarray(start, start + len),
+                );
+                start += len;
+                return part;
+              });
+            },
+          },
+        });
+        for (let i = 0; i < textCollection.length; ++i) {
+          textCollection[i].content = textCollectionContents[i];
+        }
+      }
+      withProduce(setState, (draft) => {
+        draft.total = data.total;
+        draft.records.unshift(...data.data.toReversed());
+      });
+      metadataRef.current.isLoading = false;
+      // console.log("加载完成");
     },
   });
-  const previous = useMemo(
+  const previousPage = useMemo(
     () =>
-      total > pagination.size * pagination.page ? pagination.page + 1 : void 0,
-    [pagination.page, pagination.size, total]
+      state.total > state.pagination.size * state.pagination.page
+        ? state.pagination.page + 1
+        : void 0,
+    [state.pagination.page, state.pagination.size, state.total],
   );
-  const _loadPrevious = useCallback(() => {
-    if (!previous || loading) return void 0;
-    setPagination((prev) => ({
-      page: previous,
-      size: prev.size,
-    }));
-  }, [loading, previous]);
-  const loadPrevious = useLatestFunc(_loadPrevious);
-  const scrollToBottom = useCallback(async (): Promise<void> => {
+  const loadPrevious = useLatestFunc(() => {
+    const container = containerRef.current;
+    if (!previousPage || loading || !container) return void 0;
+    withProduce(setState, (draft) => {
+      draft.pagination.page = previousPage;
+    });
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    loadCoordinator.waitForNextBatch().then(() => {
+      // const _scrollTop = container.scrollTop;
+      const _scrollHeight = container.scrollHeight;
+      // console.log(
+      //   `finish loadPrevious\nscrollTop: ${scrollTop} > ${_scrollTop} > ${_scrollHeight - scrollHeight + scrollTop}`,
+      //   `scrollHeight: ${scrollHeight} > ${_scrollHeight}`,
+      // );
+      container.scrollTo({
+        top: _scrollHeight - scrollHeight + scrollTop,
+        behavior: 'instant',
+      });
+    });
+  });
+  const scrollToBottom = useCallback((behavior?: ScrollBehavior): void => {
     const element = containerRef.current;
     if (!element) return void 0;
-    let height = element.scrollHeight - element.clientHeight;
-    return new Promise<void>((resolve) => {
-      const scroll = () => {
-        const currentHeight = element.scrollHeight - element.clientHeight;
-        if (currentHeight != height) {
-          height = currentHeight;
-          window.requestAnimationFrame(scroll);
-          return void 0;
-        }
-        element.scrollTo({ top: currentHeight });
-        resolve();
-      };
-      window.requestAnimationFrame(scroll);
-    });
+    const currentHeight = element.scrollHeight - element.clientHeight;
+    element.scrollTo({ top: currentHeight, behavior });
   }, []);
+  // 处理来自 SSE 的记录新增、删除信息，如果 SSE 重连则还加载最新的记录
   useEffect(() => {
     if (!done || error) return void 0;
-    let window_hidden_timer: number | null = null;
-    let heart_timer: number | null = null;
-    let last_event_time: number | null = null;
-    let last_heart_time: number | null = null;
-    let connecting = false;
-    const ids = new Set<string>();
-    const handleSSEMessage = async (evt: MessageEvent) => {
-      const payload: SseMessage = JSON.parse(evt.data);
-      switch (payload.type) {
-        case 'DELETE': {
-          let total = -1;
-          withProduce(setList, (draft) => {
-            const index = draft.findIndex((it) => it.uid == payload.uid);
-            draft.splice(index, 1);
-            total = draft.length;
-          });
-          prohibitScrollLoadRef.current = true;
-          if (total == 0) await refresh();
-          break;
-        }
-        case 'ADD': {
-          try {
-            // fetching latest records..., ignore sse notification
-            if (last_event_time) return void 0;
-            if (ids.has(payload.uid)) return void 0;
-            ids.add(payload.uid);
-            const entity = await getEntity(payload.uid);
-            setList((list) => [entity, ...list]);
-            scrollToBottom();
-          } catch (e) {
-            logger.error('Update list failed', e);
-          }
-          break;
-        }
-        case 'HEART': {
-          last_heart_time = payload.time;
-          break;
-        }
-      }
+    let afterTime = __BEFORE_TIME__;
+    const metadata = metadataRef.current;
+    const loadLatest = async () => {
+      const records = await execute(
+        {
+          page: 1,
+          per_page: 100,
+          after: afterTime,
+        },
+        { silent: true },
+      ).then((res) => res.data);
+      if (records.length == 0) return void 0;
+      afterTime = Date.now();
+      logger.info(`Updated ${records.length} records`);
+      withProduce(setState, (draft) => {
+        draft.total += records.length;
+        draft.records.push(...records);
+      });
+      await loadCoordinator.waitForNextBatch();
+      scrollToBottom('smooth');
     };
-    const getLatestRecords = async () => {
-      if (!last_event_time) return void 0;
-      try {
-        const records = await fetch(
-          `${__ENDPOINT}/api?page=1&per_page=${10}&after=${last_event_time}`
-        ).then<IEntity[]>((res) => (res.ok ? res.json() : []));
-        if (records.length > 0) {
-          logger.info(`updated ${records.length} records`);
-          setList((list) => [...records, ...list]);
-        }
-      } finally {
-        last_event_time = null;
+    notifyManager.ensureWork().catch((error) => {
+      logger.error(error);
+      if (error instanceof Error) {
+        snackbar.enqueueSnackbar({
+          variant: 'error',
+          message: error.message,
+        });
       }
-    };
-    let abortController = new AbortController();
-    const connectSse = async () => {
-      let retry = 0;
-      const connect = async (): Promise<EventSource | undefined> => {
-        if (connecting) return void 0;
-        connecting = true;
+    });
+    return notifyManager.batch(
+      notifyManager.on('CONNECTED', () => {
+        if (afterTime == __BEFORE_TIME__) return void 0;
+        loadLatest().catch(console.error);
+      }),
+      notifyManager.on('DISCONNECTED', () => {
+        afterTime = Date.now();
+      }),
+      notifyManager.on('RECORD_DELETED', async (uid) => {
+        let total = -1;
+        withProduce(setState, (draft) => {
+          const index = draft.records.findIndex((it) => it.uid == uid);
+          draft.records.splice(index, 1);
+          total = draft.records.length;
+        });
+        metadata.isProhibitScrollLoad = true;
+        if (total == 0) await refresh();
+      }),
+      notifyManager.on('RECORD_ADDED', async (uid) => {
         try {
-          return await new Promise<EventSource>((resolve, reject) => {
-            const _sse = new EventSource(`${__ENDPOINT}/api/notify`);
-            logger.debug('sse connecting...');
-            _sse.onopen = () => {
-              logger.debug('sse connected');
-              resolve(_sse);
-            };
-            _sse.onerror = async () => {
-              _sse.close();
-              if (
-                _sse.readyState == _sse.CONNECTING ||
-                _sse.readyState == _sse.CLOSED
-              ) {
-                reject(new Error('sse connection failed'));
-              }
-              if (_sse.readyState == _sse.OPEN) {
-                logger.debug('sse disconnected, try reconnecting.');
-                connectSse().catch(console.error);
-              }
-            };
-            _sse.onmessage = handleSSEMessage;
+          const entity = await getEntity(uid);
+          withProduce(setState, (draft) => {
+            draft.records.push(entity);
           });
-        } finally {
-          connecting = false;
-        }
-      };
-      while (retry < 6) {
-        try {
-          const sse = await connect();
-          if (!sse) return void 0;
-          retry = 0;
-          abortController.signal.throwIfAborted();
-          abortController.signal.addEventListener('abort', () => {
-            logger.debug(abortController.signal.reason);
-            if (heart_timer) window.clearInterval(heart_timer);
-            sse.close();
-          });
-          heart_timer = window.setInterval(() => {
-            if (!last_heart_time) return void 0;
-            if (last_heart_time + 3000 < Date.now()) {
-              abortController.abort('heart packet timeout');
-              abortController = new AbortController();
-              connectSse().catch(console.error);
-            }
-          }, 3000);
-          return void 0;
+          await loadCoordinator.waitForNextBatch();
+          scrollToBottom('smooth');
         } catch (e) {
-          logger.warn((e as Error)?.message ?? e);
-          retry += 1;
-          const interval = 2 ** retry * 1000;
-          logger.debug(`wait ${interval}ms retry`);
-          await wait(interval);
+          logger.error('Failed to update list, reason:', e);
         }
-      }
-      throw new Error(`more than ${6} connection failures, sse closed`);
-    };
-    const handleVisibility = () => {
-      const visibility = document.visibilityState;
-      if (visibility === 'hidden') {
-        window_hidden_timer = window.setTimeout(() => {
-          abortController.abort('inactive for more than 60s');
-          window_hidden_timer = null;
-          last_event_time = Date.now();
-        }, 6_0000);
-      } else {
-        if (window_hidden_timer) window.clearTimeout(window_hidden_timer);
-        if (!abortController.signal.aborted) return void 0;
-        abortController = new AbortController();
-        // reconnect sse
-        connectSse().catch(logger.error);
-        getLatestRecords().catch(logger.error);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    connectSse().catch(logger.error);
-    return () => {
-      abortController.abort('Component unmounted');
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [done, error, refresh, scrollToBottom]);
-  useEffect(() => {
-    const element = containerRef.current;
-    if (!element) return void 0;
-    const scrollWatcher = () => {
-      if (prohibitScrollLoadRef.current) {
-        prohibitScrollLoadRef.current = false;
-        return void 0;
-      }
-      if (element.scrollTop <= 0) {
-        loadPrevious();
-        // 保持当前滚动位置
-        element.scrollTop = 1;
-      }
-    };
-    element.addEventListener('scroll', scrollWatcher);
-    return () => {
-      element.removeEventListener('scroll', scrollWatcher);
-    };
+      }),
+    );
+  }, [done, error, execute, refresh, scrollToBottom, snackbar]);
+  const onLoadPreviousTrigger = useCallback(() => {
+    const metadata = metadataRef.current;
+    if (metadata.isLoading || !metadata.ready) return void 0;
+    metadata.isLoading = true;
+    // console.log('start loadPrevious');
+    loadPrevious();
   }, [loadPrevious]);
+  // 在 Loading 遮罩关闭前滚动至最底部
   useEffect(() => {
     if (!done) return void 0;
     const element = containerRef.current;
     if (!element) return void 0;
-    const ul = element.querySelector('ul');
-    if (!ul) return void 0;
-    let raf: number | undefined = void 0;
-    const ulObs = new ResizeObserver(() => {
-      if (raf) window.cancelAnimationFrame(raf);
-      raf = window.requestAnimationFrame(async () => {
-        raf = void 0;
-        await scrollToBottom();
-        ulObs.disconnect();
-        setScrollReday(true);
-      });
+    const list = element.querySelector('ul')!;
+    if (!list) {
+      onReady();
+      return void 0;
+    }
+    const items = [...list.children];
+    if (items.length == 0) return void 0;
+    // let startTime = Date.now();
+    // 第三次滚动，在用户未主动滚动前还可尝试滚动至最底部，理论不会触发
+    // const resizeObs = new ResizeObserver(() => {
+    // const resizeObs = new ResizeObserver((entries) => {
+    //   const now = Date.now();
+    //   console.log(
+    //     'resize',
+    //     `${now - startTime}ms`,
+    //     entries.map((it) => it.target),
+    //   );
+    //   startTime = now;
+    // scrollToBottom();
+    // });
+    // const start = Date.now();
+    // 第一次滚动，滚动至最底部
+    scrollToBottom();
+    // 第二次滚动和关闭 Loading 遮罩，当前批次的所有 Item 均高度已稳定（数据已加载）
+    loadCoordinator.waitForNextBatch().then(() => {
+      // console.log(
+      //   'ready, isTimeout:',
+      //   isTimeout,
+      //   ' elapsed:',
+      //   Date.now() - start,
+      // );
+      scrollToBottom();
+      onReady();
+      metadataRef.current.ready = true;
     });
-    ulObs.observe(ul);
-    let previousHeight = element.getBoundingClientRect().height;
-    const obs = new ResizeObserver((entries) => {
-      const height = entries[0].contentRect.height;
-      const isBottom =
-        element.scrollTop ===
-        element.scrollHeight - element.clientHeight + (height - previousHeight);
-      if (previousHeight != 0 && previousHeight != height && isBottom) {
-        scrollToBottom();
-      }
-      previousHeight = height;
-    });
-    obs.observe(element);
+    // items.forEach((item) => resizeObs.observe(item));
     return () => {
-      obs.disconnect();
+      // resizeObs.disconnect();
     };
-  }, [done, scrollToBottom]);
-  const reversedList = useMemo(() => [...list].reverse(), [list]);
+  }, [done, onReady, scrollToBottom]);
   return (
-    <motion.section
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       ref={containerRef}
       className={className}
     >
-      <div className="relative w-full h-full">
+      <div className="relative flex h-full w-full flex-col">
         {(() => {
+          if (!done) return null;
           if (error)
             return (
               <Loading.Wrapper>
-                <div className="inline-flex flex-col items-center relative text-center text-gray-400">
+                <div className="relative inline-flex flex-col items-center text-center text-gray-400">
                   <AlertTriangleIcon
-                    className="w-9 h-9 stroke-palette-bright-orange opacity-50"
+                    className="stroke-palette-bright-orange h-9 w-9 opacity-50"
                     strokeWidth={1.5}
                   />
-                  <p className="block mt-4 capitalize">{String(error)}</p>
+                  <p className="mt-4 block capitalize">{String(error)}</p>
                 </div>
               </Loading.Wrapper>
             );
-          if (!done)
+          if (state.records.length == 0)
             return (
               <Loading.Wrapper>
-                <Loading>
-                  <span className="capitalize">{t`receiving`}</span>
-                  <span className="ani_dot">...</span>
-                </Loading>
-              </Loading.Wrapper>
-            );
-          if (list.length == 0)
-            return (
-              <Loading.Wrapper>
-                <div className="inline-flex flex-col items-center relative text-center text-gray-400">
+                <div className="relative inline-flex flex-col items-center text-center text-gray-400">
                   <BirdIcon
-                    className="w-9 h-9 stroke-gray-400 opacity-50"
+                    className="h-9 w-9 stroke-gray-400 opacity-50"
                     strokeWidth={1.5}
                   />
-                  <span className="block mt-4 capitalize">{t`no items found.`}</span>
+                  <span className="mt-4 block capitalize">{t`no items found.`}</span>
                 </div>
               </Loading.Wrapper>
             );
           return (
-            <motion.div className="flex h-full flex-col relative">
+            <>
               {loading && <Loading />}
+              <LoadPreviousTrigger
+                onTrigger={onLoadPreviousTrigger}
+                hasMore={previousPage !== undefined}
+              />
               <ul
-                className={clsx(
-                  'flex-1 px-1 pt-2 pb-1 transition-opacity',
-                  !scrollReady && 'opacity-0'
-                )}
+                id="records"
+                className={clsx('flex-1 pb-8 pt-2 transition-opacity')}
               >
-                {reversedList.map((it) => (
-                  <SynclinkItem key={it.uid} it={it} />
+                {state.records.map((it) => (
+                  <Item key={it.uid} data={it} />
                 ))}
               </ul>
               <UploadManager scrollToBottom={scrollToBottom} />
-            </motion.div>
+            </>
           );
         })()}
       </div>
-    </motion.section>
+    </motion.div>
   );
 });
+
+const LoadPreviousTrigger: FC<{
+  onTrigger(): void;
+  hasMore: boolean;
+}> = ({ onTrigger: _onTrigger, hasMore }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const onTrigger = useLatestFunc(_onTrigger);
+  const i18n = useLingui();
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return void 0;
+    let previousTime = 0;
+    const obs = new IntersectionObserver(
+      () => {
+        const now = Date.now();
+        if (now < previousTime + 1000) {
+          return void 0;
+        }
+        previousTime = now;
+        onTrigger();
+      },
+      {
+        root: lookupHTMLNode(el, '.scroller'),
+        rootMargin: '0px',
+        threshold: 0.1,
+      },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onTrigger]);
+  return (
+    <div
+      ref={ref}
+      className={clsx(
+        'pointer-events-none absolute left-0 top-0 w-full py-4 text-center text-sm text-gray-300',
+        hasMore && 'invisible opacity-0',
+      )}
+      onClick={onTrigger}
+    >
+      {hasMore ? i18n._('Load previous') : i18n._('No more')}
+    </div>
+  );
+};

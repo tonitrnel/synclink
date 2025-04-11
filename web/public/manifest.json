@@ -1,15 +1,10 @@
 {
-  "short_name": "SyncLink",
-  "name": "SyncLink",
+  "short_name": "Cedasync",
+  "name": "Cedasync",
   "description": "Quickly sync text, images and files across devices",
   "icons": [
     {
       "src": "/maskable_icon.png",
-      "type": "image/png",
-      "sizes": "1024x1024"
-    },
-    {
-      "src": "/maskable_icon_x512.png",
       "type": "image/png",
       "sizes": "512x512"
     },
@@ -22,12 +17,17 @@
       "src": "/maskable_icon_x192.png",
       "type": "image/png",
       "sizes": "192x192"
+    },
+    {
+      "src": "/maskable_icon_x128.png",
+      "type": "image/png",
+      "sizes": "128x128"
     }
   ],
   "id": "/?utm_source=installed",
   "start_url": "/?utm_source=installed",
   "background_color": "#ffffff",
-  "theme_color": "#e0e1e5",
+  "theme_color": "#ffffff",
   "display": "standalone",
   "share_target": {
     "action": "/receive-files",
@@ -37,7 +37,9 @@
       "files": [
         {
           "name": "media",
-          "accept": ["*/*"]
+          "accept": [
+            "*/*"
+          ]
         }
       ]
     }

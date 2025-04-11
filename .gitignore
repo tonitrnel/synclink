@@ -1,3 +1,4 @@
 storage/
 logs/
-synclink.img
+.idea/
+*.img
