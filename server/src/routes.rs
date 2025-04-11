@@ -18,6 +18,7 @@ pub fn build() -> Router<AppState> {
         .fallback(tower_http::services::ServeFile::new("public/index.html"));
     Router::new()
         .route("/api/health", get(|| async { axum::http::StatusCode::OK }))
+        .route("/api/version", get(|| async { format!("ephemera_{}", env!("CARGO_PKG_VERSION")) }))
         .route("/api/beacon", post(services::beacon))
         .route("/api/log-tracing", post(services::log_tracing))
         .route("/api/upload", post(services::upload))

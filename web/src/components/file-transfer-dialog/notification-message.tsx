@@ -2,8 +2,8 @@ import { FC, useCallback } from 'react';
 import { useSnackbar } from '~/components/ui/snackbar';
 import { useLingui } from '@lingui/react';
 import {
-  useDeleteDiscardP2PRequest,
-  usePostAcceptP2PRequest,
+  useDiscardP2PMutation,
+  useAcceptP2PMutation,
 } from '~/endpoints';
 import { notifyManager } from '~/utils/notify-manager.ts';
 import { Button } from '~/components/ui/button';
@@ -15,9 +15,9 @@ export const NotificationMessage: FC<{
   const snackbar = useSnackbar();
   const i18n = useLingui();
   const { execute: acceptP2PRequest, pending: accepting } =
-    usePostAcceptP2PRequest();
+    useAcceptP2PMutation();
   const { execute: discardP2PRequest, pending: rejecting } =
-    useDeleteDiscardP2PRequest();
+    useDiscardP2PMutation();
   const onAccept = useCallback(
     async (requestId: string) => {
       try {

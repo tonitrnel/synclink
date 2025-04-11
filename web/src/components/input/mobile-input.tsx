@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react';
-import { ArrowLeftRightIcon, FileUpIcon, SendHorizonalIcon } from 'icons';
+import { ArrowLeftRightIcon, FileUpIcon, SendHorizonalIcon } from 'lucide-react';
 import { forwardRef, useEffect, useRef, HTMLAttributes } from 'react';
 import { clsx } from '~/utils/clsx';
 import { useComposedRefs } from '~/utils/hooks/use-compose-refs.ts';

@@ -1,4 +1,4 @@
-import { CopyIcon } from 'icons';
+import { CopyIcon } from 'lucide-react';
 import {
   FC,
   memo,
@@ -7,7 +7,7 @@ import {
   useCallback,
   HTMLAttributes,
 } from 'react';
-import { useGetFileContent } from '~/endpoints';
+import { useFileContentQuery } from '~/endpoints';
 import { copy } from '~/utils/copy';
 import { withProduce } from '~/utils/with-produce';
 import { useEntity } from '../hooks/use-entity.ts';
@@ -35,7 +35,7 @@ export const TextItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
       pending: loading,
       done,
       error,
-    } = useGetFileContent({
+    } = useFileContentQuery({
       path: {
         id: entity.uid,
       },

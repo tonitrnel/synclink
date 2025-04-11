@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { CheckIcon, ChevronRightIcon, DotIcon } from 'icons';
+import { CheckIcon, ChevronRightIcon, DotIcon } from 'lucide-react';
 import { clsx } from '~/utils/clsx';
 import './index.less';
 

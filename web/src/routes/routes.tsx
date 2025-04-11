@@ -15,6 +15,7 @@ import { getDeviceType } from '~/utils/get-device-type';
 const PAGE_MAP = import.meta.glob([
   '../pages/**/*.tsx',
   '!../pages/app.tsx',
+  '!../pages/**/_*/*.tsx',
 ]) as {
   [P: string]: () => Promise<{
     default: FunctionComponent;
@@ -25,19 +26,19 @@ const PAGE_MAP = import.meta.glob([
 const ModuleNotExportPage: FC = () => {
   return (
     <div className="p-4">
-      <h2 className="text-error-main text-xl font-bold">Error</h2>
+      <h2 className="text-error-main text-xl font-bold text-red-500">Error</h2>
       <p>Module does not export pages!</p>
     </div>
   );
 };
-// const ModuleNotFound: FC = () => {
-//   return (
-//     <div className="p-4">
-//       <h2 className="text-error-main font-bold text-xl">Error </h2>
-//       <p>Module not found!</p>
-//     </div>
-//   );
-// };
+const ModuleNotFoundPage: FC = () => {
+  return (
+    <div className="p-4">
+      <h2 className="text-error-main text-xl font-bold text-red-500">Error </h2>
+      <p>Module not found!</p>
+    </div>
+  );
+};
 
 const routeMap = new Map<
   string,
@@ -47,7 +48,9 @@ const routeMap = new Map<
     Component: LazyExoticComponent<FC>;
   }
 >();
-const isDesktop = getDeviceType(navigator.userAgent) == 'desktop';
+const platform =
+  getDeviceType(navigator.userAgent) == 'desktop' ? 'desktop' : 'mobile';
+
 for (const relationPath of Object.keys(PAGE_MAP)) {
   if (/\/_[\w/-]+/gm.test(relationPath)) continue;
   const urlPath = relationPath
@@ -61,12 +64,12 @@ for (const relationPath of Object.keys(PAGE_MAP)) {
         : _;
     });
   if (urlPath === 'App') continue;
+  if (urlPath !== platform && !urlPath.startsWith(`${platform}/`)) {
+    continue;
+  }
   routeMap.set(relationPath, {
     relationPath,
-    urlPath:
-      urlPath.toLowerCase() === (isDesktop ? 'desktop' : 'mobile')
-        ? '*'
-        : `/${urlPath}`,
+    urlPath: `${urlPath.replace(platform, '') || '/'}`,
     Component: lazy(() =>
       PAGE_MAP[relationPath]().then((module) => {
         if (!module.default) return { default: ModuleNotExportPage };
@@ -75,7 +78,6 @@ for (const relationPath of Object.keys(PAGE_MAP)) {
     ),
   });
 }
-console.log(routeMap)
 export const Routes = () => {
   return (
     <Suspense>
@@ -92,6 +94,7 @@ export const Routes = () => {
               );
             },
           )}
+          <Route path="*" element={<ModuleNotFoundPage />} />
         </Switch>
       </Router>
     </Suspense>

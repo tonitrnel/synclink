@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AlertTriangleIcon, BirdIcon } from 'icons';
+import { AlertTriangleIcon, BirdIcon } from 'lucide-react';
 import { UploadManager } from '~/components/upload-manager';
 import { Item } from '~/components/item';
 import { IEntity } from '~/constants/types.ts';
@@ -16,7 +16,7 @@ import { Loading } from '~/components/loading';
 import { t } from '@lingui/macro';
 import { motion } from 'framer-motion';
 import { useLatestFunc } from '@ptdgrp/shared-react';
-import { useGetList, useGetTextCollection } from '~/endpoints';
+import { useListQuery, useTextCollectionQuery } from '~/endpoints';
 import { clsx } from '~/utils/clsx.ts';
 import { withProduce } from '~/utils/with-produce.ts';
 import { notifyManager } from '~/utils/notify-manager.ts';
@@ -67,7 +67,7 @@ export const List: FC<{
     pending: loading,
     refresh,
     execute,
-  } = useGetList({
+  } = useListQuery({
     query: {
       page: state.pagination.page,
       per_page: state.pagination.size,
@@ -78,7 +78,7 @@ export const List: FC<{
         (it) => it.type.startsWith('text/') && it.size < 4096,
       ) as State['records'];
       if (textCollection.length > 0) {
-        const textCollectionContents = await useGetTextCollection({
+        const textCollectionContents = await useTextCollectionQuery({
           body: { uuids: textCollection.map((it) => it.uid) },
           serializers: {
             response: async (res) => {

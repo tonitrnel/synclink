@@ -7,7 +7,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { t } from '@lingui/macro';
-import { DownloadCloudIcon, Share2Icon, EraserIcon, EllipsisIcon } from 'icons';
+import { DownloadCloudIcon, Share2Icon, EraserIcon, EllipsisIcon } from 'lucide-react';
 import { useSnackbar } from '~/components/ui/snackbar';
 import { IEntity } from '~/constants/types';
 import { executeAsyncTask } from '~/utils/execute-async-task';

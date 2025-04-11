@@ -1,5 +1,5 @@
 import { ChangeEvent, FC, memo, useCallback, useMemo } from 'react';
-import { FileIcon, FolderIcon, Trash2Icon, UploadIcon } from 'icons';
+import { FileIcon, FolderIcon, Trash2Icon, UploadIcon } from 'lucide-react';
 import { FilesOrEntries } from '~/constants/types';
 import { useLingui } from '@lingui/react';
 import { Input } from '~/components/ui/input';

@@ -1,8 +1,8 @@
 import { InferSType } from '@ptdgrp/http-react';
-import { useGetList } from '~/endpoints';
+import { useListQuery } from '~/endpoints';
 import { FC } from 'react';
 
-export type IEntity = InferSType<typeof useGetList, 'Response'>['data'][number];
+export type IEntity = InferSType<typeof useListQuery, 'Response'>['data'][number];
 
 export type DirEntry =
   | {

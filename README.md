@@ -1,8 +1,8 @@
-# Ephemera
+# Ephemera(developing)
 
 Ephemera: Store Temporarily, Transfer Instantly
 
-Ephemera 是一个设计用于运行在 NAS、软路由等类似设备上的程序，目的是⽤于临时存储来自多个设备的⽂本、图像、⽂件或通过 WebRTC 或 WebSocket 进行直接传输。
+Ephemera 是一个设计用于运行在 NAS、软路由等能部署 Docker 设备上的程序，目的是⽤于临时存储来自多个设备的⽂本、图像、⽂件或通过 WebRTC 或 WebSocket 进行直接传输。
 
 ![screenshots](./docs/screenshot1.png)
 
@@ -17,6 +17,9 @@ Ephemera 是一个设计用于运行在 NAS、软路由等类似设备上的程�
 - 本地存储：该项目采用 TOML 格式存储文件索引方便可读、迁移和修改
 - 模拟目录：采用 Tar 文件模拟目录，实现上传/下载目录(需要 Chrome)
 - 点对点传输：支持两个设备点对点传输文件，基于 WebRTC 和 WebSocket
+- 支持 WGet 便捷下载(todo)
+- 多用户支持，公共区域、个人区域(todo)
+- 本地文件加密(todo)
 
 注意：本项目依赖浏览器一些特性，因此需要使用 HTTPS 环境上使用，建议使用 Nginx 转发
 

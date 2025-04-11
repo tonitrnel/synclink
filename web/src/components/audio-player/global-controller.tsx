@@ -2,7 +2,7 @@ import { FC, useCallback, useEffect, useState } from 'react';
 import { clsx } from '~/utils/clsx.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConstant } from '@ptdgrp/shared-react';
-import { MusicIcon } from 'icons';
+import { MusicIcon } from 'lucide-react';
 
 export const AudioGlobalController: FC<{
   className?: string;

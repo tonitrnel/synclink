@@ -1,7 +1,7 @@
 import { createHttpFactory } from '@ptdgrp/http-react';
 import type { InferSType } from '@ptdgrp/http-react';
 
-export const useGetList = createHttpFactory('GET:/api')
+export const useListQuery = createHttpFactory('GET:/api')
   .apply<
     'Query',
     {
@@ -41,18 +41,22 @@ export const useGetList = createHttpFactory('GET:/api')
   >()
   .doQueryRequest();
 
-export const useGetFileContent = createHttpFactory('GET:/api/file/{id}')
+export const useFileContentQuery = createHttpFactory('GET:/api/file/{id}')
   .apply<'Response', string>()
   .doQueryRequest();
 
-export const useGetTextCollection = createHttpFactory(
+export const useVersionQuery = createHttpFactory('GET:/api/version')
+  .apply<'Response', string>()
+  .doQueryRequest();
+
+export const useTextCollectionQuery = createHttpFactory(
   'POST:/api/text-collection',
 )
   .apply<'Response', string>()
   .apply<'Body', { uuids: string[] }>()
   .doRequest();
 
-export const useGetStats = createHttpFactory('GET:/api/stats')
+export const useStatsQuery = createHttpFactory('GET:/api/stats')
   .apply<
     'Response',
     {
@@ -66,7 +70,7 @@ export const useGetStats = createHttpFactory('GET:/api/stats')
   >()
   .doQueryRequest();
 
-export const useGetDirectory = createHttpFactory('GET:/api/directory/{id}')
+export const useDirectoryQuery = createHttpFactory('GET:/api/directory/{id}')
   .apply<
     'Response',
     {
@@ -80,7 +84,7 @@ export const useGetDirectory = createHttpFactory('GET:/api/directory/{id}')
   >()
   .doQueryRequest();
 
-export const useGetSseConnections = createHttpFactory(
+export const useSSEConnectionsQuery = createHttpFactory(
   'GET:/api/sse/connections',
 )
   .apply<
@@ -93,7 +97,7 @@ export const useGetSseConnections = createHttpFactory(
   >()
   .doQueryRequest();
 
-export const usePostCreateP2PRequest = createHttpFactory('POST:/api/p2p/create')
+export const useCreateP2PMutation = createHttpFactory('POST:/api/p2p/create')
   .apply<
     'Body',
     {
@@ -113,7 +117,7 @@ export const usePostCreateP2PRequest = createHttpFactory('POST:/api/p2p/create')
   >()
   .doMutationRequest();
 
-export const usePostAcceptP2PRequest = createHttpFactory('POST:/api/p2p/accept')
+export const useAcceptP2PMutation = createHttpFactory('POST:/api/p2p/accept')
   .apply<
     'Body',
     {
@@ -130,7 +134,7 @@ export const usePostAcceptP2PRequest = createHttpFactory('POST:/api/p2p/accept')
   >()
   .doMutationRequest();
 
-export const useDeleteDiscardP2PRequest = createHttpFactory(
+export const useDiscardP2PMutation = createHttpFactory(
   'DELETE:/api/p2p/discard',
 )
   .apply<

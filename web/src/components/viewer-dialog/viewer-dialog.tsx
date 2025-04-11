@@ -4,7 +4,7 @@ import { Loading } from '../loading';
 import { ViewerOptions } from './event';
 import { Dialog } from '../ui/dialog';
 import { useLingui } from '@lingui/react';
-import { MaximizeIcon, MinimizeIcon } from 'icons';
+import { MaximizeIcon, MinimizeIcon } from 'lucide-react';
 import { clsx } from '~/utils/clsx';
 import { useSrc, useViewerLoader } from './hooks.ts';
 import { t } from '@lingui/macro';

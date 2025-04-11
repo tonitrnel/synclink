@@ -141,8 +141,11 @@ export default function DebugPage() {
 
       <div>
         <h2 className="font-bold my-4">Links: </h2>
-        <div>
-          <Link to="/file-transfer">navigate</Link>
+        <div className="flex flex-col gap-2">
+          <Link to="/file-transfer">Navigate</Link>
+          <Link to="/debug/desktop-design">New Desktop Design</Link>
+          <Link to="/debug/mobile-design">New Mobile Design</Link>
+          <Link to="/desktop-legacy">Desktop Design Legacy</Link>
         </div>
       </div>
     </AnimationPage>

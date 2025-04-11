@@ -1,7 +1,7 @@
 import { DirEntry, FilesOrEntries } from '~/constants/types.ts';
 import { useCallback, useMemo, useState } from 'react';
 import { useLatestRef } from '@ptdgrp/shared-react';
-import { useGetStats } from '~/endpoints';
+import { useStatsQuery } from '~/endpoints';
 import { withProduce } from '~/utils/with-produce.ts';
 import { TreeNode } from '~/components/ui/tree';
 import { formatBytes } from '~/utils/format-bytes.ts';
@@ -58,7 +58,7 @@ export const useFileUploadLogic = ({
     };
   });
   const stateRef = useLatestRef(state);
-  const { data } = useGetStats({
+  const { data } = useStatsQuery({
     keepDirtyOnPending: true,
     cache: {
       key: 'stats',

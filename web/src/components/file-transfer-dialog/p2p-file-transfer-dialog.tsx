@@ -11,9 +11,9 @@ import {
 } from 'react';
 import {
   InferResponse,
-  useDeleteDiscardP2PRequest,
-  useGetSseConnections,
-  usePostCreateP2PRequest,
+  useDiscardP2PMutation,
+  useSSEConnectionsQuery,
+  useCreateP2PMutation,
 } from '~/endpoints';
 import { notifyManager } from '~/utils/notify-manager.ts';
 import { P2PRtc, P2PSocket, PacketFlag, RTCImpl } from '~/utils/p2p.ts';
@@ -30,7 +30,7 @@ import {
   TabletIcon,
   UploadIcon,
   XCircleIcon,
-} from 'icons';
+} from 'lucide-react';
 import { Loading } from '~/components/loading';
 import { withProduce } from '~/utils/with-produce';
 import { clsx } from '~/utils/clsx';
@@ -119,7 +119,7 @@ export const FileTransferImpl: FC<{
   }));
   const connRef = useLatestRef(state.connection);
   const participantsRef = useLatestRef([state.senderId, state.receiverId]);
-  const { data: connections = [], refresh } = useGetSseConnections({
+  const { data: connections = [], refresh } = useSSEConnectionsQuery({
     keepDirtyOnPending: true,
     onBefore: () => notifyManager.ensureWork(),
   });
@@ -262,7 +262,7 @@ export const FileTransferImpl: FC<{
 const ClientItem: FC<{
   isDialog: boolean;
   isCurrent: boolean;
-  conn: InferResponse<typeof useGetSseConnections>[number];
+  conn: InferResponse<typeof useSSEConnectionsQuery>[number];
   onClick(id: string): void;
 }> = ({ isCurrent, isDialog, conn, onClick }) => {
   const i18n = useLingui();
@@ -330,8 +330,8 @@ const UserAgent: FC<{
 
 const ClientSetup: FC<{
   isDialog: boolean;
-  currentConnection: InferResponse<typeof useGetSseConnections>[number];
-  otherConnections: InferResponse<typeof useGetSseConnections>;
+  currentConnection: InferResponse<typeof useSSEConnectionsQuery>[number];
+  otherConnections: InferResponse<typeof useSSEConnectionsQuery>;
   onConnect(targetId: string, protocol?: ProtocolPriority): void;
 }> = ({ currentConnection, otherConnections, onConnect, isDialog }) => {
   const [state, setState] = useState<{
@@ -494,8 +494,8 @@ const ConnectionControl: FC<{
   });
   const stateRef = useLatestRef(state);
   const { execute: createP2PRequest, pending: creating } =
-    usePostCreateP2PRequest();
-  const { execute: discardP2PRequest } = useDeleteDiscardP2PRequest();
+    useCreateP2PMutation();
+  const { execute: discardP2PRequest } = useDiscardP2PMutation();
   const snackbar = useSnackbar();
   const i18n = useLingui();
 

@@ -6,6 +6,7 @@ import { lingui } from '@lingui/vite-plugin';
 import wasm from 'vite-plugin-wasm';
 import top_await from 'vite-plugin-top-level-await';
 import { VitePWA as pwa } from 'vite-plugin-pwa';
+import tailwindcss from "@tailwindcss/vite"
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -18,7 +19,7 @@ const parseProject = async () => {
 const parseTSAlias = async () => {
   try {
     const { baseUrl = '.', paths = {} }: CompilerOptions = await fs
-      .readFile(path.join(__PROJECT__, '/tsconfig.json'))
+      .readFile(path.join(__PROJECT__, '/tsconfig.app.json'))
       .then((r) => {
         const content = r
           .toString()
@@ -63,6 +64,7 @@ export default defineConfig(async ({ command }) => {
       pwa({
         registerType: 'autoUpdate',
       }),
+      tailwindcss()
     ],
     resolve: {
       alias: await parseTSAlias(),

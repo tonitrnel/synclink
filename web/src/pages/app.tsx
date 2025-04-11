@@ -1,3 +1,4 @@
+import './global.css';
 import { FC, PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { dynamicActivate } from '~/locales';
 import { I18nProvider } from '@lingui/react';
@@ -9,7 +10,6 @@ import { createHttpClient, HttpClientProvider } from '@ptdgrp/http-react';
 import { Routes } from '~/routes';
 import dayjs from 'dayjs';
 import { dayjsLocales } from '~/locales/dayjs-shim.ts';
-import './globals.css';
 import './app.css';
 
 const DynamicI18nLayer: FC<PropsWithChildren> = ({ children }) => {

@@ -9,7 +9,7 @@ import FileTransferPage from './file-transfer';
 import FileUploadPage from './file-upload';
 import ViewerPage from './viewer';
 import { AnimatedRoutes } from '~/components/animated-routes';
-import { ChevronLeftIcon } from 'icons';
+import { ChevronLeftIcon } from 'lucide-react';
 import { ViewerProvider } from '~/components/viewer-dialog';
 import {
   P2PFileReceiverProvider,

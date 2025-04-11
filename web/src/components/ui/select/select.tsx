@@ -5,7 +5,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-} from 'icons';
+} from 'lucide-react';
 import { clsx } from '~/utils/clsx';
 
 const Select = SelectPrimitive.Root as FC<SelectPrimitive.SelectProps> & {

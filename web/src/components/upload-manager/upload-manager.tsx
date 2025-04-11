@@ -10,7 +10,7 @@ import {
 import { OneShot } from '~/utils/one-shot.ts';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { calculateDuration } from '~/utils/calculate-duration.ts';
-import { XIcon } from 'icons';
+import { XIcon } from 'lucide-react';
 import { withProduce } from '~/utils/with-produce.ts';
 import { useLatestRef, useLatestFunc, useConstant } from '@ptdgrp/shared-react';
 import { AnimatePresence, motion } from 'framer-motion';

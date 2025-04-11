@@ -11,7 +11,7 @@ import {
   useCallback,
 } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { XIcon } from 'icons';
+import { XIcon } from 'lucide-react';
 import { clsx } from '~/utils/clsx.ts';
 import { Trans } from '@lingui/macro';
 import { AnimatePresence, motion, Variants } from 'framer-motion';

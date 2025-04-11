@@ -6,7 +6,7 @@ import {
   XIcon,
   SendIcon,
   FilesIcon as PasteIcon,
-} from 'icons';
+} from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { forwardRef, useRef, useEffect, HTMLAttributes } from 'react';
 import { useDialog } from '~/utils/hooks/use-dialog';

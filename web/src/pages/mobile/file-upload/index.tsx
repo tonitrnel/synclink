@@ -17,7 +17,7 @@ import {
 } from '~/components/file-upload-dialog/logic.ts';
 import { FileUploadImpl } from '~/components/file-upload-dialog';
 import { Button } from '~/components/ui/button';
-import { UploadIcon } from 'icons';
+import { UploadIcon } from 'lucide-react';
 
 const FileUploadInner: FC<{
   mode: 'file' | 'directory';

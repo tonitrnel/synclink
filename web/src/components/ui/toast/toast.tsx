@@ -4,7 +4,7 @@ import {
   forwardRef,
   ReactElement,
 } from 'react';
-import { XIcon } from 'icons';
+import { XIcon } from 'lucide-react';
 import * as ToastPrimitives from '@radix-ui/react-toast';
 import { clsx, clsv, VariantProps } from '~/utils/clsx.ts';
 

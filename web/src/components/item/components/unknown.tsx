@@ -3,7 +3,7 @@ import { useEntity } from '../hooks/use-entity.ts';
 import { Metadata } from './metadata';
 import { CustomMenuSlot, Menu } from './menu';
 import { openViewer, supportsFileViewer } from '~/components/viewer-dialog';
-import { EyeIcon } from 'icons';
+import { EyeIcon } from 'lucide-react';
 import { useLingui } from '@lingui/react';
 import { clsx } from '~/utils/clsx.ts';
 import { useCoordinator } from '../hooks/use-coordinator.ts';

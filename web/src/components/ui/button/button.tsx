@@ -2,8 +2,8 @@ import { ButtonHTMLAttributes, forwardRef, ReactNode } from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { clsv, clsx, VariantProps } from '~/utils/clsx.ts';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../tooltip';
-import { LoaderCircleIcon } from 'icons';
-import './button.less';
+import { LoaderIcon } from 'lucide-react';
+import './button.css';
 
 const buttonVariants = clsv('ui-button', {
   variants: {
@@ -53,7 +53,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : 'button';
     const loadingSlot = loading ? (
-      <LoaderCircleIcon className="h-4 w-4 animate-spin" />
+      <LoaderIcon className="h-4 w-4 animate-spin mr-1" />
     ) : undefined;
     const child = (
       <Comp

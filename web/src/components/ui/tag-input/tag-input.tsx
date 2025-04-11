@@ -1,5 +1,5 @@
 import { useLatestRef } from '@ptdgrp/shared-react';
-import { XIcon } from 'icons';
+import { XIcon } from 'lucide-react';
 import {
   ChangeEvent,
   FC,

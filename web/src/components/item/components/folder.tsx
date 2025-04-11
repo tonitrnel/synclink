@@ -1,6 +1,6 @@
 import { FC, useMemo, MouseEvent, HTMLAttributes, memo } from 'react';
 import { useEntity } from '../hooks/use-entity.ts';
-import { InferResponse, useGetDirectory } from '~/endpoints';
+import { InferResponse, useDirectoryQuery } from '~/endpoints';
 import { toTreeByPath } from '~/utils/to-tree-by-path';
 import { formatBytes } from '~/utils/format-bytes';
 import {
@@ -9,7 +9,7 @@ import {
   FileIcon,
   FolderDownIcon,
   FolderIcon,
-} from 'icons';
+} from 'lucide-react';
 import { t } from '@lingui/macro';
 import { Metadata } from './metadata';
 import { CustomMenuSlot, Menu } from './menu';
@@ -30,7 +30,7 @@ type RecordData = {
   size: string;
   type: string;
   lastModified: string;
-  __raw: InferResponse<typeof useGetDirectory>[number];
+  __raw: InferResponse<typeof useDirectoryQuery>[number];
 };
 
 export const FolderItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> =
@@ -38,7 +38,7 @@ export const FolderItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> =
     const entity = useEntity();
     const i18n = useLingui();
     const snackbar = useSnackbar();
-    const { data: list, done } = useGetDirectory({
+    const { data: list, done } = useDirectoryQuery({
       path: {
         id: entity.uid,
       },
@@ -225,7 +225,7 @@ const ActionColumn: FC<{
 };
 
 const calculateFolderSize = (
-  items: InferResponse<typeof useGetDirectory>,
+  items: InferResponse<typeof useDirectoryQuery>,
 ): Record<string, number> => {
   const folderSizes: Record<string, number> = {};
   items.forEach((item) => {

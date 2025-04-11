@@ -6,7 +6,7 @@ import {
   AlertTriangleIcon,
   CheckCircle2Icon,
   XCircleIcon,
-} from 'icons';
+} from 'lucide-react';
 import { clsv } from '~/utils/clsx.ts';
 import { isFunction } from '@ptdgrp/shared-react';
 

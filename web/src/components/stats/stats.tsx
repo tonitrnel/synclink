@@ -1,13 +1,13 @@
 import { FC, memo, useEffect, useMemo } from 'react';
 import { formatBytes } from '~/utils/format-bytes.ts';
 import { clsx } from '~/utils/clsx.ts';
-import { RefreshCwIcon } from 'icons';
-import { useGetStats } from '~/endpoints';
+import { RefreshCwIcon } from 'lucide-react';
+import { useStatsQuery } from '~/endpoints';
 
 export const Stats: FC<{
   className?: string;
 }> = memo(({ className }) => {
-  const { data, pending, refresh } = useGetStats({
+  const { data, pending, refresh } = useStatsQuery({
     keepDirtyOnPending: true,
     cache: {
       key: 'stats',
