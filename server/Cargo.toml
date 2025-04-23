@@ -21,7 +21,7 @@ tokio-stream = { version = "0.1.14", features = ["sync"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["cors", "trace", "fs"] }
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["default", "chrono", "json"] }
+tracing-subscriber = { version = "0.3.18", default-features = false }
 tracing-error = "0.2.0"
 anyhow = { version = "1.0.75", features = ["backtrace"] }
 thiserror = "2.0.12"
@@ -35,6 +35,7 @@ libvips = { git = "https://github.com/tonitrnel/libvips-rust-bindings", rev = "c
 sqlx = { version = "0.8.2", features = ["sqlite", "runtime-tokio-native-tls", "macros", "uuid", "chrono"] }
 dashmap = "6.1.0"
 base64 = "0.22.1"
+colored = "3.0.0"
 
 
 [profile.release]
