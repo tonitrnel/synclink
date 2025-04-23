@@ -2,12 +2,12 @@ use chrono::{LocalResult, NaiveDateTime, ParseError, TimeZone, Utc};
 use serde::{Deserialize, Deserializer, Serializer};
 
 pub fn utc_to_i64(s: &str) -> Result<i64, ParseError> {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S %Z").map(|it| it.timestamp_millis())
+    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S %Z").map(|it| it.and_utc().timestamp())
 }
 
 pub fn i64_to_utc(t: &i64) -> Result<String, &str> {
     match Utc
-        .timestamp_millis_opt(*t)
+        .timestamp_opt(*t,0)
         .map(|dt| dt.format("%Y-%m-%d %H:%M:%S %Z").to_string())
     {
         LocalResult::Single(utc_string) => Ok(utc_string),
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn test_utc_to_i64() {
         // Test valid UTC string
-        assert_eq!(utc_to_i64("2023-06-01 09:22:40 UTC"), Ok(1685611360000));
+        assert_eq!(utc_to_i64("2023-06-01 09:22:40 UTC"), Ok(1685611360));
 
         // Test invalid UTC string
         assert!(utc_to_i64("invalid_timestamp").is_err());

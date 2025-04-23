@@ -1,13 +1,18 @@
+mod auth;
+mod file;
+mod p2p;
+mod sse;
+mod system;
+mod upload;
+
 use crate::middlewares::trace_id::{TraceId, TraceIdLayer};
-use crate::services;
 use crate::state::AppState;
 use axum::body::Body;
 use axum::http::Request;
 use axum::response::Response;
 use axum::{
-    middleware,
-    routing::{delete, get, head, post, put},
     Router,
+    routing::{delete, get, head, post, put},
 };
 use std::time::Duration;
 use tracing::Span;
@@ -18,45 +23,49 @@ pub fn build() -> Router<AppState> {
         .fallback(tower_http::services::ServeFile::new("public/index.html"));
     Router::new()
         .route("/api/health", get(|| async { axum::http::StatusCode::OK }))
-        .route("/api/version", get(|| async { format!("ephemera_{}", env!("CARGO_PKG_VERSION")) }))
-        .route("/api/beacon", post(services::beacon))
-        .route("/api/log-tracing", post(services::log_tracing))
-        .route("/api/upload", post(services::upload))
         .route(
-            "/api/upload-part/allocate",
-            post(services::upload_part::allocate),
+            "/api/version",
+            get(|| async { format!("ephemera_{}", env!("CARGO_PKG_VERSION")) }),
+        )
+        // .route("/api/beacon", post(services::beacon))
+        // .route("/api/log-tracing", post(services::log_tracing))
+        // ======== upload ========
+        .route("/api/upload", post(upload::upload))
+        .route(
+            "/api/upload/multipart/start-session",
+            post(upload::multipart::start_session),
         )
         .route(
-            "/api/upload-part/concatenate",
-            post(services::upload_part::concatenate),
+            "/api/upload/multipart/concatenate",
+            post(upload::multipart::finalize),
         )
         .route(
-            "/api/upload-part/abort",
-            delete(services::upload_part::abort),
+            "/api/upload/multipart/cancel",
+            delete(upload::multipart::cancel),
         )
-        .route("/api/upload-part/{uuid}", put(services::upload_part::append))
-        .route("/api/upload-preflight", head(services::upload_preflight))
-        .route("/api/notify", get(services::notify))
-        .route("/api/sse/connections", get(services::sse_connections))
-        .route("/api/stats", get(services::stats))
-        .route("/api/clean-dump", get(services::clean_dump))
-        .route("/api/text-collection", post(services::get_text_collection))
-        .route("/api/file/{uuid}", delete(services::delete))
-        .route("/api/file/{uuid}", get(services::get))
-        .route("/api/directory/{uuid}", get(services::get_virtual_directory))
         .route(
-            "/api/directory/{uuid}/{*path}",
-            get(services::get_virtual_file),
+            "/api/upload/multipart/{uuid}",
+            put(upload::multipart::append_part),
         )
-        .route("/api/p2p/create", post(services::create_request))
-        .route("/api/p2p/accept", post(services::accept_request))
-        .route("/api/p2p/discard", delete(services::discard_request))
-        .route("/api/p2p/signaling", post(services::signaling))
-        .route("/api/p2p/socket", get(services::socket))
-        .route("/api/authorize", post(services::authorize))
-        .route("/api/{uuid}", get(services::get_metadata))
-        .route("/api", get(services::list))
-        .layer(middleware::from_extractor::<services::Claims>())
+        .route("/api/upload/preflight", head(upload::preflight))
+        .route("/api/notify", get(sse::notify))
+        .route("/api/sse/connections", get(sse::connections))
+        .route("/api/stats", get(system::stats))
+        // .route("/api/clean-dump", get(services::clean_dump))
+        // ======== file ========
+        .route("/api/file/text-collection", post(file::get_text_collection))
+        .route("/api/file/list", get(file::list))
+        .route("/api/file/{uuid}/metadata", get(file::get_metadata))
+        .route("/api/file/{uuid}", delete(file::delete))
+        .route("/api/file/{uuid}", get(file::get))
+        .route("/api/directory/{uuid}", get(file::get_virtual_directory))
+        .route("/api/directory/{uuid}/{*path}", get(file::get_virtual_file))
+        // ======== p2p ========
+        .route("/api/p2p/create", post(p2p::create_request))
+        .route("/api/p2p/accept", post(p2p::accept_request))
+        .route("/api/p2p/discard", delete(p2p::discard_request))
+        .route("/api/p2p/signaling", post(p2p::signaling))
+        .route("/api/p2p/relay", get(p2p::relay))
         .fallback_service(static_files_service)
         .layer(
             tower_http::trace::TraceLayer::new_for_http()
@@ -90,10 +99,7 @@ pub fn build() -> Router<AppState> {
                 .allow_methods(tower_http::cors::Any)
                 .expose_headers(tower_http::cors::Any)
                 .allow_headers([
-                    "CONTENT-TYPE".parse().unwrap(),
-                    "ACCESS-TOKEN".parse().unwrap(),
-                    "X-CONTENT-SHA256".parse().unwrap(),
-                    "X-RAW-FILENAME".parse().unwrap(),
+                    axum::http::header::AUTHORIZATION,
                 ]),
         )
 }

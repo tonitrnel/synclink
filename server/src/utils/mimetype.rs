@@ -13,9 +13,9 @@ fn byte_range_matches(buf: &[u8], lower: usize, high: usize, sig: &str) -> bool 
         .all(|(byte, sig_byte)| sig_byte.contains(&byte))
 }
 
-fn generic_infer(buf: &[u8]) -> Option<String> {
+fn generic_infer(buf: &[u8]) -> Option<&'static str> {
     let kind = infer::get(buf)?;
-    Some(String::from(kind.mime_type()))
+    Some(kind.mime_type())
 }
 
 // custom example
@@ -47,41 +47,49 @@ fn is_utf8_text(buf: &[u8]) -> bool {
     simdutf8::basic::from_utf8(&buf[0..end]).is_ok()
 }
 
-fn parse_mimetype_from_bytes(bytes: &[u8]) -> Option<String> {
+fn parse_mimetype_from_bytes(bytes: &[u8]) -> Option<&'static str> {
     if let Some(mime) = generic_infer(bytes) {
         return Some(mime);
     }
     if is_ant_fit(bytes) {
-        return Some("application/vnd.ant.fit".to_string());
+        return Some("application/vnd.ant.fit");
     }
     if is_plain_text(bytes) {
-        return Some("text/plain".to_string());
+        return Some("text/plain");
     }
     if is_utf8_text(bytes) {
-        return Some("text/plain".to_string());
+        return Some("text/plain");
     }
     None
 }
 
-fn map_extname_to_mime(ext: &str, default_mime: String) -> String {
-    match ext {
-        "md" if default_mime == "text/plain" => "text/markdown".to_string(),
-        _ => default_mime,
+fn map_extname_to_mime<'a>(extname: &str, default_mimetype: &'a str) -> &'a str {
+    match extname {
+        "md" if default_mimetype == "text/plain" => "text/markdown",
+        _ => default_mimetype,
     }
 }
-pub async fn guess_mimetype_from_path(path: PathBuf, content_type: Option<String>) -> String {
-    let ext = path.extension().and_then(|it| it.to_str()).unwrap_or("");
+pub async fn guess_mimetype_from_path(path: PathBuf, content_type: Option<&str>) -> &str {
+    let extname = path
+        .extension()
+        .map(|it| it.to_string_lossy())
+        .unwrap_or_default();
     if let Some(content_type) = content_type {
-        return map_extname_to_mime(ext, content_type);
+        return map_extname_to_mime(&extname, content_type);
     }
-    let mut file = File::open(&path).await.ok().unwrap();
-    let capacity = file
-        .metadata()
-        .await
-        .ok()
-        .map(|it| it.len())
-        .unwrap_or(0)
-        .min(4096) as usize;
+    let file = File::open(&path).await.ok().unwrap();
+    guess_mimetype_from_file(file, content_type, Some(&extname)).await
+}
+pub async fn guess_mimetype_from_file<'a>(
+    mut file: File,
+    content_type: Option<&'a str>,
+    extname: Option<&str>,
+) -> &'a str {
+    if let Some(content_type) = content_type {
+        return map_extname_to_mime(extname.unwrap_or_default(), content_type);
+    }
+    let metadata = file.metadata().await.ok();
+    let capacity = metadata.map(|it| it.len()).unwrap_or(0).min(4096) as usize;
     let mime = 'try_parse: {
         if capacity == 0 {
             break 'try_parse None;
@@ -92,16 +100,10 @@ pub async fn guess_mimetype_from_path(path: PathBuf, content_type: Option<String
         };
         parse_mimetype_from_bytes(&buf)
     };
-    map_extname_to_mime(
-        ext,
-        mime.unwrap_or_else(|| String::from("application/octet-stream")),
-    )
+    map_extname_to_mime(extname.unwrap_or_default(), mime.unwrap_or_else(|| "application/octet-stream"))
 }
-pub fn guess_mimetype_from_bytes(bytes: &[u8], ext: Option<&str>) -> String {
-    let ext = ext.unwrap_or("");
-    let mime = parse_mimetype_from_bytes(bytes);
-    map_extname_to_mime(
-        ext,
-        mime.unwrap_or_else(|| String::from("application/octet-stream")),
-    )
+pub fn guess_mimetype_from_bytes<'a>(bytes: &[u8], extname: Option<&str>) -> &'a str {
+    let extname = extname.unwrap_or("");
+    let mimetype = parse_mimetype_from_bytes(bytes).unwrap_or_else(|| "application/octet-stream");
+    map_extname_to_mime(extname, mimetype)
 }

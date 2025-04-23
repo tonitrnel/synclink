@@ -1,15 +1,7 @@
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ImageMetadata {
-    width: u32,
-    height: u32,
-    thumbnail_width: Option<u32>,
-    thumbnail_height: Option<u32>,
-}
+use crate::models::file::ImageFileMetadata;
 
 const ALLOW_IMAGE_MIMETYPES: [&str; 4] = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
@@ -21,6 +13,7 @@ static APP: LazyLock<Arc<libvips::VipsApp>> = LazyLock::new(||{
     app.cache_set_max_files(0);
     Arc::new(app)
 });
+
 enum ImageFormat {
     Jpeg,
     Png,
@@ -42,12 +35,12 @@ impl From<&str> for ImageFormat {
     }
 }
 
-pub struct Image {
+pub struct ImageService {
     format: ImageFormat,
     path: String,
 }
 
-impl Image {
+impl ImageService {
     pub fn new(path: &Path, mimetype: &str) -> anyhow::Result<Self> {
         let format = ImageFormat::from(mimetype);
         Ok(Self {
@@ -60,13 +53,13 @@ impl Image {
         thumbnail_path: &Path,
         width: u32,
         height: u32,
-    ) -> anyhow::Result<ImageMetadata> {
+    ) -> anyhow::Result<ImageFileMetadata> {
         let app = APP.clone();
         let image = libvips::VipsImage::new_from_file(&self.path).with_context(|| {
             format!("libvips error: {}", app.error_buffer().unwrap_or_default())
         })?;
         if (image.get_width() as u32) < width && (image.get_height() as u32) < height {
-            return Ok(ImageMetadata {
+            return Ok(ImageFileMetadata {
                 width: image.get_width() as u32,
                 height: image.get_height() as u32,
                 thumbnail_width: None,
@@ -122,14 +115,14 @@ impl Image {
             }
             ImageFormat::Unknown => libvips::ops::vipssave(&thumbnail, &thumbnail_path),
         }
-        .with_context(|| {
-            format!(
-                "Failed write thumbnail image file to {}, libvips error: {}",
-                thumbnail_path,
-                app.error_buffer().unwrap_or_default()
-            )
-        })?;
-        let metadata = ImageMetadata {
+            .with_context(|| {
+                format!(
+                    "Failed write thumbnail image file to {}, libvips error: {}",
+                    thumbnail_path,
+                    app.error_buffer().unwrap_or_default()
+                )
+            })?;
+        let metadata = ImageFileMetadata {
             width: image.get_width() as u32,
             height: image.get_height() as u32,
             thumbnail_width: Some(thumbnail.get_width() as u32),
@@ -144,13 +137,13 @@ impl Image {
         source_path: &Path,
         thumbnail_path: &Path,
         mimetype: &str,
-        metadata: Option<ImageMetadata>,
-    ) -> anyhow::Result<ImageMetadata> {
+        metadata: Option<ImageFileMetadata>,
+    ) -> anyhow::Result<ImageFileMetadata> {
         let mut metadata = match metadata {
             Some(metadata) => metadata,
             // 重新生成缩略图
             _ => {
-                let image = Image::new(source_path, mimetype)?;
+                let image = Self::new(source_path, mimetype)?;
                 let metadata = image.generate_thumbnail(thumbnail_path, 500, 280).await?;
                 return Ok(metadata);
             }
@@ -168,13 +161,13 @@ impl Image {
                 // ImageFormat::Gif => libvips::ops::gifload(&thumbnail_path),
                 ImageFormat::Unknown => return Ok(metadata),
             }
-            .with_context(|| {
-                format!(
-                    "Unable to read thumbnail image file. path: {}, libvips error: {}",
-                    thumbnail_path,
-                    app.error_buffer().unwrap_or_default()
-                )
-            })?;
+                .with_context(|| {
+                    format!(
+                        "Unable to read thumbnail image file. path: {}, libvips error: {}",
+                        thumbnail_path,
+                        app.error_buffer().unwrap_or_default()
+                    )
+                })?;
             metadata.thumbnail_width = Some(image.get_width() as u32);
             metadata.thumbnail_height = Some(image.get_height() as u32);
         }

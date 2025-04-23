@@ -4,12 +4,12 @@ mod extractors;
 mod logging;
 mod middlewares;
 mod models;
-mod pidfile;
 mod routes;
 mod server;
 mod services;
 mod state;
 mod utils;
+mod macros;
 
 use crate::logging::{registry_logs, LogWriter};
 use crate::server::ServerArgs;
@@ -32,7 +32,7 @@ fn print_banner() {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
-    let _pid = pidfile::Pidfile::new()?;
+    let _pid = utils::pidfile::Pidfile::new()?;
     let config = &config::CONFIG;
     let (mut log_writer, log_handle) = LogWriter::new()?;
     let listener = {

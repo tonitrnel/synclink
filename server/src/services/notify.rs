@@ -1,227 +1,186 @@
-use crate::common::ApiResult;
-use crate::extractors::ClientIp;
-use crate::state::AppState;
-use crate::utils::{guardable, Observable, Observer};
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    response::{sse, Sse},
-    BoxError, Json,
-};
-use futures::stream;
-use serde::Serialize;
-use std::collections::HashMap;
+use crate::models::dtos::notify::SseClientResponseDto;
+use crate::models::notify::{SSEBroadcastEvent, SSEBroadcastTargets};
+use crate::utils::lru_cache::LruCache;
+use crate::utils::{Observable, Observer, base64_url};
+use dashmap::DashMap;
 use std::sync::{Arc, Mutex, Weak};
-use std::time::Duration;
 use tokio::sync::broadcast;
-use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 #[derive(Clone)]
-struct NotifyGuard {
+pub(crate) struct SseClientGuard {
     id: Uuid,
-    user_agent: String,
-    ip: String,
-    pin: String,
-    notify_manager: Arc<NotifyManager>,
+    notify_service: Arc<NotifyService>,
 }
-impl NotifyGuard {
-    fn new(ip: String, user_agent: String, notify_manager: Arc<NotifyManager>) -> Self {
-        let id = Uuid::new_v4();
-        let pin = {
-            #[cfg(debug_assertions)]
-            {
-                "000000".to_string()
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                use rand::Rng;
-                let mut rng = rand::thread_rng();
-                let pin: u32 = rng.gen_range(000000..=999999);
-                format!("{:0>6}", pin)
-            }
-        };
-        notify_manager.add_client(
-            id,
-            SSEConnection {
-                ip: ip.to_string(),
-                user_agent: user_agent.to_string(),
-                pin: pin.to_owned(),
-            },
-        );
-        Self {
-            id,
-            ip,
-            pin,
-            user_agent,
-            notify_manager,
-        }
-    }
-}
-impl Drop for NotifyGuard {
+impl Drop for SseClientGuard {
     fn drop(&mut self) {
-        self.notify_manager.remove_client(&self.id);
-        tracing::trace!("`{}@{}` disconnected", self.ip, self.user_agent);
+        if let Some(ipaddr) = self.notify_service.inactive_client(&self.id) {
+            tracing::trace!("client {} disconnected", ipaddr,);
+        };
     }
 }
 
-pub async fn notify(
-    State(state): State<AppState>,
-    ClientIp(ip): ClientIp,
-    headers: HeaderMap,
-) -> Sse<impl tokio_stream::Stream<Item = Result<sse::Event, BoxError>>> {
-    let ip = ip.unwrap_or("unknown".to_string());
-    let user_agent = headers
-        .get("user-agent")
-        .map(|it| String::from_utf8(it.as_bytes().to_vec()).unwrap())
-        .unwrap_or("unknown user_agent".into());
-    tracing::trace!("`{}@{}` connected", ip, user_agent);
-    let guard = NotifyGuard::new(ip, user_agent, state.notify_manager.clone());
-    let id = guard.id;
-    let pin = guard.pin.to_owned();
-    let receiver = state.notify_manager.subscribe();
-    let notify_stream = tokio_stream::wrappers::BroadcastStream::new(receiver).filter_map(
-        move |it| -> Option<Result<sse::Event, BoxError>> {
-            match it {
-                Ok((payload, targets)) => match targets {
-                    SSEBroadcastTargets::AllClients => {
-                        Some(Ok(sse::Event::default().data(payload.to_json())))
-                    }
-                    SSEBroadcastTargets::Client(target) if target == id => {
-                        Some(Ok(sse::Event::default().data(payload.to_json())))
-                    }
-                    SSEBroadcastTargets::ClientSet(targets) if targets.contains(&id) => {
-                        Some(Ok(sse::Event::default().data(payload.to_json())))
-                    }
-                    SSEBroadcastTargets::AllExceptClient(target) if target != id => {
-                        Some(Ok(sse::Event::default().data(payload.to_json())))
-                    }
-                    SSEBroadcastTargets::AllExceptClientSet(targets) if !targets.contains(&id) => {
-                        Some(Ok(sse::Event::default().data(payload.to_json())))
-                    }
-                    _ => None,
-                },
-                Err(err) => {
-                    tracing::error!(reason = ?err, "failed to read broadcast message.");
-                    Some(Err(Box::new(err)))
-                }
-            }
-        },
-    );
-    // let heart_stream = stream::repeat_with(|| {
-    //     let now = SystemTime::now()
-    //         .duration_since(std::time::UNIX_EPOCH)
-    //         .unwrap_or_default();
-    //     sse::Event::default().data(
-    //         serde_json::json!({
-    //             "type": "HEART",
-    //             "time": now.as_millis()
-    //         })
-    //         .to_string(),
-    //     )
-    // })
-    // .map(|it| -> Result<sse::Event, BoxError> { Ok(it) })
-    // .throttle(Duration::from_secs(1));
-    // let combined_stream = stream::select(notify_stream, heart_stream);
-    let combined_stream = guardable(notify_stream, guard);
-    let (combined_stream, stream_controller) = stream::abortable(combined_stream);
-    let shutdown_signal = state.shutdown_signal.clone();
-    // issue: https://github.com/hyperium/hyper/issues/2787
-    tokio::spawn(async move {
-        shutdown_signal.cancelled().await;
-        stream_controller.abort();
-    });
-    state
-        .notify_manager
-        .send_with_client(SSEBroadcastEvent::ClientId(id, pin), &id)
-        .unwrap();
-    Sse::new(combined_stream).keep_alive(
-        sse::KeepAlive::new()
-            .interval(Duration::from_secs(15))
-            .text("keep(•_•)"),
-    )
-}
-
-#[derive(Serialize, Debug)]
-pub struct ConnectionDto {
-    id: Uuid,
-    ip_alias: Option<String>,
-    user_agent: String,
-}
-pub async fn sse_connections(State(state): State<AppState>) -> ApiResult<Json<Vec<ConnectionDto>>> {
-    let device_ip_tags = crate::config::CONFIG.device_ip_tags.as_ref();
-    let guard = state.notify_manager.connections.lock().unwrap();
-    let data = guard
-        .iter()
-        .map(|(id, it)| ConnectionDto {
-            id: *id,
-            ip_alias: device_ip_tags.and_then(|tags| tags.get(&it.ip).cloned()),
-            user_agent: it.user_agent.clone(),
-        })
-        .collect::<Vec<_>>();
-    Ok(Json(data))
-}
-
-// #[derive(Debug)]
-pub struct NotifyManager {
+/// 负责向客户端发送消息，同时还负责记录客户端的信息
+pub struct NotifyService {
     sender: broadcast::Sender<(SSEBroadcastEvent, SSEBroadcastTargets)>,
-    connections: Mutex<HashMap<Uuid, SSEConnection>>,
-    observers: Vec<Weak<dyn Observer<Uuid>>>,
+    clients: DashMap<Uuid, SseClientInfo>,
+    inactive_clients: LruCache<Uuid, SseClientInfo>,
+    observers: Mutex<Vec<Weak<dyn Observer<Uuid>>>>,
 }
+
 #[derive(Debug)]
-pub struct SSEConnection {
-    ip: String,
+pub struct SseClientInfo {
+    ipaddr: String,
     user_agent: String,
-    pin: String,
+    code: String,
+    secret: String,
 }
 
 type SendResult =
     Result<usize, broadcast::error::SendError<(SSEBroadcastEvent, SSEBroadcastTargets)>>;
-impl NotifyManager {
-    #[allow(clippy::new_without_default)]
+impl NotifyService {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(8);
         Self {
             sender: tx,
-            connections: Mutex::new(HashMap::new()),
-            observers: Vec::new(),
+            clients: DashMap::new(),
+            inactive_clients: LruCache::new(32),
+            observers: Mutex::new(Vec::new()),
         }
     }
-    pub fn add_client(&self, id: Uuid, conn: SSEConnection) {
-        let mut guard = self.connections.lock().unwrap();
-        guard.insert(id, conn);
-        tracing::trace!("add_client, connection len {:?}", guard.len());
-        if guard.len() <= 1 {
+    pub fn create_client(
+        ipaddr: String,
+        user_agent: String,
+        notify_service: Arc<NotifyService>,
+    ) -> (Uuid, String, SseClientGuard) {
+        let id = Uuid::new_v4();
+        let code = Self::generate_code(&notify_service);
+        let secret = Self::generate_secret();
+        let client_info = SseClientInfo {
+            ipaddr,
+            code,
+            user_agent,
+            secret: secret.clone(),
+        };
+        notify_service.add_client(id, client_info);
+        (id, secret, SseClientGuard { id, notify_service })
+    }
+    fn generate_code(&self) -> String {
+        use rand::Rng;
+        let mut rng = rand::rng();
+        loop {
+            let code: u32 = rng.random_range(000000..=999999);
+            let code = format!("{:0>6}", code);
+            if !self.is_pin_code_used(&code) {
+                break code;
+            }
+        }
+    }
+    fn generate_secret() -> String {
+        use rand::prelude::*;
+
+        let mut rng = StdRng::from_os_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key);
+        base64_url::encode(&key)
+    }
+    pub fn try_resume_client(
+        resume_secret: String,
+        notify_service: Arc<NotifyService>,
+    ) -> Option<(Uuid, String, SseClientGuard)> {
+        let id = notify_service.inactive_clients.iter().find_map(|it| {
+            if &it.secret == &resume_secret {
+                Some(it.key().clone_key())
+            } else {
+                None
+            }
+        })?;
+        let mut entry = notify_service.inactive_clients.remove(&id)?;
+        entry.secret = Self::generate_secret();
+        let secret = entry.secret.clone();
+        notify_service.add_client(id, entry);
+        Some((id, secret, SseClientGuard { id, notify_service }))
+    }
+    pub fn add_client(&self, id: Uuid, conn: SseClientInfo) {
+        self.clients.insert(id, conn);
+        tracing::trace!("add_client, connection len {:?}", self.clients.len());
+        if self.clients.len() <= 1 {
             return;
         }
         if let Err(err) = self.send(SSEBroadcastEvent::UserConnected(id)) {
             tracing::error!(reason = ?err, "Failed to send sse client connected event");
         }
     }
-    pub fn remove_client(&self, id: &Uuid) {
-        let mut guard = self.connections.lock().unwrap();
-        self.observers.iter().for_each(|it| {
+    fn inactive_client(&self, id: &Uuid) -> Option<String> {
+        let (_, conn) = self.clients.remove(id)?;
+        tracing::trace!("inactive_client, connection len {:?}", self.clients.len());
+        if !self.clients.is_empty() {
+            if let Err(err) = self.send(SSEBroadcastEvent::UserDisconnected(*id)) {
+                tracing::error!(reason = ?err, "Failed to send sse client disconnected event");
+            };
+        }
+        let ipaddr = conn.ipaddr.clone();
+        self.inactive_clients.insert(*id, conn);
+        Some(ipaddr)
+    }
+    pub fn remove_client(&self, id: &Uuid) -> Option<SseClientInfo> {
+        let (_, conn) = self.clients.remove(id)?;
+        self.observers.lock().unwrap().iter().for_each(|it| {
             let observer = it.upgrade();
             if let Some(observer) = observer {
                 observer.notify(*id)
             }
         });
-        guard.remove(id);
-        tracing::trace!("remove_client, connection len {:?}", guard.len());
-        if guard.is_empty() {
-            return;
+        tracing::trace!("remove_client, connection len {:?}", self.clients.len());
+        if !self.clients.is_empty() {
+            if let Err(err) = self.send(SSEBroadcastEvent::UserDisconnected(*id)) {
+                tracing::error!(reason = ?err, "Failed to send sse client disconnected event");
+            };
         }
-        if let Err(err) = self.send(SSEBroadcastEvent::UserDisconnected(*id)) {
-            tracing::error!(reason = ?err, "Failed to send sse client disconnected event");
-        };
+        Some(conn)
     }
     pub fn contains_client(&self, id: &Uuid) -> bool {
-        let guard = self.connections.lock().unwrap();
-        guard.contains_key(id)
+        self.clients.contains_key(id)
     }
-    pub fn get_client_pin(&self, id: &Uuid) -> Option<String> {
-        let guard = self.connections.lock().unwrap();
-        guard.get(id).map(|it| it.pin.to_owned())
+    pub fn clients(&self) -> Vec<SseClientResponseDto> {
+        let device_ip_tags = crate::config::CONFIG.device_ip_tags.as_ref();
+        let data = self
+            .clients
+            .iter()
+            .map(|entry| SseClientResponseDto {
+                id: *entry.key(),
+                ip_alias: device_ip_tags.and_then(|tags| tags.get(&entry.ipaddr).cloned()),
+                user_agent: entry.user_agent.clone(),
+            })
+            .collect::<Vec<_>>();
+        data
+    }
+    pub fn get_id_by_code(&self, pin_code: &str) -> Option<Uuid> {
+        self.clients.iter().find_map(|entry| {
+            if entry.code == pin_code {
+                Some(*entry.key())
+            } else {
+                None
+            }
+        })
+    }
+    pub fn get_code(&self, id: &Uuid) -> Option<String> {
+        let entry = self.clients.get(id)?;
+        Some(entry.code.clone())
+    }
+    pub fn get_ipaddr(&self, id: &Uuid) -> Option<String> {
+        let entry = self.clients.get(id)?;
+        Some(entry.ipaddr.clone())
+    }
+    pub fn is_pin_code_used(&self, code: &str) -> bool {
+        self.clients
+            .iter()
+            .find(|entry| &entry.code == code)
+            .is_some()
+    }
+    pub fn get_secret(&self, id: &Uuid) -> Option<String> {
+        let entry = self.clients.get(id)?;
+        Some(entry.secret.clone())
     }
     pub fn send(&self, event: SSEBroadcastEvent) -> SendResult {
         self.sender.send((event, SSEBroadcastTargets::AllClients))
@@ -251,64 +210,19 @@ impl NotifyManager {
     }
 }
 
-impl Observable<Uuid> for NotifyManager {
-    fn register(&mut self, observer: Weak<dyn Observer<Uuid>>) {
-        self.observers.push(observer)
+impl Observable<Uuid> for NotifyService {
+    /// 注册用于当客户端断开的通知的监听
+    fn register(&self, observer: Weak<dyn Observer<Uuid>>) {
+        self.observers.lock().unwrap().push(observer)
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum SSEBroadcastEvent {
-    ClientId(Uuid, String),
-    UserConnected(Uuid),
-    UserDisconnected(Uuid),
-    IndexUpdate(crate::models::file_indexing::IndexChangeAction),
-    P2PRequest(Uuid),
-    P2PReject(Uuid),
-    P2PExchange(crate::services::p2p::Exchange),
-    P2PSignaling(serde_json::Value),
-}
-#[derive(Debug, Clone)]
-pub enum SSEBroadcastTargets {
-    AllClients,                    // 所有客户端
-    Client(Uuid),                  // 指定的单个客户端
-    ClientSet(Vec<Uuid>),          // 指定的客户端集
-    AllExceptClient(Uuid),         // 除了指定的单个客户端
-    AllExceptClientSet(Vec<Uuid>), // 除了指定的客户端集
-}
-impl SSEBroadcastEvent {
-    pub fn to_json(&self) -> String {
-        let (action, uid) = match self {
-            SSEBroadcastEvent::IndexUpdate(value) => return value.to_json(),
-            SSEBroadcastEvent::UserConnected(uid) => ("USER_CONNECTED", uid),
-            SSEBroadcastEvent::UserDisconnected(uid) => ("USER_DISCONNECTED", uid),
-            SSEBroadcastEvent::ClientId(uid, pin) => {
-                return serde_json::json!({
-                    "type": "CLIENT_ID",
-                    "payload": format!("{uid};{pin}")
-                })
-                .to_string()
-            }
-            SSEBroadcastEvent::P2PRequest(uid) => ("P2P_REQUEST", uid),
-            SSEBroadcastEvent::P2PReject(uid) => ("P2P_REJECT", uid),
-            SSEBroadcastEvent::P2PExchange(value) => return value.to_json(),
-            SSEBroadcastEvent::P2PSignaling(value) => {
-                return serde_json::json!({
-                    "type": "P2P_SIGNALING",
-                    "payload": value
-                })
-                .to_string()
-            }
-        };
-        serde_json::json!({
-            "type": action,
-            "payload": uid
-        })
-        .to_string()
-    }
-}
-impl From<crate::models::file_indexing::IndexChangeAction> for SSEBroadcastEvent {
-    fn from(value: crate::models::file_indexing::IndexChangeAction) -> Self {
-        SSEBroadcastEvent::IndexUpdate(value)
+#[cfg(test)]
+mod tests {
+    use super::NotifyService;
+
+    #[test]
+    fn test_secret() {
+        println!("{}", NotifyService::generate_secret())
     }
 }

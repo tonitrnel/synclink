@@ -476,7 +476,7 @@ mod tests {
                 std::fs::create_dir(&path)?;
             }
             let path = path.join(format!("{id}.tmp"));
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let mut hasher = Sha256::new();
             let mut buf = [0; 4096];
             let mut written_bytes = 0;
@@ -496,7 +496,7 @@ mod tests {
             while written_bytes < size {
                 let chunk_size = buf.len().min(size - written_bytes);
                 for byte in &mut buf[0..chunk_size] {
-                    *byte = rng.sample(rand::distributions::Alphanumeric)
+                    *byte = rng.sample(rand::distr::Alphanumeric)
                 }
                 hasher.update(&buf[0..chunk_size]);
                 file.write_all(&buf[0..chunk_size]).await?;
@@ -727,7 +727,7 @@ mod tests {
         let mut hasher = Sha256::new();
         while let Some(chunk) = stream.next().await {
             assert!(chunk.is_ok(), "{chunk:?}");
-            let chunk = chunk.unwrap();
+            let chunk = chunk?;
             assert_eq!(
                 chunk.len(),
                 capacity.min(mock_file.size - transferred),
@@ -785,7 +785,7 @@ mod tests {
         let mut count = 0;
         while let Some(chunk) = stream.next().await {
             assert!(chunk.is_ok(), "{chunk:?}");
-            let chunk = chunk.unwrap();
+            let chunk = chunk?;
             transferred += chunk.len();
             count += 1;
         }
@@ -832,7 +832,7 @@ mod tests {
 
         while let Some(chunk) = stream.next().await {
             assert!(chunk.is_ok(), "Unexpected error during read: {chunk:?}");
-            let chunk = chunk.unwrap();
+            let chunk = chunk?;
             total_transferred += chunk.len();
             block_count += 1;
         }

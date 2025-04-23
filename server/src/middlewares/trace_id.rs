@@ -36,7 +36,7 @@ impl<S> Layer<S> for TraceIdLayer {
     fn layer(&self, inner: S) -> Self::Service {
         TraceIdService {
             inner,
-            trace_id: TraceId(Uuid::new_v4()),
+            trace_id: TraceId(Uuid::now_v7()),
         }
     }
 }

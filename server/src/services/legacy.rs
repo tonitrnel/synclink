@@ -1,8 +1,20 @@
-use crate::models::image::ImageMetadata;
+#[allow(unused)]
+use crate::utils::guess_mimetype_from_path;
 use crate::{config, utils};
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ImageMetadata {
+    width: u32,
+    height: u32,
+    thumbnail_width: Option<u32>,
+    thumbnail_height: Option<u32>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -136,27 +148,119 @@ impl Entity {
     pub fn get_metadata(&self) -> &Option<EntityMetadata> {
         &self.metadata
     }
-    pub fn serialize_and_write(&self, writer: &mut String, key: &str) -> anyhow::Result<()> {
-        writeln!(writer, "[[{}]]", key)?;
-        write!(writer, "{}", toml::to_string(&self)?)?;
-        if let Some(metadata) = &self.metadata {
-            let s = toml::to_string(metadata)?;
-            #[allow(clippy::write_literal)]
-            writeln!(
-                writer,
-                "metadata = {prefix}{value}{suffix}",
-                prefix = "{ ",
-                suffix = " }",
-                value = s.trim_end().replace('\n', ", ")
-            )?;
-        }
-        writeln!(writer)?;
-        Ok(())
-    }
 }
 
 impl PartialEq for Entity {
     fn eq(&self, other: &Self) -> bool {
         self.hash == other.hash
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct Index {
+    #[serde(rename = "item", default)]
+    items: Vec<Entity>,
+}
+
+#[derive(Debug)]
+pub struct FileIndexingService {
+    index: Arc<Mutex<Index>>,
+    index_file: fs::File,
+    directory: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct WriteIndexArgs {
+    pub uid: Uuid,
+    pub user_agent: Option<String>,
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+    pub hash: String,
+    pub size: usize,
+    pub ip: Option<String>,
+    pub caption: String,
+    pub tags: Vec<String>,
+}
+
+impl WriteIndexArgs {
+    async fn into_entity(self, dir: &Path) -> Entity {
+        let now = chrono::Local::now();
+        let (name, ext) = if let Some(_name) = self.filename.as_ref() {
+            let path = Path::new(_name);
+            let name = path
+                .file_name()
+                .map(|it| it.to_string_lossy().to_string())
+                .unwrap_or("untitled".to_string());
+            let ext = path.extension().map(|it| it.to_string_lossy().to_string());
+            (name, ext)
+        } else {
+            (format!("pasted_{}", now.format("%Y-%m-%d-%H-%M")), None)
+        };
+        let resource = match &ext {
+            Some(ext) => format!("{}.{}", self.uid, ext),
+            None => self.uid.to_string(),
+        };
+        Entity {
+            uid: self.uid,
+            name,
+            created: now.timestamp_millis(),
+            modified: None,
+            hash: self.hash,
+            size: self.size as u64,
+            content_type: guess_mimetype_from_path(
+                dir.join(resource),
+                self.content_type.as_deref(),
+            )
+            .await
+            .to_string(),
+            ext,
+            ip: self.ip,
+            metadata: None,
+            caption: self.caption,
+            tags: self.tags,
+        }
+    }
+}
+
+impl FileIndexingService {
+    pub async fn new(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let path = path.as_ref().to_owned();
+        if !&path.is_dir() {
+            anyhow::bail!("Error: Path '{:?}' is not a directory", path.as_os_str())
+        }
+        let index_path = path.join("index.toml");
+        if index_path.exists() && !index_path.is_file() {
+            anyhow::bail!("Error: Path '{:?}' is not a file", index_path.as_os_str())
+        }
+        let directory = index_path.parent().unwrap().to_path_buf();
+        let mut index_file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(!index_path.exists())
+            .open(&index_path)
+            .await
+            .with_context(|| format!("Error: Index file open '{:?}' failed", &index_path))?;
+        let mut index_content = String::new();
+        index_file
+            .read_to_string(&mut index_content)
+            .await
+            .with_context(|| format!("Error: Index read '{:?}' failed", index_path.as_os_str()))?;
+        let index: Index = toml::from_str(&index_content).unwrap_or_else(|err| {
+            eprintln!("{:#?}", err);
+            panic!("Error: Index parse failed")
+        });
+        let this = Self {
+            index: Arc::new(Mutex::new(index)),
+            index_file,
+            directory,
+        };
+        Ok(this)
+    }
+    pub fn map_clone<T, F>(&self, f: F) -> T
+    where
+        F: FnOnce(&Vec<Entity>) -> T,
+    {
+        let guard = self.index.lock().unwrap();
+        f(&guard.items)
     }
 }

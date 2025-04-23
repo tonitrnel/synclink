@@ -1,16 +1,42 @@
-use std::net::SocketAddr;
-use std::sync::Arc;
-
 use crate::config::Config;
 use crate::logging::LogWriter;
-use crate::utils::{Observable, Observer};
-use crate::{models, routes, state};
+use crate::{routes, state};
+use anyhow::Context;
+use sqlx::migrate::Migrator;
+use sqlx::sqlite;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 use tokio::{net::TcpListener, signal, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 
 pub struct ServerArgs<'a> {
     pub logs: Arc<LogWriter>,
     pub config: &'a Config,
+}
+
+static MIGRATOR: Migrator = sqlx::migrate!();
+
+async fn connect_database(dir: &PathBuf) -> anyhow::Result<sqlx::SqlitePool> {
+    let path = dir.join("ephemera.db");
+    if !path.exists() {
+        std::fs::File::create(&path).with_context(|| {
+            format!("Failed to create SQLite database file: {}", path.display())
+        })?;
+    }
+    let database_url = format!(
+        "sqlite:///{}?mode=rwc",
+        path.to_str().unwrap().trim_start_matches(r"\\?\")
+    );
+
+    let options = sqlite::SqliteConnectOptions::from_str(&database_url)
+        .with_context(|| format!("Failed to parse SQLite url: '{}'", database_url))?;
+    let pool = sqlx::SqlitePool::connect_with(options)
+        .await
+        .with_context(|| format!("Failed to connect to SQLite database: {}", path.display()))?;
+    MIGRATOR.run(&pool).await?;
+    Ok(pool)
 }
 
 pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::Result<()> {
@@ -21,22 +47,10 @@ pub async fn run_until_done(args: ServerArgs<'_>, bind: TcpListener) -> anyhow::
         let shutdown_signal = shutdown_signal.clone();
         let dir = args.config.file_storage.parse_dir()?;
         join_set.spawn(async move {
-            let indexing = Arc::new(
-                models::file_indexing::FileIndexing::new(dir)
-                    .await
-                    .unwrap_or_else(|err| panic!("Failed to read index, reason = {err:?}")),
-            );
-            let mut notify_manager = crate::services::NotifyManager::new();
-            let socket_manager = Arc::new(crate::services::P2PSocketManager::new());
-            notify_manager.register(Arc::downgrade(
-                &(Arc::clone(&socket_manager) as Arc<dyn Observer<uuid::Uuid>>),
-            ));
-            let state = state::AppState {
-                indexing,
-                notify_manager: Arc::new(notify_manager),
-                socket_manager,
-                shutdown_signal: shutdown_signal.clone(),
-            };
+            let pool = connect_database(&dir).await.unwrap();
+            let state = state::AppState::build(pool, dir, shutdown_signal.clone())
+                .await
+                .unwrap();
             let routes = routes::build().with_state(state);
             axum::serve(
                 bind,
