@@ -51,9 +51,8 @@ where
                 continue;
             };
             if fields.starts_with("trace_id=") {
-                trace_id.push_str("[");
+                trace_id.push_str("@");
                 trace_id.push_str(&fields["trace_id=".len()..]);
-                trace_id.push_str("]");
                 continue;
             }
             if fields_str.is_empty() {
