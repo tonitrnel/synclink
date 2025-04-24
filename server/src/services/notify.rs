@@ -1,5 +1,5 @@
 use crate::models::dtos::notify::SseClientResponseDto;
-use crate::models::notify::{SSEBroadcastEvent, SSEBroadcastTargets};
+use crate::models::notify::{BroadcastEvent, BroadcastScope};
 use crate::utils::lru_cache::LruCache;
 use crate::utils::{Observable, Observer, base64_url};
 use dashmap::DashMap;
@@ -22,7 +22,7 @@ impl Drop for SseClientGuard {
 
 /// 负责向客户端发送消息，同时还负责记录客户端的信息
 pub struct NotifyService {
-    sender: broadcast::Sender<(SSEBroadcastEvent, SSEBroadcastTargets)>,
+    sender: broadcast::Sender<(BroadcastEvent, BroadcastScope)>,
     clients: DashMap<Uuid, SseClientInfo>,
     inactive_clients: LruCache<Uuid, SseClientInfo>,
     observers: Mutex<Vec<Weak<dyn Observer<Uuid>>>>,
@@ -37,7 +37,7 @@ pub struct SseClientInfo {
 }
 
 type SendResult =
-    Result<usize, broadcast::error::SendError<(SSEBroadcastEvent, SSEBroadcastTargets)>>;
+    Result<usize, broadcast::error::SendError<(BroadcastEvent, BroadcastScope)>>;
 impl NotifyService {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(8);
@@ -107,7 +107,7 @@ impl NotifyService {
         if self.clients.len() <= 1 {
             return;
         }
-        if let Err(err) = self.send(SSEBroadcastEvent::UserConnected(id)) {
+        if let Err(err) = self.send(BroadcastEvent::UserConnected(id)) {
             tracing::error!(reason = ?err, "Failed to send sse client connected event");
         }
     }
@@ -115,7 +115,7 @@ impl NotifyService {
         let (_, conn) = self.clients.remove(id)?;
         tracing::trace!("inactive_client, connection len {:?}", self.clients.len());
         if !self.clients.is_empty() {
-            if let Err(err) = self.send(SSEBroadcastEvent::UserDisconnected(*id)) {
+            if let Err(err) = self.send(BroadcastEvent::UserDisconnected(*id)) {
                 tracing::error!(reason = ?err, "Failed to send sse client disconnected event");
             };
         }
@@ -133,7 +133,7 @@ impl NotifyService {
         });
         tracing::trace!("remove_client, connection len {:?}", self.clients.len());
         if !self.clients.is_empty() {
-            if let Err(err) = self.send(SSEBroadcastEvent::UserDisconnected(*id)) {
+            if let Err(err) = self.send(BroadcastEvent::UserDisconnected(*id)) {
                 tracing::error!(reason = ?err, "Failed to send sse client disconnected event");
             };
         }
@@ -182,30 +182,30 @@ impl NotifyService {
         let entry = self.clients.get(id)?;
         Some(entry.secret.clone())
     }
-    pub fn send(&self, event: SSEBroadcastEvent) -> SendResult {
-        self.sender.send((event, SSEBroadcastTargets::AllClients))
+    pub fn send(&self, event: BroadcastEvent) -> SendResult {
+        self.sender.send((event, BroadcastScope::All))
     }
-    pub fn send_with_client(&self, event: SSEBroadcastEvent, conn_id: &Uuid) -> SendResult {
+    pub fn send_with_client(&self, event: BroadcastEvent, conn_id: &Uuid) -> SendResult {
         self.sender
-            .send((event, SSEBroadcastTargets::Client(*conn_id)))
+            .send((event, BroadcastScope::Only(*conn_id)))
     }
-    pub fn send_without_client(&self, event: SSEBroadcastEvent, conn_id: &Uuid) -> SendResult {
+    pub fn send_without_client(&self, event: BroadcastEvent, conn_id: &Uuid) -> SendResult {
         self.sender
-            .send((event, SSEBroadcastTargets::AllExceptClient(*conn_id)))
+            .send((event, BroadcastScope::Except(*conn_id)))
     }
-    pub fn send_with_clients(&self, event: SSEBroadcastEvent, conn_ids: Vec<Uuid>) -> SendResult {
+    pub fn send_with_clients(&self, event: BroadcastEvent, conn_ids: Vec<Uuid>) -> SendResult {
         self.sender
-            .send((event, SSEBroadcastTargets::ClientSet(conn_ids)))
+            .send((event, BroadcastScope::OnlySet(conn_ids)))
     }
     pub fn send_without_clients(
         &self,
-        event: SSEBroadcastEvent,
+        event: BroadcastEvent,
         conn_ids: Vec<Uuid>,
     ) -> SendResult {
         self.sender
-            .send((event, SSEBroadcastTargets::AllExceptClientSet(conn_ids)))
+            .send((event, BroadcastScope::ExceptSet(conn_ids)))
     }
-    pub fn subscribe(&self) -> broadcast::Receiver<(SSEBroadcastEvent, SSEBroadcastTargets)> {
+    pub fn subscribe(&self) -> broadcast::Receiver<(BroadcastEvent, BroadcastScope)> {
         self.sender.subscribe()
     }
 }
