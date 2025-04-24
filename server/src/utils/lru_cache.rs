@@ -1,3 +1,4 @@
+#![allow(unused)]
 use dashmap::DashMap;
 use dashmap::mapref::one::{Ref, RefMut};
 use std::hash::Hash;
@@ -97,7 +98,6 @@ impl<K, V> DerefMut for SafeLruEntry<K, V> {
     }
 }
 
-#[allow(unused)]
 pub struct LruCache<K, V> {
     map: DashMap<KeyRef<K>, SafeLruEntry<K, V>>,
     capacity: usize,
