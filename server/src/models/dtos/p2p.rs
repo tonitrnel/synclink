@@ -19,7 +19,7 @@ pub struct P2PCreateBodyDto {
     /// PIN 码
     pub code: String,
     /// 是否支持 webrtc
-    pub supports_rtc: bool,
+    pub supports_webrtc: bool,
     /// 优先使用的协议
     pub priority: Option<ExchangeProtocol>,
 }
@@ -28,11 +28,17 @@ pub struct P2PCreateBodyDto {
 pub struct P2PAcceptBodyDto {
     pub request_id: Uuid,
     pub client_id: Uuid,
-    pub supports_rtc: bool,
+    pub supports_webrtc: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct P2PDiscardBodyDto {
+    pub request_id: Uuid,
+    pub client_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct P2PDowngradeBodyDto {
     pub request_id: Uuid,
     pub client_id: Uuid,
 }

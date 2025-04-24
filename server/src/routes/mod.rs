@@ -30,17 +30,16 @@ pub fn build() -> Router<AppState> {
         // .route("/api/beacon", post(services::beacon))
         // .route("/api/log-tracing", post(services::log_tracing))
         // ======== upload ========
-        .route("/api/upload", post(upload::upload))
         .route(
             "/api/upload/multipart/start-session",
             post(upload::multipart::start_session),
         )
         .route(
-            "/api/upload/multipart/concatenate",
+            "/api/upload/multipart/{uuid}/finalize",
             post(upload::multipart::finalize),
         )
         .route(
-            "/api/upload/multipart/cancel",
+            "/api/upload/multipart/{uuid}/cancel",
             delete(upload::multipart::cancel),
         )
         .route(
@@ -48,6 +47,7 @@ pub fn build() -> Router<AppState> {
             put(upload::multipart::append_part),
         )
         .route("/api/upload/preflight", head(upload::preflight))
+        .route("/api/upload", post(upload::upload))
         .route("/api/notify", get(sse::notify))
         .route("/api/sse/connections", get(sse::connections))
         .route("/api/stats", get(system::stats))
@@ -58,13 +58,14 @@ pub fn build() -> Router<AppState> {
         .route("/api/file/{uuid}/metadata", get(file::get_metadata))
         .route("/api/file/{uuid}", delete(file::delete))
         .route("/api/file/{uuid}", get(file::get))
-        .route("/api/directory/{uuid}", get(file::get_virtual_directory))
         .route("/api/directory/{uuid}/{*path}", get(file::get_virtual_file))
+        .route("/api/directory/{uuid}", get(file::get_virtual_directory))
         // ======== p2p ========
         .route("/api/p2p/create", post(p2p::create_request))
         .route("/api/p2p/accept", post(p2p::accept_request))
         .route("/api/p2p/discard", delete(p2p::discard_request))
         .route("/api/p2p/signaling", post(p2p::signaling))
+        .route("/api/p2p/downgrade", post(p2p::downgrade))
         .route("/api/p2p/relay", get(p2p::relay))
         .fallback_service(static_files_service)
         .layer(
@@ -81,14 +82,14 @@ pub fn build() -> Router<AppState> {
                         method = %req.method(),
                         uri = %req.uri(),
                         version = %format!("{:?}", req.version()),
-                        "started processing request"
+                        "starting request"
                     );
                 })
                 .on_response(|res: &Response, latency: Duration, _span: &Span| {
                     tracing::trace!(
                         status = ?res.status(),
                         latency = %format!("{}ms", latency.as_millis()),
-                        "finished processing request"
+                        "finished request"
                     );
                 }),
         )

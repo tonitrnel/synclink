@@ -4,7 +4,6 @@ use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::sqlite::SqliteTypeInfo;
 use sqlx::{Database, Decode, Encode, FromRow, Sqlite, Type};
-use std::fmt::Display;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,9 +15,28 @@ pub struct ImageFileMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveEntry {
+    pub path: String,
+    pub mtime: u64,
+    pub size: u64,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub mimetype: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub hash: Option<String>,
+    pub entry_type: u8,
+    pub header_position: u64,
+    pub file_position: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveFileMetadata {
+    pub(crate) entries: Vec<ArchiveEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum FileMetadata {
     Image(ImageFileMetadata),
+    Archive(ArchiveFileMetadata),
     None,
 }
 
@@ -29,8 +47,9 @@ impl Default for FileMetadata {
 }
 
 impl FileMetadata {
-    pub fn is_none(&self) -> bool {
-        matches!(self, FileMetadata::None)
+    pub fn to_json_string(&self) -> anyhow::Result<String> {
+        let str = serde_json::to_string(&self)?;
+        Ok(str)
     }
 }
 
@@ -61,9 +80,14 @@ impl From<Option<FileMetadata>> for FileMetadata {
         value.unwrap_or_else(|| FileMetadata::None)
     }
 }
-impl Display for FileMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.serialize(f)
+impl From<ImageFileMetadata> for FileMetadata {
+    fn from(value: ImageFileMetadata) -> Self {
+        Self::Image(value)
+    }
+}
+impl From<Vec<ArchiveEntry>> for FileMetadata {
+    fn from(value: Vec<ArchiveEntry>) -> Self {
+        Self::Archive(ArchiveFileMetadata { entries: value })
     }
 }
 
@@ -74,7 +98,7 @@ impl<'q> Encode<'q, Sqlite> for FileMetadata {
     ) -> Result<IsNull, BoxDynError> {
         match self {
             FileMetadata::None => Ok(IsNull::Yes),
-            _ => <String as Encode<'q, Sqlite>>::encode_by_ref(&self.to_string(), buf),
+            _ => <String as Encode<'q, Sqlite>>::encode_by_ref(&self.to_json_string()?, buf),
         }
     }
 }
@@ -82,9 +106,7 @@ impl<'r> Decode<'r, Sqlite> for FileMetadata {
     fn decode(value: <Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <Option<String> as Decode<'r, Sqlite>>::decode(value)?;
         match s {
-            Some(s) => {
-                FileMetadata::try_from(s.as_str()).map_err(|e| Box::new(e) as _)
-            },
+            Some(s) => FileMetadata::try_from(s.as_str()).map_err(|e| Box::new(e) as _),
             None => Ok(FileMetadata::None),
         }
     }
@@ -98,7 +120,7 @@ impl Type<Sqlite> for FileMetadata {
     }
 }
 
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, FromRow)]
 pub struct FileEntity {
     pub id: Uuid,
     pub name: String,
@@ -106,28 +128,11 @@ pub struct FileEntity {
     pub size: i64,
     pub mimetype: String,
     pub extname: Option<String>,
-    pub ipaddr: Option<String>,
-    #[serde(skip_serializing_if = "FileMetadata::is_none")]
     pub metadata: FileMetadata,
+    pub ipaddr: Option<String>,
+    pub device: Option<String>,
     pub is_encrypted: bool,
     pub is_pined: bool,
     pub created_at: types::Timestamp,
     pub updated_at: types::Timestamp,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArchiveEntry {
-    pub path: String,
-    pub mtime: u64,
-    pub size: u64,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub mimetype: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub hash: Option<String>,
-    #[serde(rename = "e_type")]
-    pub entry_type: u8,
-    #[serde(rename = "h_pos")]
-    pub header_position: u64,
-    #[serde(rename = "f_pos")]
-    pub file_position: u64,
 }

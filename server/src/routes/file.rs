@@ -1,7 +1,8 @@
 use crate::common::ApiResult;
 use crate::extractors::Header;
+use crate::models::CursorPager;
 use crate::models::dtos::file::{
-    FileCollectionQueryDto, FileHeaderDto, FileListQueryDto, FileQueryDto,
+    FileCollectionQueryDto, FileHeaderDto, FileQueryDto, FileRecordQueryDto, FileRecordResponseDto,
 };
 use crate::models::dtos::pagination::PaginationDto;
 use crate::services::file::{GetArchiveEntryArgs, GetContentArgs, ListArgs, TotalArgs};
@@ -15,40 +16,48 @@ use uuid::Uuid;
 /// 列出所有文件
 pub async fn list(
     State(state): State<AppState>,
-    Query(query): Query<FileListQueryDto>,
+    Query(query): Query<FileRecordQueryDto>,
 ) -> ApiResult<impl IntoResponse> {
-    let offset = query.page * query.per_page;
-    let limit = query.per_page;
+    let pagination = CursorPager {
+        first: query.first,
+        last: query.last,
+        after: query.after,
+        before: query.before,
+    };
+    pagination.validate()?;
     let group = query
         .group
         .as_ref()
         .map(|it| it.split(",").map(|p| p.trim()).collect::<Vec<_>>())
         .unwrap_or_default();
-    let data = state
+    let with_total = query.with_total.unwrap_or(false);
+    let (entries, has_prev, has_next) = state
         .file_service
         .list(
             None,
             ListArgs {
-                offset,
-                limit,
-                after: query.after,
-                before: query.before,
+                pager: &pagination,
                 group: &group,
             },
         )
         .await?;
-    let total = state
-        .file_service
-        .total(
-            None,
-            TotalArgs {
-                after: query.after,
-                before: query.before,
-                group: &group,
-            },
-        )
-        .await?;
-    Ok(Json(PaginationDto { data, total }))
+    let total = if with_total {
+        Some(state
+            .file_service
+            .total(None, TotalArgs { group: &group })
+            .await?)
+    } else { 
+        None
+    };
+    Ok(Json(PaginationDto {
+        data: entries
+            .into_iter()
+            .map(|it| FileRecordResponseDto::from(it))
+            .collect::<Vec<_>>(),
+        has_prev,
+        has_next,
+        total,
+    }))
 }
 
 /// 读取文件内容
@@ -64,9 +73,10 @@ pub async fn get(
         .get_content_by_id(
             id,
             GetContentArgs {
-                r: header.range,
-                m: method,
-                q: query,
+                range: header.range,
+                method,
+                raw: query.raw.is_some(),
+                thumbnail_prefer: query.thumbnail_prefer.is_some()
             },
         )
         .await?;
@@ -78,9 +88,9 @@ pub async fn get_metadata(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<impl IntoResponse> {
-    let metadata = state.file_service.get_by_id(id).await?;
+    let entry = state.file_service.get_by_id(id).await?;
 
-    Ok(Json(metadata))
+    Ok(Json(FileRecordResponseDto::from(entry)))
 }
 
 /// 删除文件
@@ -126,10 +136,10 @@ pub async fn get_virtual_file(
         .get_archive_entry(
             id,
             GetArchiveEntryArgs {
-                ph,
-                r: header.range,
-                q: query,
-                m: method,
+                path_or_hash: ph,
+                range: header.range,
+                raw: query.raw.is_some(),
+                method,
             },
         )
         .await?;

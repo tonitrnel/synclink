@@ -1,7 +1,7 @@
 use crate::common::AppError;
-use crate::models::dtos::file::{ArchiveEntryResponseDto, FileQueryDto};
+use crate::models::dtos::file::ArchiveResponseDto;
 use crate::models::file::*;
-use crate::models::{Timestamp, Ulid};
+use crate::models::{CursorPager, Timestamp, Ulid};
 use crate::services::legacy::FileIndexingService;
 use crate::services::notify::NotifyService;
 use crate::utils::{
@@ -58,41 +58,31 @@ pub struct FileService {
 
 pub struct GetContentArgs {
     /// header range
-    pub(crate) r: Option<String>,
+    pub(crate) range: Option<String>,
     /// http method
-    pub(crate) m: Method,
-    /// query params
-    pub(crate) q: FileQueryDto,
+    pub(crate) method: Method,
+    pub(crate) raw: bool,
+    pub(crate) thumbnail_prefer: bool,
 }
 
 pub struct GetArchiveEntryArgs {
     /// entry path or hash
-    pub(crate) ph: String,
+    pub(crate) path_or_hash: String,
     /// range
-    pub(crate) r: Option<String>,
-    /// query params
-    pub(crate) q: FileQueryDto,
+    pub(crate) range: Option<String>,
+    pub(crate) raw: bool,
     /// method
-    pub(crate) m: Method,
+    pub(crate) method: Method,
 }
 
 pub struct ListArgs<'a> {
-    /// offset
-    pub(crate) offset: u32,
-    /// limit
-    pub(crate) limit: u32,
-    /// after
-    pub(crate) after: Option<i64>,
-    /// before
-    pub(crate) before: Option<i64>,
+    /// pager
+    pub(crate) pager: &'a CursorPager,
     /// group
     pub(crate) group: &'a [&'a str],
 }
+
 pub struct TotalArgs<'a> {
-    /// after
-    pub(crate) after: Option<i64>,
-    /// before
-    pub(crate) before: Option<i64>,
     /// group
     pub(crate) group: &'a [&'a str],
 }
@@ -144,94 +134,80 @@ impl FileService {
         &self,
         user_id: Option<Uuid>,
         args: ListArgs<'_>,
-    ) -> anyhow::Result<Vec<FileEntity>, AppError> {
+    ) -> anyhow::Result<(Vec<FileEntity>, bool, bool), AppError> {
         let ListArgs {
-            offset,
-            limit,
-            after,
-            before,
+            pager,
             group: _group,
         } = args;
+        // (0/4)combined sql start
         let mut sql = String::from(
             r#"SELECT 
-                    id, name, hash, size, mimetype, extname,
-                    ipaddr, metadata, is_encrypted,
-                    is_pined, created_at, updated_at
-                  FROM files
+                    f.id, f.name, f.hash, f.size, f.mimetype, f.extname,
+                    f.metadata, f.ipaddr, f.is_encrypted, f.is_pined,
+                    f.created_at, f.updated_at, d.device_name as device
+                  FROM files f
+                  LEFT JOIN devices d ON d.id == f.device_id
                 "#,
         );
         let mut args = sqlx::sqlite::SqliteArguments::default();
-        let mut where_cause = String::new();
-        if let Some(user_id) = user_id {
-            args.add(user_id).map_err(|e| sqlx::Error::Encode(e))?;
-            let ix = args.len();
-            if where_cause.is_empty() {
-                write!(where_cause, " AND")?;
+        // (1/4)where cause
+        {
+            let mut where_cause = String::new();
+            if let Some(user_id) = user_id {
+                args.add(user_id).map_err(|e| sqlx::Error::Encode(e))?;
+                if !where_cause.is_empty() {
+                    write!(where_cause, "AND ")?;
+                }
+                write!(where_cause, "f.user_id == ?{} ", args.len())?;
             }
-            write!(where_cause, " user_id == ${}", ix)?;
-        }
-        if let Some(after) = after {
-            args.add(after).map_err(|e| sqlx::Error::Encode(e))?;
-            let ix = args.len();
-            if where_cause.is_empty() {
-                write!(where_cause, " AND")?;
+            if !where_cause.is_empty() {
+                write!(where_cause, "AND ")?;
             }
-            write!(where_cause, " created_at > ${}", ix)?;
-        }
-        if let Some(before) = before {
-            args.add(before).map_err(|e| sqlx::Error::Encode(e))?;
-            let ix = args.len();
-            if where_cause.is_empty() {
-                write!(where_cause, " AND")?;
+            pager.write_where_cause(&mut where_cause, &mut args, "f")?;
+            if !where_cause.is_empty() {
+                write!(sql, "WHERE {}", where_cause)?;
             }
-            write!(where_cause, " created_at < ${}", ix)?;
         }
-        if !where_cause.is_empty() {
-            write!(sql, " WHERE {}", where_cause)?;
-        }
-        args.add(limit).map_err(|e| sqlx::Error::Encode(e))?;
-        args.add(offset).map_err(|e| sqlx::Error::Encode(e))?;
-        write!(
-            sql,
-            " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
-            args.len() - 1,
-            args.len()
-        )?;
+        // (2/4)order cause
+        write!(sql, "ORDER BY ")?;
+        pager.write_order_cause(&mut sql, "f")?;
+        // (3/4)limit cause
+        pager.write_limit_cause(&mut sql, &mut args)?;
+        // (4/4)combined sql finalize
+        tracing::debug!("SQL: {}", sql);
+        tracing::debug!("Args: {:?}", args);
         let rows = sqlx::query_with(&sql, args)
             .fetch_all(&self.pool)
             .await
             .with_context(|| sql)?;
-        let mut records = Vec::new();
+        let mut entries = Vec::new();
         for row in rows {
-            records.push(FileEntity {
+            entries.push(FileEntity {
                 id: row.try_get_unchecked::<Uuid, _>("id")?,
                 name: row.try_get_unchecked::<String, _>("name")?,
                 hash: row.try_get_unchecked::<String, _>("hash")?,
                 size: row.try_get_unchecked::<i64, _>("size")?,
                 mimetype: row.try_get_unchecked::<String, _>("mimetype")?,
                 extname: row.try_get_unchecked::<Option<String>, _>("extname")?,
-                ipaddr: row.try_get_unchecked::<Option<String>, _>("ipaddr")?,
                 metadata: row
                     .try_get_unchecked::<Option<String>, _>("metadata")?
                     .into(),
+                ipaddr: row.try_get_unchecked::<Option<String>, _>("ipaddr")?,
+                device: None,
                 is_encrypted: row.try_get_unchecked::<bool, _>("is_encrypted")?,
                 is_pined: row.try_get_unchecked::<bool, _>("is_pined")?,
                 created_at: row.try_get_unchecked::<i64, _>("created_at")?.into(),
                 updated_at: row.try_get_unchecked::<i64, _>("updated_at")?.into(),
             })
         }
-        Ok(records)
+        Ok(pager.prune(entries))
     }
     pub async fn total(
         &self,
         user_id: Option<Uuid>,
         args: TotalArgs<'_>,
     ) -> anyhow::Result<u32, AppError> {
-        let TotalArgs {
-            after,
-            before,
-            group: _group,
-        } = args;
+        let TotalArgs { group: _group } = args;
         let mut sql = String::from("SELECT COUNT(id) as total FROM files");
         let mut args = sqlx::sqlite::SqliteArguments::default();
         let mut where_cause = String::new();
@@ -241,20 +217,6 @@ impl FileService {
                 write!(where_cause, " AND")?;
             }
             write!(where_cause, " user_id = ${}", args.len())?;
-        }
-        if let Some(after) = after {
-            args.add(after).map_err(|e| sqlx::Error::Encode(e))?;
-            if !where_cause.is_empty() {
-                write!(where_cause, " AND")?;
-            }
-            write!(where_cause, " created > ${}", args.len())?;
-        }
-        if let Some(before) = before {
-            args.add(before).map_err(|e| sqlx::Error::Encode(e))?;
-            if !where_cause.is_empty() {
-                write!(where_cause, " AND")?;
-            }
-            write!(where_cause, " created < ${}", args.len())?;
         }
         if !where_cause.is_empty() {
             write!(sql, " WHERE {}", where_cause)?;
@@ -267,11 +229,13 @@ impl FileService {
         let record = sqlx::query_as!(
             FileEntity,
             r#"
-            SELECT id as "id: Uuid", name, hash, size, mimetype, extname,
-                ipaddr, metadata as "metadata: FileMetadata", is_encrypted,
-                is_pined, created_at, updated_at
-            FROM files
-            WHERE id = ?
+            SELECT f.id as "id: Uuid", f.name, f.hash, f.size, f.mimetype, f.extname,
+                metadata as "metadata: FileMetadata", f.ipaddr,
+                is_encrypted, f.is_pined, f.created_at, f.updated_at,
+                d.device_name as device
+            FROM files f
+            LEFT JOIN devices d ON d.id == f.device_id
+            WHERE f.id = ?
             "#,
             id
         )
@@ -301,7 +265,7 @@ impl FileService {
             .join(build_filename(&id, record.extname.as_deref()));
 
         if let Some(thumbnail_path) =
-            self.if_thumbnail(args.q.thumbnail_prefer, &id, record.extname.as_deref())
+            self.if_thumbnail(args.thumbnail_prefer, &id, record.extname.as_deref())
         {
             filepath = thumbnail_path
         };
@@ -327,7 +291,7 @@ impl FileService {
                 "timeout=15".to_string(),
             ),
         ];
-        if args.q.raw {
+        if args.raw {
             response_headers.push((
                 header::CONTENT_DISPOSITION,
                 format!("attachment; filename=\"{}\"", record.name),
@@ -338,8 +302,8 @@ impl FileService {
         }
         let total = metadata.len();
         build_response(BuildResponseArgs {
-            only_head: args.m == Method::HEAD,
-            range: args.r,
+            only_head: args.method == Method::HEAD,
+            range: args.range,
             headers: response_headers,
             reader: file,
             total,
@@ -428,24 +392,39 @@ impl FileService {
     pub async fn get_archive_entries(
         &self,
         id: Uuid,
-    ) -> anyhow::Result<Vec<ArchiveEntryResponseDto>, AppError> {
+    ) -> anyhow::Result<Vec<ArchiveResponseDto>, AppError> {
         let record = sqlx::query!(
             r#"
             SELECT 
-                id, mimetype, extname 
+                id as "id: Uuid", mimetype, extname, metadata as "metadata: FileMetadata"
             FROM files 
-            WHERE id = ? AND mimetype == 'application/x-tar'
+            WHERE id == ? AND mimetype == 'application/x-tar'
             "#,
             id
         )
         .fetch_optional(&self.pool)
         .await?;
         let record = check_record_exists(record)?;
+        match record.metadata {
+            Some(FileMetadata::Archive(meta)) => {
+                return Ok(meta.entries.into_iter().map(Into::into).collect());
+            }
+            _ => (),
+        }
         let filepath = self
             .dir
             .join(build_filename(&id, record.extname.as_deref()));
         let data = archive::parse_entries(&filepath).await?;
+        if let Err(err) = self.write_metadata(&id, data.clone().into()).await {
+            tracing::error!("Failed to write archive metadata: {}", err);
+        }
         Ok(data.into_iter().map(Into::into).collect())
+    }
+    async fn write_metadata(&self, id: &Uuid, metadata: FileMetadata) -> anyhow::Result<bool> {
+        let result = sqlx::query!("UPDATE files SET metadata = ? WHERE id = ?", metadata, id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
     }
     pub async fn get_archive_entry(
         &self,
@@ -455,7 +434,7 @@ impl FileService {
         let record = sqlx::query!(
             r#"
             SELECT 
-                id, mimetype, extname 
+                id, mimetype, extname, metadata as "metadata: FileMetadata"
             FROM files 
             WHERE id = ? AND mimetype == 'application/x-tar'
             "#,
@@ -467,11 +446,25 @@ impl FileService {
         let filepath = self
             .dir
             .join(build_filename(&id, record.extname.as_deref()));
-        let entries = archive::parse_entries(&filepath).await?;
+        let entries = match record.metadata {
+            Some(FileMetadata::Archive(meta)) => meta.entries,
+            _ => {
+                let entries = archive::parse_entries(&filepath).await?;
+                if let Err(err) = self.write_metadata(&id, entries.clone().into()).await {
+                    tracing::error!("Failed to archive metadata: {err:?}")
+                }
+                entries
+            }
+        };
         let entry = entries
             .into_iter()
             .find(|it| {
-                it.path == args.ph || it.hash.as_deref().map(|h| h == args.ph).unwrap_or_default()
+                it.path == args.path_or_hash
+                    || it
+                        .hash
+                        .as_deref()
+                        .map(|h| h == args.path_or_hash)
+                        .unwrap_or_default()
             })
             .ok_or_else(|| AppError::NotFound)?;
 
@@ -493,7 +486,7 @@ impl FileService {
                 "timeout=15".to_string(),
             ),
         ];
-        if args.q.raw {
+        if args.raw {
             response_headers.push((
                 header::CONTENT_DISPOSITION,
                 format!(
@@ -507,8 +500,8 @@ impl FileService {
         }
         let total = entry.size;
         build_response(BuildResponseArgs {
-            only_head: args.m == Method::HEAD,
-            range: args.r,
+            only_head: args.method == Method::HEAD,
+            range: args.range,
             headers: response_headers,
             reader,
             total,
@@ -848,7 +841,7 @@ mod archive {
     use std::task::Poll;
     use tar::Archive;
     use tokio::fs::File;
-    use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWriteExt, ReadBuf};
+    use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, ReadBuf};
 
     fn add_extension(path: &PathBuf, extension: impl AsRef<std::path::Path>) -> PathBuf {
         let mut path = PathBuf::from(path);
@@ -867,7 +860,6 @@ mod archive {
         use sha2::{Digest, Sha256};
         use std::io::Read;
 
-        let mut data = Vec::new();
         let idx_path = add_extension(path, "idx");
         'try_read_cache: {
             if idx_path.exists() {
@@ -880,9 +872,12 @@ mod archive {
                 if let Err(_e) = file.read_to_string(&mut str).await {
                     break 'try_read_cache;
                 };
-                if let Ok(mut d) = serde_json::from_str::<Vec<ArchiveEntry>>(&str) {
-                    data.append(&mut d);
-                    return Ok(data);
+                drop(file);
+                if let Err(err) = tokio::fs::remove_file(&idx_path).await {
+                    tracing::error!("Failed to remove archive index file: {}", err);
+                };
+                if let Ok(entries) = serde_json::from_str::<Vec<ArchiveEntry>>(&str) {
+                    return Ok(entries);
                 };
             }
         }
@@ -893,6 +888,7 @@ mod archive {
             })?;
         let file = file.into_std().await;
         let mut archive = Archive::new(file);
+        let mut entries = Vec::new();
         for entry in archive.entries()? {
             let mut entry = entry?;
             let path = entry.path()?.to_string_lossy().to_string();
@@ -924,7 +920,7 @@ mod archive {
                 None
             };
 
-            data.push(ArchiveEntry {
+            entries.push(ArchiveEntry {
                 path,
                 mtime: entry.header().mtime()?,
                 size: entry.size(),
@@ -935,15 +931,7 @@ mod archive {
                 file_position: entry.raw_file_position(),
             })
         }
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(&idx_path)
-            .await?;
-        file.write_all(serde_json::to_string(&data)?.as_bytes())
-            .await?;
-        Ok(data)
+        Ok(entries)
     }
     pub(crate) fn parse_filename_from_path(path: &str) -> String {
         path.rsplit_once('/')
