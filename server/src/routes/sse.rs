@@ -1,7 +1,7 @@
 use crate::common::AppError;
 use crate::extractors::{ClientIp, Header};
 use crate::models::dtos::notify::NotifyHeaderDto;
-use crate::models::notify::{SSEBroadcastEvent, SSEBroadcastTargets};
+use crate::models::notify::{BroadcastEvent, BroadcastScope};
 use crate::services::notify::NotifyService;
 use crate::state::AppState;
 use crate::utils::guardable;
@@ -48,19 +48,19 @@ pub async fn notify(
         move |it| -> Option<Result<sse::Event, BoxError>> {
             match it {
                 Ok((payload, targets)) => match targets {
-                    SSEBroadcastTargets::AllClients => {
+                    BroadcastScope::All => {
                         Some(Ok(sse::Event::default().data(payload.to_json())))
                     }
-                    SSEBroadcastTargets::Client(target) if target == id => {
+                    BroadcastScope::Only(target) if target == id => {
                         Some(Ok(sse::Event::default().data(payload.to_json())))
                     }
-                    SSEBroadcastTargets::ClientSet(targets) if targets.contains(&id) => {
+                    BroadcastScope::OnlySet(targets) if targets.contains(&id) => {
                         Some(Ok(sse::Event::default().data(payload.to_json())))
                     }
-                    SSEBroadcastTargets::AllExceptClient(target) if target != id => {
+                    BroadcastScope::Except(target) if target != id => {
                         Some(Ok(sse::Event::default().data(payload.to_json())))
                     }
-                    SSEBroadcastTargets::AllExceptClientSet(targets) if !targets.contains(&id) => {
+                    BroadcastScope::ExceptSet(targets) if !targets.contains(&id) => {
                         Some(Ok(sse::Event::default().data(payload.to_json())))
                     }
                     _ => None,
@@ -99,7 +99,7 @@ pub async fn notify(
     state
         .notify_service
         .send_with_client(
-            SSEBroadcastEvent::ClientRegistration(id, pin_code),
+            BroadcastEvent::ClientRegistration(id, pin_code),
             &id,
         )
         .unwrap();
