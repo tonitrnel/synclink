@@ -1,7 +1,5 @@
-use crate::models::dtos::p2p::{
-    ExchangeProtocol, P2PAcceptBodyDto, P2PCreateBodyDto, P2PDiscardBodyDto, SignalingBodyDto,
-};
-use crate::models::notify::SSEBroadcastEvent;
+use crate::models::dtos::p2p::{ExchangeProtocol, P2PAcceptBodyDto, P2PCreateBodyDto, P2PDiscardBodyDto, P2PDowngradeBodyDto, SignalingBodyDto};
+use crate::models::notify::BroadcastEvent;
 use crate::services::notify::NotifyService;
 use crate::utils::{Observer, TtiCache};
 use anyhow::Context;
@@ -10,7 +8,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 struct PeerSession {
-    support_rtc: bool,
+    supports_webrtc: bool,
     /// 主发起方 Peer ID
     primary_peer: Uuid,
     /// 次发起方 Peer ID
@@ -57,11 +55,11 @@ impl P2PService {
         };
         let request_id = Uuid::new_v4();
         self.notify_service
-            .send_with_client(SSEBroadcastEvent::P2PRequest(request_id), &receiver_id)?;
+            .send_with_client(BroadcastEvent::P2PRequest(request_id), &receiver_id)?;
         self.sessions.insert(
             request_id,
             PeerSession {
-                support_rtc: args.supports_rtc,
+                supports_webrtc: args.supports_webrtc,
                 priority: args.priority,
                 primary_peer: args.client_id,
                 secondary_peer: receiver_id,
@@ -70,7 +68,7 @@ impl P2PService {
         );
         tracing::debug!(
             "created p2p request, rtc: {}, request_id: {}",
-            args.supports_rtc,
+            args.supports_webrtc,
             request_id
         );
         Ok(request_id)
@@ -79,7 +77,7 @@ impl P2PService {
     pub fn accept_request(&self, args: P2PAcceptBodyDto) -> anyhow::Result<()> {
         tracing::debug!(
             "accepted p2p request, rtc: {}, request_id: {}",
-            args.supports_rtc,
+            args.supports_webrtc,
             args.request_id
         );
         let (protocol, sender_id, receiver_id) = {
@@ -97,8 +95,8 @@ impl P2PService {
                 anyhow::bail!("Failed to accept p2p request, sender closed.")
             }
             entry.is_established = true;
-            let protocol = if entry.support_rtc
-                && entry.support_rtc == args.supports_rtc
+            let protocol = if entry.supports_webrtc
+                && entry.supports_webrtc == args.supports_webrtc
                 && entry
                     .priority
                     .as_ref()
@@ -112,7 +110,7 @@ impl P2PService {
             (protocol, entry.primary_peer, entry.secondary_peer)
         };
         if let Err(err) = self.notify_service.send_with_clients(
-            SSEBroadcastEvent::P2PExchange(Exchange {
+            BroadcastEvent::P2PExchange(Exchange {
                 request_id: args.request_id,
                 protocol,
                 participants: vec![sender_id, receiver_id],
@@ -134,7 +132,21 @@ impl P2PService {
             entry.primary_peer
         };
         self.notify_service
-            .send_with_client(SSEBroadcastEvent::P2PSignaling(args.payload), &receiver_id)?;
+            .send_with_client(BroadcastEvent::P2PSignaling(args.payload), &receiver_id)?;
+        Ok(())
+    }
+    
+    pub fn downgrade(&self, args: P2PDowngradeBodyDto) -> anyhow::Result<()> {
+        let mut entry = self
+            .sessions
+            .get_mut(&args.request_id)
+            .with_context(|| "Failed to send signal: invalid request_id")?;
+        if !entry.is_established || (entry.primary_peer != args.client_id&&entry.secondary_peer!=args.client_id) {
+            return Ok(())
+        }
+        entry.supports_webrtc = false;
+        self.notify_service
+            .send_with_clients(BroadcastEvent::P2PDowngrade(args.request_id), vec![entry.primary_peer, entry.secondary_peer])?;
         Ok(())
     }
     pub fn discard_request(&self, args: P2PDiscardBodyDto) -> anyhow::Result<bool> {
@@ -142,9 +154,9 @@ impl P2PService {
         if let Some(entry) = self.sessions.remove(&args.request_id) {
             let evt = if entry.primary_peer == args.client_id {
                 is_primary = true;
-                SSEBroadcastEvent::P2PCanceled(args.request_id)
+                BroadcastEvent::P2PCanceled(args.request_id)
             } else {
-                SSEBroadcastEvent::P2PRejected(args.request_id)
+                BroadcastEvent::P2PRejected(args.request_id)
             };
             self.notify_service
                 .send_with_client(evt, &entry.primary_peer)?;

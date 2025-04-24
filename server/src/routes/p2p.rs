@@ -1,11 +1,8 @@
 use crate::common::AppError;
 use crate::extractors::Header;
-use crate::models::dtos::p2p::{
-    P2PAcceptBodyDto, P2PCreateBodyDto, P2PDiscardBodyDto, SignalingBodyDto, SocketProxyHeaderDto,
-};
+use crate::models::dtos::p2p::{P2PAcceptBodyDto, P2PCreateBodyDto, P2PDiscardBodyDto, P2PDowngradeBodyDto, SignalingBodyDto, SocketProxyHeaderDto};
 use crate::state::AppState;
-use axum::Json;
-use axum::extract::{ConnectInfo, State, WebSocketUpgrade};
+use axum::extract::{ConnectInfo, Json, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use std::net::SocketAddr;
 
@@ -52,7 +49,13 @@ pub async fn signaling(
     state.p2p_service.signaling(form)?;
     Ok(Json("ok!"))
 }
-
+pub async fn downgrade(
+    State(state): State<AppState>,
+    Json(form): Json<P2PDowngradeBodyDto>,
+) -> anyhow::Result<impl IntoResponse, AppError> {
+    state.p2p_service.downgrade(form)?;
+    Ok(Json("ok!"))
+}
 /// 用于不支持 WebRTC 时使用服务充当代理
 pub async fn relay(
     State(state): State<AppState>,
