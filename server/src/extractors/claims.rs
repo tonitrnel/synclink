@@ -68,7 +68,7 @@ where
     }
 }
 
-pub struct OptionalUserId(Option<Uuid>);
+pub struct OptionalUserId(pub Option<Uuid>);
 
 impl<S> FromRequestParts<S> for OptionalUserId
 where
