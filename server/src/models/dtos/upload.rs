@@ -17,7 +17,7 @@ pub struct UploadHeaderDto {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct StartSessionQueryDto {
+pub struct StartSessionBodyDto {
     pub hash: Option<String>,
     pub size: u64,
 }
@@ -28,7 +28,7 @@ pub struct AppendPartQueryDto {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct FinalizeQueryDto {
+pub struct FinalizeBodyDto {
     pub tags: Option<String>,
     pub caption: Option<String>,
     pub filename: Option<String>,

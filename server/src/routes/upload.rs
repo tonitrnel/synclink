@@ -1,13 +1,13 @@
 use crate::common::{ApiResult, AppError};
-use crate::extractors::{ClientIp, DeviceId, Header};
+use crate::extractors::{ClientIp, DeviceId, Header, OptionalUserId};
 use crate::models::dtos::upload::{PreflightQueryDto, UploadHeaderDto, UploadQueryDto};
 use crate::services::upload::UploadArgs;
 use crate::state::AppState;
 use crate::utils::decode_uri;
-use axum::extract::{Query, Request, State};
-use axum::http::{header, StatusCode};
-use axum::response::{AppendHeaders, IntoResponse};
 use axum::Json;
+use axum::extract::{Query, Request, State};
+use axum::http::{StatusCode, header};
+use axum::response::{AppendHeaders, IntoResponse};
 
 /// 上传文件
 pub async fn upload(
@@ -16,6 +16,7 @@ pub async fn upload(
     Query(query): Query<UploadQueryDto>,
     Header(header): Header<UploadHeaderDto>,
     DeviceId(device_id): DeviceId,
+    OptionalUserId(user_id): OptionalUserId,
     request: Request,
 ) -> ApiResult<impl IntoResponse> {
     let tags = query
@@ -43,7 +44,7 @@ pub async fn upload(
         .upload(
             stream,
             UploadArgs {
-                user_id: None,
+                user_id,
                 device_id,
                 hash,
                 ipaddr,
@@ -60,26 +61,23 @@ pub async fn upload(
 
 /// 分片上传相关接口
 pub mod multipart {
-    use crate::common::{ApiResult, AppError};
-    use crate::extractors::{ClientIp, DeviceId};
-    use crate::models::dtos::upload::{
-        AppendPartQueryDto, FinalizeQueryDto, StartSessionQueryDto,
-    };
+    use crate::common::ApiResult;
+    use crate::extractors::{ClientIp, DeviceId, OptionalUserId};
+    use crate::models::dtos::upload::{AppendPartQueryDto, FinalizeBodyDto, StartSessionBodyDto};
     use crate::services::upload::UploadPartArgs;
     use crate::state::AppState;
-    use crate::utils::decode_uri;
-    use axum::extract::{Path, Query, Request, State};
+    use axum::extract::{Json, Path, Query, Request, State};
     use axum::http::StatusCode;
     use axum::response::{AppendHeaders, IntoResponse};
-    use axum::Json;
     use uuid::Uuid;
 
     /// 开启一个新的分片会话
     pub async fn start_session(
         State(state): State<AppState>,
-        Query(query): Query<StartSessionQueryDto>,
+        OptionalUserId(user_id): OptionalUserId,
+        Json(body): Json<StartSessionBodyDto>,
     ) -> ApiResult<impl IntoResponse> {
-        if let Some(hash) = query.hash.as_ref() {
+        if let Some(hash) = body.hash.as_ref() {
             if let Some(uuid) = state.file_service.exists(hash).await? {
                 return Ok((
                     StatusCode::CONFLICT,
@@ -90,7 +88,7 @@ pub mod multipart {
         };
         let (id, start) = state
             .upload_service
-            .allocate(None, query.hash, query.size)
+            .allocate(user_id, body.hash, body.size)
             .await?;
         Ok((StatusCode::CREATED, format!("{id};{start}")).into_response())
     }
@@ -99,11 +97,12 @@ pub mod multipart {
     pub async fn finalize(
         State(state): State<AppState>,
         Path(id): Path<Uuid>,
-        Query(query): Query<FinalizeQueryDto>,
         ClientIp(ipaddr): ClientIp,
         DeviceId(device_id): DeviceId,
+        OptionalUserId(user_id): OptionalUserId,
+        Json(body): Json<FinalizeBodyDto>,
     ) -> ApiResult<impl IntoResponse> {
-        let tags = query
+        let tags = body
             .tags
             .as_ref()
             .map(|it| {
@@ -113,23 +112,19 @@ pub mod multipart {
             })
             .unwrap_or_default();
 
-        let caption = query.caption.clone().unwrap_or_default();
-        let filename = query
-            .filename
-            .as_ref()
-            .map(|it| decode_uri(it).map_err(AppError::from))
-            .transpose()?;
+        let caption = body.caption.unwrap_or_default();
+        let filename = body.filename;
         state
             .upload_service
             .concatenate(
                 id,
                 UploadPartArgs {
-                    user_id: None,
+                    user_id,
                     device_id,
                     ipaddr,
                     tags,
                     caption,
-                    mimetype: query.mimetype,
+                    mimetype: body.mimetype,
                     filename,
                 },
             )
