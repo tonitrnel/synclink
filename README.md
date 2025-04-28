@@ -4,7 +4,7 @@ Ephemera: Store Temporarily, Transfer Instantly
 
 Ephemera 是一个设计用于运行在 NAS、软路由等能部署 Docker 设备上的程序，目的是⽤于临时存储来自多个设备的⽂本、图像、⽂件或通过 WebRTC 或 WebSocket 进行直接传输。
 
-![screenshots](./docs/screenshot1.png)
+![screenshots](./docs/new-screenshot.png)
 
 ## 功能
 
