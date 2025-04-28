@@ -1,0 +1,1 @@
+export type RenderProps = object

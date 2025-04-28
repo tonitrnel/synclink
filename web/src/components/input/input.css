@@ -1,0 +1,22 @@
+.input-gradient {
+    position: relative;
+    z-index: 2;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        bottom: 0;
+        inset-inline-start: 0;
+        width: 100%;
+        height: 100px;
+        pointer-events: none;
+        z-index: -1;
+        background: linear-gradient(
+                180deg,
+                oklch(1 0 0 / 0%),
+                oklch(1 0 0 / 100%) 60%
+        );
+    }
+}
+

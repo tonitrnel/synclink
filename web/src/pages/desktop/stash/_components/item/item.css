@@ -1,0 +1,40 @@
+@import 'photoswipe/dist/photoswipe.css';
+
+@reference "~/pages/global.css";
+
+/* Item */
+.item {
+}
+
+@media screen and (max-width: 780px) {
+    .item {
+        margin-bottom: 0;
+    }
+}
+
+.item-title {
+    @apply mt-0 font-semibold;
+}
+
+@layer components {
+    :where(.item-action-button) {
+        @apply inline-flex cursor-pointer items-center border-none bg-transparent p-0 leading-none text-gray-500;
+
+        svg {
+            @apply mr-1;
+        }
+        &:hover {
+            @apply text-gray-800;
+        }
+        &:active {
+            text-shadow: 0 1px 0 #333;
+            text-decoration: underline dotted;
+        }
+    }
+}
+
+/* Preview Item */
+
+.item-preview {
+    max-width: 100%;
+}

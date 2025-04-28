@@ -5,17 +5,17 @@
  * @param delay
  * @this null
  */
-export function debounce<T extends (...args: any[]) => void>(
-  func: T,
-  delay = 500,
+export function debounce<T extends (...args: unknown[]) => void>(
+    func: T,
+    delay = 500,
 ) {
-  let timeout: number | null = null;
-  return (...args: Parameters<T>) => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-    }
-    timeout = window.setTimeout(() => {
-      func(...args);
-    }, delay);
-  };
+    let timeout: number | null = null;
+    return (...args: Parameters<T>) => {
+        if (timeout !== null) {
+            clearTimeout(timeout);
+        }
+        timeout = window.setTimeout(() => {
+            func(...args);
+        }, delay);
+    };
 }

@@ -1,0 +1,25 @@
+@reference "~/pages/global.css";
+
+@layer components {
+    :where(.ui-scroll-area) {
+        @apply relative overflow-hidden;
+
+        .ui-scroll-area-viewport {
+            @apply h-full w-full rounded-[inherit];
+        }
+
+        .ui-scroll-area-scrollbar {
+            @apply flex touch-none transition-colors select-none;
+            &.vertical {
+                @apply h-full w-2.5 border-l border-l-transparent p-[1px];
+            }
+            &.horizontal {
+                @apply h-2.5 flex-col border-t border-t-transparent p-[1px];
+            }
+        }
+
+        .ui-scroll-area-thumb {
+            @apply bg-border relative flex-1 rounded-full;
+        }
+    }
+}

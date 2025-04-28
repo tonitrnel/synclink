@@ -1,3 +1,3 @@
 export default function TransferPage() {
-  return <div>TransferPage</div>;
+    return <div>TransferPage</div>;
 }

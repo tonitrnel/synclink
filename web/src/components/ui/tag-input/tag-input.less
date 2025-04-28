@@ -1,35 +1,35 @@
 .ui-tag-input {
-  @apply flex flex-wrap gap-1 items-center text-sm;
-  @apply rounded-md border border-input shadow-sm transition-colors;
-  min-height: 2.25rem;
-  padding: 0.25rem;
-  &:focus-within{
-    @apply ring-1 ring-ring;
-  }
-  & > div {
-    @apply flex items-center h-6 bg-secondary rounded leading-normal;
-    &[data-state='active'] {
-      @apply ring-ring ring-2 ring-offset-2 ring-offset-background;
+    @apply flex flex-wrap items-center gap-1 text-sm;
+    @apply border-input rounded-md border shadow-sm transition-colors;
+    min-height: 2.25rem;
+    padding: 0.25rem;
+    &:focus-within {
+        @apply ring-ring ring-1;
     }
-    span {
-      @apply py-1 px-2 text-sm rounded bg-transparent;
+    & > div {
+        @apply bg-secondary flex h-6 items-center rounded leading-normal;
+        &[data-state='active'] {
+            @apply ring-ring ring-offset-background ring-2 ring-offset-2;
+        }
+        span {
+            @apply rounded bg-transparent px-2 py-1 text-sm;
+        }
+        svg {
+            @apply mr-1 flex cursor-pointer rounded bg-transparent opacity-70;
+            &:hover {
+                @apply opacity-100;
+            }
+        }
     }
-    svg {
-      @apply flex rounded bg-transparent mr-1 cursor-pointer opacity-70;
-      &:hover{
-        @apply opacity-100;
-      }
-    }
-  }
-  & > input {
-    min-width: 4rem;
-    @apply text-sm h-6 bg-transparent pl-2 pr-1 py-1 leading-normal flex-1 w-full;
+    & > input {
+        min-width: 4rem;
+        @apply h-6 w-full flex-1 bg-transparent py-1 pr-1 pl-2 text-sm leading-normal;
 
-    &:focus {
-      @apply outline-none;
+        &:focus {
+            @apply outline-none;
+        }
     }
-  }
-  & > div + input {
-    @apply pl-1;
-  }
+    & > div + input {
+        @apply pl-1;
+    }
 }

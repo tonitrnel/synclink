@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { produce } from 'immer';
 import { Dispatch, SetStateAction } from 'react';
 
@@ -10,11 +11,11 @@ type InferState<T> = T extends Dispatch<SetStateAction<infer U>> ? U : never;
  * @example withProduce(setState, (draft) => void (draft.push("str")))
  */
 export const withProduce = <
-  T extends Dispatch<SetStateAction<any>>,
-  S extends any = InferState<T>
+    T extends Dispatch<SetStateAction<any>>,
+    S = InferState<T>,
 >(
-  dispatch: T,
-  recipe: (draft: S) => void
+    dispatch: T,
+    recipe: (draft: S) => void,
 ) => {
-  dispatch((prevState: any) => produce(prevState, recipe));
+    dispatch((prevState: any) => produce(prevState, recipe));
 };

@@ -1,13 +1,31 @@
 import { FC } from 'react';
+import { MenuIcon } from 'lucide-react';
+import { Button } from '~/components/ui/button';
 
 export interface TitleBarProps {
-  title: string;
+    externalProps: {
+        title: string;
+    };
+    showMenu?: boolean;
+
+    onClickMenu?(): void;
 }
 
-export const TitleBar: FC<TitleBarProps> = ({ title }) => {
-  return (
-    <header className="flex items-center justify-between border-b bg-white px-6 py-3 h-[50px]">
-      <h2 className="text-lg font-medium capitalize leading-none">{title}</h2>
-    </header>
-  );
+export const TitleBar: FC<TitleBarProps> = ({
+    externalProps: { title },
+    showMenu,
+    onClickMenu,
+}) => {
+    return (
+        <header className="flex h-[50px] items-center gap-2 border-b bg-white/80 px-6 py-3">
+            {showMenu && (
+                <Button variant="ghost" size="icon" onClick={onClickMenu}>
+                    <MenuIcon className="size-5" />
+                </Button>
+            )}
+            <h2 className="text-lg leading-none font-medium capitalize">
+                {title}
+            </h2>
+        </header>
+    );
 };

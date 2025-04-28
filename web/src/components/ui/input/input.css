@@ -1,25 +1,25 @@
 @reference "~/pages/global.css";
 
 @layer components {
-  .ui-input {
-    @apply flex h-9 w-full px-3 py-1 text-sm bg-transparent;
-    @apply rounded-md border border-input;
-    @apply shadow-sm transition-colors;
+    .ui-input {
+        @apply flex h-9 w-full bg-transparent px-3 py-1 text-sm;
+        @apply border-input rounded-md border;
+        @apply shadow-sm transition-colors;
 
-    &:focus-visible {
-      @apply outline-none ring-1 ring-ring;
-    }
+        &:focus-visible {
+            @apply ring-ring ring-1 outline-none;
+        }
 
-    &:disabled {
-      @apply cursor-not-allowed opacity-50;
-    }
+        &:disabled {
+            @apply cursor-not-allowed opacity-50;
+        }
 
-    &::placeholder {
-      @apply text-muted-foreground;
-    }
+        &::placeholder {
+            @apply text-muted-foreground;
+        }
 
-    &[type='file'] {
-      @apply border-0 bg-transparent text-sm font-medium;
+        &[type='file'] {
+            @apply border-0 bg-transparent text-sm font-medium;
+        }
     }
-  }
 }

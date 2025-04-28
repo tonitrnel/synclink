@@ -2,13 +2,13 @@
 /// <reference types="./constants/wicg-file-system-access" />
 
 declare module '*.svg' {
-  import * as React from 'react';
+    import * as React from 'react';
 
-  export const ReactComponent: React.FunctionComponent<
-    React.SVGProps<SVGSVGElement> & { title?: string }
-  >;
+    export const ReactComponent: React.FunctionComponent<
+        React.SVGProps<SVGSVGElement> & { title?: string }
+    >;
 
-  export default ReactComponent;
+    export default ReactComponent;
 }
 
 declare const __ENDPOINT__: string;
