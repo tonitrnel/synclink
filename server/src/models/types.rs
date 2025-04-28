@@ -117,7 +117,7 @@ impl Cursor {
         is_asc: bool,
         table: &str,
     ) -> anyhow::Result<(), AppError> {
-        let direction = if is_asc { "<" } else { ">" };
+        let direction = if is_asc { ">" } else { "<" };
         if let Some(created_at) = self.created_at.as_ref() {
             args.add(*created_at).map_err(|e| sqlx::Error::Encode(e))?;
             args.add(self.id).map_err(|e| sqlx::Error::Encode(e))?;
@@ -276,9 +276,9 @@ impl CursorPager {
         } else if let Some(before) = self.before.as_ref() {
             before.write_order_cause(writer, false, table)?;
         } else if self.last.is_some() {
-            write!(writer, "{} ", Cursor::order_cause(true, true, table))?;
-        } else {
             write!(writer, "{} ", Cursor::order_cause(true, false, table))?;
+        } else {
+            write!(writer, "{} ", Cursor::order_cause(true, true, table))?;
         }
         Ok(())
     }

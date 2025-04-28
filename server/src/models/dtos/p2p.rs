@@ -13,6 +13,7 @@ pub enum ExchangeProtocol {
     WebRTC,
     WebSocket,
 }
+
 #[derive(Debug, Deserialize)]
 pub struct P2PCreateBodyDto {
     pub client_id: Uuid,

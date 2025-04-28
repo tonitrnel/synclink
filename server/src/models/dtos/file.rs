@@ -61,6 +61,7 @@ pub struct FileQueryDto {
     pub raw: Option<String>,
     pub thumbnail_prefer: Option<String>,
 }
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct FileHeaderDto {
@@ -89,7 +90,7 @@ impl FileMetadataResponseDto {
 
 impl From<FileMetadata> for FileMetadataResponseDto{
     fn from(value: FileMetadata) -> Self {
-        match value { 
+        match value {
             FileMetadata::Image(image) => FileMetadataResponseDto::Image(image),
             FileMetadata::Archive(archive) => {
                 FileMetadataResponseDto::Archive(ArchiveMetadataResponseDto{
