@@ -45,7 +45,7 @@ impl BroadcastEvent {
                 .to_string();
             }
             BroadcastEvent::P2PRequest(uid) => ("P2P_REQUEST", uid),
-            BroadcastEvent::P2PRejected(uid) => ("P2P_REJECT", uid),
+            BroadcastEvent::P2PRejected(uid) => ("P2P_REJECTED", uid),
             BroadcastEvent::P2PCanceled(uid) => ("P2P_CANCELED", uid),
             BroadcastEvent::P2PExchange(value) => return value.to_json(),
             BroadcastEvent::P2PSignaling(value) => {

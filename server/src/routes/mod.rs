@@ -96,11 +96,20 @@ pub fn build() -> Router<AppState> {
         .layer(TraceIdLayer::new())
         .layer(
             tower_http::cors::CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods(tower_http::cors::Any)
-                .expose_headers(tower_http::cors::Any)
-                .allow_headers([
-                    axum::http::header::AUTHORIZATION,
-                ]),
+                .allow_origin(
+                    "http://localhost:8081"
+                        .parse::<axum::http::HeaderValue>()
+                        .unwrap(),
+                )
+                .allow_methods([
+                    axum::http::Method::GET,
+                    axum::http::Method::HEAD,
+                    axum::http::Method::POST,
+                    axum::http::Method::PUT,
+                    axum::http::Method::DELETE,
+                ])
+                .allow_credentials(true)
+                .expose_headers([axum::http::header::CONTENT_RANGE])
+                .allow_headers([axum::http::header::AUTHORIZATION]),
         )
 }

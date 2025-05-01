@@ -21,16 +21,16 @@ pub async fn notify(
     let ipaddr = ip.unwrap_or("unknown".to_string());
     let user_agent = header.user_agent;
     tracing::trace!("client `{}@{}` connected", ipaddr, user_agent);
-    let resume_secret = header
+    let rc_token = header
         .cookie
         .as_ref()
         .map(|it| it.split("; "))
-        .and_then(|mut it| it.find(|part| part.starts_with("resume_secret=")))
+        .and_then(|mut it| it.find(|part| part.starts_with("rc-token=")))
         .and_then(|it| it.split_once('='))
         .map(|(_k, v)| v.trim().to_string());
-    let (id, resume_secret, guard) = resume_secret
-        .and_then(|resume_secret| {
-            NotifyService::try_resume_client(resume_secret, state.notify_service.clone())
+    let (id, rc_token, guard) = rc_token
+        .and_then(|rc_token| {
+            NotifyService::try_resume_client(rc_token, state.notify_service.clone())
         })
         .unwrap_or_else(|| {
             NotifyService::create_client(ipaddr, user_agent, state.notify_service.clone())
@@ -38,19 +38,24 @@ pub async fn notify(
     let receiver = state.notify_service.subscribe();
     let headers = AppendHeaders([(
         SET_COOKIE,
-        format!(
-            "resume_secret={}; HttpOnly; Secure; SameSite=Strict; Path=/",
-            resume_secret
-        ),
+        if cfg!(debug_assertions) {
+            format!(
+                "rc-token={};HttpOnly; Secure; SameSite=None; Path=/",
+                rc_token
+            )
+        } else {
+            format!(
+                "rc-token={}; HttpOnly; Secure; SameSite=Strict; Path=/",
+                rc_token
+            )
+        },
     )]);
 
     let notify_stream = wrappers::BroadcastStream::new(receiver).filter_map(
         move |it| -> Option<Result<sse::Event, BoxError>> {
             match it {
                 Ok((payload, targets)) => match targets {
-                    BroadcastScope::All => {
-                        Some(Ok(sse::Event::default().data(payload.to_json())))
-                    }
+                    BroadcastScope::All => Some(Ok(sse::Event::default().data(payload.to_json()))),
                     BroadcastScope::Only(target) if target == id => {
                         Some(Ok(sse::Event::default().data(payload.to_json())))
                     }

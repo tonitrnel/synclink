@@ -13,4 +13,5 @@ pub struct SseClientResponseDto {
     pub id: Uuid,
     pub ip_alias: Option<String>,
     pub user_agent: String,
+    pub active: bool,
 }

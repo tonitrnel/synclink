@@ -36,8 +36,7 @@ pub struct SseClientInfo {
     secret: String,
 }
 
-type SendResult =
-    Result<usize, broadcast::error::SendError<(BroadcastEvent, BroadcastScope)>>;
+type SendResult = Result<usize, broadcast::error::SendError<(BroadcastEvent, BroadcastScope)>>;
 impl NotifyService {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(8);
@@ -151,7 +150,18 @@ impl NotifyService {
                 id: *entry.key(),
                 ip_alias: device_ip_tags.and_then(|tags| tags.get(&entry.ipaddr).cloned()),
                 user_agent: entry.user_agent.clone(),
+                active: true,
             })
+            .chain(
+                self.inactive_clients
+                    .iter()
+                    .map(|entry| SseClientResponseDto {
+                        id: entry.key().clone_key(),
+                        ip_alias: device_ip_tags.and_then(|tags| tags.get(&entry.ipaddr).cloned()),
+                        user_agent: entry.user_agent.clone(),
+                        active: false,
+                    }),
+            )
             .collect::<Vec<_>>();
         data
     }
@@ -186,22 +196,15 @@ impl NotifyService {
         self.sender.send((event, BroadcastScope::All))
     }
     pub fn send_with_client(&self, event: BroadcastEvent, conn_id: &Uuid) -> SendResult {
-        self.sender
-            .send((event, BroadcastScope::Only(*conn_id)))
+        self.sender.send((event, BroadcastScope::Only(*conn_id)))
     }
     pub fn send_without_client(&self, event: BroadcastEvent, conn_id: &Uuid) -> SendResult {
-        self.sender
-            .send((event, BroadcastScope::Except(*conn_id)))
+        self.sender.send((event, BroadcastScope::Except(*conn_id)))
     }
     pub fn send_with_clients(&self, event: BroadcastEvent, conn_ids: Vec<Uuid>) -> SendResult {
-        self.sender
-            .send((event, BroadcastScope::OnlySet(conn_ids)))
+        self.sender.send((event, BroadcastScope::OnlySet(conn_ids)))
     }
-    pub fn send_without_clients(
-        &self,
-        event: BroadcastEvent,
-        conn_ids: Vec<Uuid>,
-    ) -> SendResult {
+    pub fn send_without_clients(&self, event: BroadcastEvent, conn_ids: Vec<Uuid>) -> SendResult {
         self.sender
             .send((event, BroadcastScope::ExceptSet(conn_ids)))
     }
