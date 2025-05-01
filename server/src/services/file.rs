@@ -674,8 +674,29 @@ impl FileService {
         Ok(())
     }
 
+    #[allow(unused)]
+    #[inline]
     pub fn get_storage_dir(&self) -> &Path {
         self.dir.as_path()
+    }
+
+    pub async fn update_image_metadata(
+        &self,
+        id: Uuid,
+        metadata: ImageFileMetadata,
+    ) -> anyhow::Result<bool, AppError> {
+        let metadata = FileMetadata::Image(metadata);
+        let result = sqlx::query!(
+            r#"
+                UPDATE files SET metadata = ? 
+                WHERE id = ? AND mimetype LIKE 'image/%' AND metadata is NULL
+            "#,
+            metadata,
+            id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
     }
 }
 

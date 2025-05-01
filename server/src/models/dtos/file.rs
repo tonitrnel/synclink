@@ -129,3 +129,9 @@ impl From<ArchiveEntry> for ArchiveResponseDto {
         }
     }
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum PatchFileMetadataBodyDto{
+    Image(ImageFileMetadata),
+}

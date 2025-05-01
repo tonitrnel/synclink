@@ -1,9 +1,7 @@
 use crate::common::ApiResult;
 use crate::extractors::Header;
 use crate::models::CursorPager;
-use crate::models::dtos::file::{
-    FileCollectionQueryDto, FileHeaderDto, FileQueryDto, FileRecordQueryDto, FileRecordResponseDto,
-};
+use crate::models::dtos::file::{FileCollectionQueryDto, FileHeaderDto, FileQueryDto, FileRecordQueryDto, FileRecordResponseDto, PatchFileMetadataBodyDto};
 use crate::models::dtos::pagination::PaginationDto;
 use crate::services::file::{GetArchiveEntryArgs, GetContentArgs, ListArgs, TotalArgs};
 use crate::state::AppState;
@@ -91,6 +89,20 @@ pub async fn get_metadata(
     let entry = state.file_service.get_by_id(id).await?;
 
     Ok(Json(FileRecordResponseDto::from(entry)))
+}
+
+/// 更新文件元数据，适用于服务端没有元数据的情况
+pub async fn patch_metadata(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<PatchFileMetadataBodyDto>,
+)-> ApiResult<impl IntoResponse>{
+    match body { 
+        PatchFileMetadataBodyDto::Image(metadata) => {
+            state.file_service.update_image_metadata(id, metadata).await?;
+        }
+    }
+    Ok(Json("ok!"))
 }
 
 /// 删除文件

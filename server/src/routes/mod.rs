@@ -12,7 +12,7 @@ use axum::http::Request;
 use axum::response::Response;
 use axum::{
     Router,
-    routing::{delete, get, head, post, put},
+    routing::{delete, get, head, patch, post, put},
 };
 use std::time::Duration;
 use tracing::Span;
@@ -56,6 +56,7 @@ pub fn build() -> Router<AppState> {
         .route("/api/file/text-collection", post(file::get_text_collection))
         .route("/api/file/list", get(file::list))
         .route("/api/file/{uuid}/metadata", get(file::get_metadata))
+        .route("/api/file/{uuid}/metadata", patch(file::patch_metadata))
         .route("/api/file/{uuid}", delete(file::delete))
         .route("/api/file/{uuid}", get(file::get))
         .route("/api/directory/{uuid}/{*path}", get(file::get_virtual_file))
@@ -107,6 +108,7 @@ pub fn build() -> Router<AppState> {
                     axum::http::Method::POST,
                     axum::http::Method::PUT,
                     axum::http::Method::DELETE,
+                    axum::http::Method::PATCH,
                 ])
                 .allow_credentials(true)
                 .expose_headers([axum::http::header::CONTENT_RANGE])
