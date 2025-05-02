@@ -7,10 +7,10 @@ import {
     useRef,
     useState,
 } from 'react';
-import { ReactComponent as SendIcon } from '~/assets/send.svg';
 import type { DirEntry, FilesOrEntries } from '~/constants/types.ts';
 import { useLingui } from '@lingui/react';
 import { AnimatePresence, motion, Variant } from 'framer-motion';
+import { SendIcon } from 'lucide-react';
 import dayjs from 'dayjs';
 import { createPortal } from 'react-dom';
 import './dropzone.css';

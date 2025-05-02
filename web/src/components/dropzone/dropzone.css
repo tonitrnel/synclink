@@ -20,7 +20,7 @@
         justify-content: center;
         overflow: hidden;
         flex-direction: column;
-        gap: 10px;
+        gap: 20px;
         box-sizing: border-box;
         border: 2px dashed #143cee;
         border-radius: 20px;
@@ -29,7 +29,7 @@
     }
 
     svg {
-        @apply size-12 stroke-gray-700;
+        @apply size-8 stroke-gray-700;
     }
 
     span {
