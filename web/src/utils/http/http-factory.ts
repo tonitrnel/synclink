@@ -1559,7 +1559,7 @@ const populateQueryParams = (
     if (!params) return void 0;
     url.search = Object.keys(params)
         .reduce((search, key) => {
-            search.append(key, String(params[key]));
+            if (isDef(params[key])) search.append(key, String(params[key]));
             return search;
         }, new URLSearchParams())
         .toString();
