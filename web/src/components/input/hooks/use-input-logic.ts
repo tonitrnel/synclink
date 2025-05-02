@@ -15,6 +15,7 @@ import { FilesOrEntries } from '~/constants/types.ts';
 import { useSnackbar } from '~/components/ui/snackbar';
 import { useLatestFunc, useLatestRef } from '@ptdgrp/shared';
 import { Logger } from '~/utils/logger.ts';
+import dayjs from 'dayjs';
 
 const logger = new Logger('Input');
 
@@ -51,7 +52,11 @@ export const useInputLogic = (
                         await upload({
                             type: 'multi-file',
                             files: [
-                                new File([value], '', { type: 'text/plain' }),
+                                new File(
+                                    [value],
+                                    `message_${dayjs().format('YYYY-MM-DD-HH-mm')}`,
+                                    { type: 'text/plain' },
+                                ),
                             ],
                         });
                         setText('');
