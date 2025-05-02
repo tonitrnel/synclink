@@ -38,7 +38,6 @@
     "react-dom": "18.2.0",
     "react-hook-form": "^7.55.0",
     "react-router-dom": "6.25.0",
-    "react-virtuoso": "^4.12.6",
     "sha256-binding": "file:..\\wasm\\sha256\\pkg",
     "tar-binding": "file:..\\wasm\\tar\\pkg",
     "zod": "^3.24.2",
