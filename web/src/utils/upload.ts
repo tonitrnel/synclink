@@ -52,7 +52,7 @@ const fastPerform = async (
     );
     const alreadyExists = await preflight(hash, file.size);
     if (alreadyExists) {
-        throw new Error(t`resource already exists`);
+        throw new Error(t`Resource already exists`);
     }
     return await createFileUpload({
         query: {
@@ -98,7 +98,7 @@ const slowPerform = async (
         const alreadyExists = await preflight(hash, file.size);
         if (alreadyExists) {
             manager.entryCompleteStage();
-            throw new Error(t`resource already exists`);
+            throw new Error(t`Resource already exists`);
         }
         // 100 MB
         const uid = await (
@@ -164,7 +164,7 @@ const dirPerform = async (
         },
     });
     if (await preflight(hash, size)) {
-        throw new Error(t`directory already exists`);
+        throw new Error(t`Directory already exists`);
     }
     // const headers: Record<string, string> = {
     //   'x-content-sha256': hash,

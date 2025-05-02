@@ -16,13 +16,13 @@ import { Menu } from './menu';
 import { RenderProps } from './type.ts';
 import { clsx } from '~/utils/clsx.ts';
 import { useEntry } from '../../../_hooks/use-entry.ts';
+import { patchFileMetadata } from '~/endpoints';
 
 export const ImageItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
     ({ className, ...props }) => {
         const entry = useEntry();
         const isMobile = useMediaQuery(useMediaQuery.MOBILE_QUERY);
-        const [{ loaded, metadata }, setState] = useState(() => ({
-            loaded: false,
+        const [{ metadata }, setState] = useState(() => ({
             metadata:
                 entry.metadata?.type == 'image' ? entry.metadata : undefined,
         }));
@@ -44,18 +44,32 @@ export const ImageItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
                 lightbox.destroy();
             };
         }, [metadata, id, isMobile, entry.mimetype]);
-        const onLoad = useCallback((evt: SyntheticEvent<HTMLImageElement>) => {
-            withProduce(setState, (draft) => {
-                draft.loaded = true;
-                if (!draft.metadata) {
+        const onLoad = useCallback(
+            (evt: SyntheticEvent<HTMLImageElement>) => {
+                if (entry.metadata?.type == 'image') {
+                    return;
+                }
+                // 或许这里可以将 metadata 更新到服务器？
+                patchFileMetadata({
+                    path: {
+                        id: entry.id,
+                    },
+                    body: {
+                        type: 'image',
+                        width: evt.currentTarget.naturalWidth,
+                        height: evt.currentTarget.naturalHeight,
+                    },
+                }).catch(console.warn);
+                withProduce(setState, (draft) => {
                     draft.metadata = {
                         type: 'image',
                         width: evt.currentTarget.naturalWidth,
                         height: evt.currentTarget.naturalHeight,
                     };
-                }
-            });
-        }, []);
+                });
+            },
+            [entry.id, entry.metadata?.type],
+        );
         const onError = useCallback(() => {
             console.warn('Error while loading image', entry.id);
         }, [entry.id]);
@@ -83,18 +97,16 @@ export const ImageItem: FC<HTMLAttributes<HTMLDivElement> & RenderProps> = memo(
                             style={{
                                 height: metadata?.thumbnail_height
                                     ? `${metadata.thumbnail_height}px`
-                                    : undefined,
+                                    : 220,
                                 width: metadata?.thumbnail_width
                                     ? `${metadata.thumbnail_width}px`
                                     : undefined,
                             }}
                         />
                     </a>
-                    {loaded && (
-                        <figcaption className="mt-2 w-full truncate overflow-hidden text-right text-sm text-gray-500 italic">
-                            {entry.name}
-                        </figcaption>
-                    )}
+                    <figcaption className="mt-2 w-full truncate overflow-hidden text-right text-sm text-gray-500 italic">
+                        {entry.name}
+                    </figcaption>
                 </figure>
 
                 <div className="mt-4 flex items-center justify-between">

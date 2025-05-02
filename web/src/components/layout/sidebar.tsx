@@ -117,21 +117,21 @@ export const Sidebar: FC<SidebarProps> = () => {
                             active={activeTab === 'stash'}
                             onClick={() => setActiveTab('stash')}
                         >
-                            {t`暂存区`}
+                            {t`Stash`}
                         </NavItem>
                         <NavItem
                             icon={<Share2Icon size={18} />}
                             active={activeTab === 'transfer'}
                             onClick={() => setActiveTab('transfer')}
                         >
-                            {t`互联`}
+                            {t`Transfer`}
                         </NavItem>
                         <NavItem
                             icon={<SettingsIcon size={18} />}
                             active={activeTab === 'settings'}
                             onClick={() => setActiveTab('settings')}
                         >
-                            {t`设置`}
+                            {t`Settings`}
                         </NavItem>
                     </ul>
                 </nav>
@@ -146,7 +146,7 @@ export const Sidebar: FC<SidebarProps> = () => {
                                 )}
                             />
                             <span className="block leading-none">
-                                {online ? '在线' : '离线'}
+                                {online ? t`Online` : `Offline`}
                             </span>
                         </div>
                         <div className="flex items-center gap-2.5">

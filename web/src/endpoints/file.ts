@@ -27,23 +27,23 @@ export const useListQuery = createHttpFactory('GET:/api/file/list')
                 device?: string;
                 metadata?:
                     | {
-                    type: 'image';
-                    width: number;
-                    height: number;
-                    thumbnail_width?: number;
-                    thumbnail_height?: number;
-                }
+                          type: 'image';
+                          width: number;
+                          height: number;
+                          thumbnail_width?: number;
+                          thumbnail_height?: number;
+                      }
                     | {
-                    type: 'archive';
-                    entries: {
-                        path: string;
-                        mtime: number;
-                        size: number;
-                        mimetype?: string;
-                        is_file: boolean;
-                        hash?: string;
-                    }[];
-                };
+                          type: 'archive';
+                          entries: {
+                              path: string;
+                              mtime: number;
+                              size: number;
+                              mimetype?: string;
+                              is_file: boolean;
+                              hash?: string;
+                          }[];
+                      };
                 is_encrypted: boolean;
                 is_pined: boolean;
                 created_at: number;
@@ -80,3 +80,19 @@ export const useDirectoryQuery = createHttpFactory('GET:/api/directory/{id}')
         }[]
     >()
     .makeQuery();
+
+export const patchFileMetadata = createHttpFactory(
+    'PATCH:/api/file/{id}/metadata',
+)
+    .apply<
+        'Body',
+        {
+            type: 'image';
+            width: number;
+            height: number;
+            thumbnail_width?: number;
+            thumbnail_height?: number;
+        }
+    >()
+    .apply<'Response', string>()
+    .makeRequest();

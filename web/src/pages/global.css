@@ -187,4 +187,7 @@
             outline: 1px dashed red;
         }
     }
+    .anchor-none{
+        overflow-anchor: none;
+    }
 }

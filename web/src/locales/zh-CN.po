@@ -14,173 +14,265 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/components/list/list.tsx:328
-msgid "Load previous"
-msgstr "加载之前"
+#: src/pages/mobile/index.tsx:66
+#: src/pages/desktop/stash/_components/list/list.tsx:50
+msgid "Receiving"
+msgstr "接收中"
 
 #. js-lingui-explicit-id
-#: src/components/list/list.tsx:328
-msgid "No more"
-msgstr "没有了"
+#: src/pages/mobile/file-upload/index.tsx:61
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:253
+msgid "Upload"
+msgstr "上传"
 
 #. js-lingui-explicit-id
-#: src/components/dropzone/dropzone.tsx:236
-msgid "Drag and Drop file here"
-msgstr "拖拽文件放置于此"
+#: src/pages/mobile/file-upload/index.tsx:136
+#: src/components/input/desktop-input.tsx:97
+#: src/components/input/desktop-input.tsx:98
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:215
+msgid "Upload folder"
+msgstr "上传文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/notification-message.tsx:62
-#: src/components/file-transfer-dialog/p2p-file-receiver-provider.tsx:38
-msgid "The villagers want to share some mysterious documents with you"
-msgstr "其他设备端想与您分享一些神秘文件"
+#: src/pages/mobile/file-upload/index.tsx:137
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:216
+msgid "Upload files"
+msgstr "上传文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/notification-message.tsx:67
-msgid "Do you want to receive it?"
-msgstr "你想要接收它吗？"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/notification-message.tsx:77
-msgid "Reject"
-msgstr "拒绝"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/notification-message.tsx:85
-msgid "Accept"
-msgstr "同意"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-receiver-provider.tsx:42
-msgid "Please confirm if you want to accept"
-msgstr "请确认是否接收"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:91
-#: src/components/input/desktop-input.tsx:109
-#: src/components/input/desktop-input.tsx:110
-#: src/pages/mobile/file-transfer/index.tsx:34
+#: src/pages/mobile/file-transfer/index.tsx:35
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:92
 msgid "Peer to peer file transfer"
 msgstr "端对端文件传输"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:93
-msgid "Quickly share files with other client who open this page"
-msgstr "与打开此页面的其他客户端快速共享文件"
+#: src/pages/desktop/stash/_components/item/item.tsx:49
+msgid "Shared from"
+msgstr "分享来自"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:286
-msgid "Connect"
-msgstr "连接"
+#: src/pages/desktop/stash/_components/item/item.tsx:51
+msgid "Unknown"
+msgstr "未知"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:348
-msgid "Auto"
-msgstr "自动"
+#: src/pages/desktop/stash/_components/item/base/unknown.tsx:26
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:228
+msgid "Preview"
+msgstr "预览"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:372
-msgid "User agent"
-msgstr "用户代理"
+#: src/pages/desktop/stash/_components/item/base/text.tsx:40
+msgid "Copy"
+msgstr "复制"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:378
-msgid "Protocol"
-msgstr "协议"
+#: src/pages/desktop/stash/_components/item/base/text.tsx:86
+msgid "The content of this text is a bit large, so it will not be actively load."
+msgstr "该文本内容有点大，因此不会主动加载。"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:390
-msgid "Select a protocol"
-msgstr "选择协议"
+#: src/pages/desktop/stash/_components/item/base/text.tsx:94
+msgid "Load content in viewer"
+msgstr "在查看器中加载内容"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:404
-msgid "Peer PIN"
-msgstr "连接密钥"
+#: src/pages/desktop/stash/_components/item/base/text.tsx:110
+msgid "Continue read"
+msgstr "继续阅读"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:417
-msgid "Client"
-msgstr "客户端"
+#: src/pages/desktop/stash/_components/item/base/menu.tsx:153
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:238
+msgid "Download"
+msgstr "下载"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:433
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1213
-#: src/components/ui/tree-table/tree-table.tsx:161
-msgid "No data"
-msgstr "无数据"
+#: src/pages/desktop/stash/_components/item/base/menu.tsx:166
+msgid "Share"
+msgstr "分享"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:504
-msgid "Waiting for acceptance"
-msgstr "等待接受"
+#: src/pages/desktop/stash/_components/item/base/menu.tsx:178
+msgid "Delete"
+msgstr "删除"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:508
-msgid "Testing availability"
-msgstr "测试可用性"
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:89
+msgid "Download success"
+msgstr "下载成功"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:512
-msgid "Accepted, waiting to establish connection"
-msgstr "已接受，等待连接建立"
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:105
+msgid "Download folder"
+msgstr "下载文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:515
-msgid "The peer has refused"
-msgstr "对方已拒绝"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:516
-msgid "Connection timeout"
-msgstr "连接超时"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:517
-msgid "Please enter the peer client PIN"
-msgstr "请输入对方设备密钥"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:749
-msgid "Oh! An error has occurred"
-msgstr "糟糕! 发生了一个错误"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:784
-msgid "Cancel"
-msgstr "取消"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1192
-msgid "Drag and Drop file here or"
-msgstr "拖拽文件放置于此"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1198
-msgid "Choose file"
-msgstr "选择文件"
-
-#. js-lingui-explicit-id
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1210
-msgid "History:"
-msgstr "历史"
-
-#. js-lingui-explicit-id
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:142
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:58
-#: src/components/item/components/folder.tsx:132
 msgid "Name"
 msgstr "名称"
 
 #. js-lingui-explicit-id
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:150
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:65
-#: src/components/item/components/folder.tsx:139
 msgid "Size"
 msgstr "大小"
 
 #. js-lingui-explicit-id
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:155
+msgid "Type"
+msgstr "类型"
+
+#. js-lingui-explicit-id
+#: src/pages/desktop/stash/_components/item/base/folder.tsx:160
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:70
-#: src/components/item/components/folder.tsx:149
 msgid "Last modified"
 msgstr "最后修改于"
+
+#. js-lingui-explicit-id
+#: src/components/viewer-dialog/viewer-dialog.tsx:56
+msgid "View the contents of file {filename}"
+msgstr "查看文件 \"{filename}\" 的内容"
+
+#. js-lingui-explicit-id
+#: src/components/viewer-dialog/viewer-dialog.tsx:71
+msgid "Exit fullscreen"
+msgstr "退出全屏"
+
+#. js-lingui-explicit-id
+#: src/components/viewer-dialog/viewer-dialog.tsx:72
+msgid "Enter fullscreen"
+msgstr "进入全屏"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:314
+msgid "Preparing"
+msgstr "准备中"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:324
+msgid "Hash calculating:"
+msgstr "哈希计算："
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:342
+msgid "In transit"
+msgstr "传输中"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:351
+msgid "Nearing complete"
+msgstr "即将完成"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:360
+msgid "Upload successfully"
+msgstr "上传成功"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:372
+msgid "Canceled."
+msgstr "已取消"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:388
+msgid "Total:"
+msgstr "总共："
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:391
+msgid "Length of data sent to server"
+msgstr "已发送到服务器的数据大小"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:392
+msgid "Transferred:"
+msgstr "已传输："
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:397
+msgid "Hash calculation speed or upload speed"
+msgstr "哈希计算速度或上传速度"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:399
+msgid "Speed:"
+msgstr "速度："
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:402
+msgid "Duration time"
+msgstr "持续时间"
+
+#. js-lingui-explicit-id
+#: src/components/upload-manager/upload-manager.tsx:403
+msgid "Duration:"
+msgstr "持续："
+
+#. js-lingui-explicit-id
+#: src/components/ui/tree-table/tree-table.tsx:176
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:475
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1325
+msgid "No data"
+msgstr "无数据"
+
+#. js-lingui-explicit-id
+#: src/components/input/mobile-input.tsx:75
+msgid "More"
+msgstr "更多"
+
+#. js-lingui-explicit-id
+#: src/components/input/mobile-input.tsx:95
+#: src/components/input/mobile-input.tsx:98
+#: src/components/input/desktop-input.tsx:86
+#: src/components/input/desktop-input.tsx:87
+msgid "Upload file"
+msgstr "上传文件"
+
+#. js-lingui-explicit-id
+#: src/components/input/mobile-input.tsx:106
+#: src/components/input/mobile-input.tsx:109
+msgid "Direct transfer"
+msgstr "直接传输"
+
+#. js-lingui-explicit-id
+#: src/components/input/mobile-input.tsx:126
+#: src/components/input/desktop-input.tsx:154
+msgid "Send"
+msgstr "发送"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:74
+msgid "Enter your message here..."
+msgstr "在这输入文本..."
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:108
+#: src/components/input/desktop-input.tsx:109
+msgid "Paste"
+msgstr "粘贴"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:119
+#: src/components/input/desktop-input.tsx:120
+msgid "Voice recording"
+msgstr "音频录制"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:132
+msgid "Clear"
+msgstr "清除"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:143
+msgid "Send (Ctrl + Enter)"
+msgstr "发送（Ctrl + Enter）"
+
+#. js-lingui-explicit-id
+#: src/components/input/desktop-input.tsx:150
+msgid "Sending"
+msgstr "发送中"
 
 #. js-lingui-explicit-id
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:79
@@ -188,386 +280,326 @@ msgid "You can't upload the file because the disk has exceeded its quota"
 msgstr "你无法上传文件因为磁盘容量不足"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:101
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:104
 msgid "Used:"
 msgstr "已使用："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:108
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:111
 msgid "Planned use:"
 msgstr "计划使用："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:115
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:118
 msgid "Free:"
 msgstr "剩余："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:124
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:127
 msgid "Folders:"
 msgstr "文件夹："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:124
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:128
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:127
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
 msgid "items"
 msgstr "项"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:128
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
 msgid "File:"
 msgstr "文件："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:131
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:134
 msgid "Total Size:"
 msgstr "总大小："
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:139
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:147
 msgid "Caption"
 msgstr "说明"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:147
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:163
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:156
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:174
 msgid "Optional"
 msgstr "可选"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:153
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:163
 msgid "Add tags"
 msgstr "添加标签"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:204
-#: src/components/input/desktop-input.tsx:87
-#: src/components/input/desktop-input.tsx:88
-#: src/pages/mobile/file-upload/index.tsx:136
-msgid "Upload folder"
-msgstr "上传文件夹"
-
-#. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:205
-#: src/pages/mobile/file-upload/index.tsx:137
-msgid "Upload files"
-msgstr "上传文件夹"
-
-#. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:208
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:219
 msgid "Check the files or folders to be upload"
 msgstr "检查要上传的文件或文件夹"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:234
+#: src/components/file-upload-dialog/file-upload-dialog.tsx:245
 msgid "Discard"
 msgstr "丢弃"
 
 #. js-lingui-explicit-id
-#: src/components/file-upload-dialog/file-upload-dialog.tsx:242
-#: src/pages/mobile/file-upload/index.tsx:61
-msgid "Upload"
-msgstr "上传"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:95
+msgid "Quickly share files with other client who open this page"
+msgstr "与打开此页面的其他客户端快速共享文件"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:69
-msgid "Enter your message here..."
-msgstr "在这输入文本..."
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:305
+msgid "Connect"
+msgstr "连接"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:76
-#: src/components/input/desktop-input.tsx:77
-#: src/components/input/mobile-input.tsx:89
-#: src/components/input/mobile-input.tsx:92
-msgid "Upload file"
-msgstr "上传文件"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:373
+msgid "Auto"
+msgstr "自动"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:98
-#: src/components/input/desktop-input.tsx:99
-msgid "Paste"
-msgstr "粘贴"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:398
+msgid "User agent"
+msgstr "用户代理"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:122
-msgid "Clear"
-msgstr "清除"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:406
+msgid "Protocol"
+msgstr "协议"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:133
-msgid "Send (Ctrl + Enter)"
-msgstr "发送（Ctrl + Enter）"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:422
+msgid "Select a protocol"
+msgstr "选择协议"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:140
-msgid "Sending"
-msgstr "发送中"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:438
+msgid "Peer PIN"
+msgstr "连接密钥"
 
 #. js-lingui-explicit-id
-#: src/components/input/desktop-input.tsx:144
-#: src/components/input/mobile-input.tsx:118
-msgid "Send"
-msgstr "发送"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:459
+msgid "Client"
+msgstr "客户端"
 
 #. js-lingui-explicit-id
-#: src/components/input/mobile-input.tsx:69
-msgid "More"
-msgstr "更多"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:546
+msgid "Waiting for acceptance"
+msgstr "等待接受"
 
 #. js-lingui-explicit-id
-#: src/components/input/mobile-input.tsx:98
-#: src/components/input/mobile-input.tsx:101
-msgid "Direct transfer"
-msgstr "直接传输"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:552
+msgid "Testing availability"
+msgstr "测试可用性"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/folder.tsx:84
-msgid "Download success"
-msgstr "下载成功"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:558
+msgid "Accepted, waiting to establish connection"
+msgstr "已接受，等待连接建立"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/folder.tsx:144
-msgid "Type"
-msgstr "类型"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:561
+msgid "The peer has refused"
+msgstr "对方已拒绝"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/folder.tsx:212
-#: src/components/item/components/unknown.tsx:29
-msgid "Preview"
-msgstr "预览"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:562
+msgid "Connection timeout"
+msgstr "连接超时"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/folder.tsx:221
-#: src/components/item/components/menu.tsx:138
-msgid "Download"
-msgstr "下载"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:563
+msgid "Please enter the peer client PIN"
+msgstr "请输入对方设备密钥"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/menu.tsx:150
-msgid "Share"
-msgstr "分享"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:812
+msgid "Oh! An error has occurred"
+msgstr "糟糕! 发生了一个错误"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/menu.tsx:161
-msgid "Delete"
-msgstr "删除"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:854
+msgid "Cancel"
+msgstr "取消"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:60
-msgid "Copy"
-msgstr "复制"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1303
+msgid "Drag and Drop file here or"
+msgstr "拖拽文件放置于此"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:102
-msgid "The content of this text is a bit large, so it will not be actively load."
-msgstr "该文本内容有点大，因此不会主动加载。"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1309
+msgid "Choose file"
+msgstr "选择文件"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:113
-msgid "Load content in viewer"
-msgstr "在查看器中加载内容"
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:1321
+msgid "History:"
+msgstr "历史"
 
 #. js-lingui-explicit-id
-#: src/components/item/components/text.tsx:133
-msgid "Continue read"
-msgstr "继续阅读"
+#: src/components/file-transfer-dialog/p2p-file-receiver-provider.tsx:40
+#: src/components/file-transfer-dialog/notification-message.tsx:59
+msgid "The villagers want to share some mysterious documents with you"
+msgstr "其他设备端想与您分享一些神秘文件"
 
 #. js-lingui-explicit-id
-#: src/components/item/item.tsx:82
-msgid "shared from"
-msgstr "分享来自"
+#: src/components/file-transfer-dialog/p2p-file-receiver-provider.tsx:44
+msgid "Please confirm if you want to accept"
+msgstr "请确认是否接收"
 
 #. js-lingui-explicit-id
-#: src/components/item/item.tsx:84
-msgid "unknown"
-msgstr "未知"
+#: src/components/file-transfer-dialog/notification-message.tsx:64
+msgid "Do you want to receive it?"
+msgstr "你想要接收它吗？"
 
 #. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:307
-msgid "Preparing"
-msgstr "准备中"
+#: src/components/file-transfer-dialog/notification-message.tsx:74
+msgid "Reject"
+msgstr "拒绝"
 
 #. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:315
-msgid "Hash calculating:"
-msgstr "哈希计算："
+#: src/components/file-transfer-dialog/notification-message.tsx:82
+msgid "Accept"
+msgstr "同意"
 
 #. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:324
-msgid "In transit"
-msgstr "传输中"
+#: src/components/dropzone/dropzone.tsx:271
+msgid "Drag and Drop file here"
+msgstr "拖拽文件放置于此"
 
 #. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:331
-msgid "Nearing complete"
-msgstr "即将完成"
+#: src/components/list/list.tsx:328
+#~ msgid "Load previous"
+#~ msgstr "加载之前"
 
 #. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:338
-msgid "Upload successfully"
-msgstr "上传成功"
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:346
-msgid "Canceled."
-msgstr "已取消"
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:362
-msgid "Total:"
-msgstr "总共："
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:365
-msgid "Length of data sent to server"
-msgstr "已发送到服务器的数据大小"
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:366
-msgid "Transferred:"
-msgstr "已传输："
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:369
-msgid "Hash calculation speed or upload speed"
-msgstr "哈希计算速度或上传速度"
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:370
-msgid "Speed:"
-msgstr "速度："
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:373
-msgid "Duration time"
-msgstr "持续时间"
-
-#. js-lingui-explicit-id
-#: src/components/upload-manager/upload-manager.tsx:374
-msgid "Duration:"
-msgstr "持续："
-
-#. js-lingui-explicit-id
-#: src/components/viewer-dialog/viewer-dialog.tsx:70
-msgid "Exit fullscreen"
-msgstr "退出全屏"
-
-#. js-lingui-explicit-id
-#: src/components/viewer-dialog/viewer-dialog.tsx:71
-msgid "Enter fullscreen"
-msgstr "进入全屏"
-
-#. js-lingui-explicit-id
-#: src/pages/desktop/index.tsx:46
-#: src/pages/mobile/index.tsx:67
-msgid "Receiving"
-msgstr "接收中"
+#: src/components/list/list.tsx:328
+#~ msgid "No more"
+#~ msgstr "没有了"
 
 #. js-lingui-explicit-id
 #: src/pages/mobile/index.tsx:39
-msgid "Back"
-msgstr "返回"
+#~ msgid "Back"
+#~ msgstr "返回"
 
 #. js-lingui-explicit-id
 #: src/components/file-upload-dialog/file-upload-dialog.tsx:101
 #~ msgid "Reserved:"
 #~ msgstr "保留："
 
-#: src/components/item/components/menu.tsx:103
-msgid "can't share this file"
+#: src/pages/desktop/stash/_components/item/base/menu.tsx:117
+msgid "Can't share this file"
 msgstr "无法分享这个文件"
 
-#: src/components/input/hooks/use-input-logic.ts:156
-msgid "cannot to paste such files"
+#: src/components/input/hooks/use-input-logic.ts:171
+msgid "Cannot to paste such files"
 msgstr "无法粘贴此类文件"
 
 #: src/components/ui/dialog/dialog.tsx:155
 msgid "Close"
 msgstr "关闭"
 
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:509
+#. placeholder {0}: state.delay
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:555
 msgid "Connected, delay {0}ms"
 msgstr "已连接，延迟 {0}ms"
 
-#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:505
+#. placeholder {0}: state.protocol
+#: src/components/file-transfer-dialog/p2p-file-transfer-dialog.tsx:549
 msgid "Connecting, using {0} protocol"
 msgstr "连接中，使用 {0} 协议"
 
 #: src/components/item/item.tsx:289
-#~ msgid "continue read"
+#~ msgid "Continue read"
 #~ msgstr "继续阅读"
 
 #: src/components/item/item.tsx:229
-#~ msgid "copy"
+#~ msgid "Copy"
 #~ msgstr "复制"
 
 #: src/components/item/item.tsx:159
-#~ msgid "delete"
+#~ msgid "Delete"
 #~ msgstr "删除"
 
-#: src/utils/upload.ts:171
-msgid "directory already exists"
+#: src/utils/upload.ts:167
+msgid "Directory already exists"
 msgstr "文件夹已经存在"
 
 #: src/components/item/item.tsx:141
-#~ msgid "download"
+#~ msgid "Download"
 #~ msgstr "下载"
 
 #: src/components/item/components/folder.tsx:99
-msgid "Download folder"
-msgstr "下载文件夹"
+#~ msgid "Download folder"
+#~ msgstr "下载文件夹"
 
 #: src/components/list/list.tsx:262
-msgid "no items found."
-msgstr "未找到任何记录"
+#~ msgid "No items found."
+#~ msgstr "未找到任何记录"
+
+#: src/components/layout/sidebar.tsx:149
+msgid "Online"
+msgstr "在线"
 
 #: src/components/input/input.tsx:454
-#~ msgid "paste"
+#~ msgid "Paste"
 #~ msgstr "粘贴"
 
-#: src/components/input/hooks/use-input-logic.ts:124
-msgid "paste file is empty"
+#: src/components/input/hooks/use-input-logic.ts:126
+msgid "Paste file is empty"
 msgstr "粘贴文件为空"
 
 #: src/components/list/list.tsx:329
-#~ msgid "receiving"
+#~ msgid "Receiving"
 #~ msgstr "接收中"
 
-#: src/utils/upload.ts:57
-#: src/utils/upload.ts:110
-msgid "resource already exists"
+#: src/utils/upload.ts:55
+#: src/utils/upload.ts:101
+msgid "Resource already exists"
 msgstr "资源已存在"
 
 #: src/components/input/input.tsx:399
 #: src/components/input/input.tsx:482
-#~ msgid "send"
+#~ msgid "Send"
 #~ msgstr "发送"
 
 #: src/components/input/input.tsx:478
-#~ msgid "sending"
+#~ msgid "Sending"
 #~ msgstr "发送中"
 
+#: src/components/layout/sidebar.tsx:134
+msgid "Settings"
+msgstr "设置"
+
 #: src/components/item/item.tsx:150
-#~ msgid "share"
+#~ msgid "Share"
 #~ msgstr "分享"
 
 #: src/components/item/item.tsx:474
-#~ msgid "shared from"
+#~ msgid "Shared from"
 #~ msgstr "分享来自"
 
+#: src/components/layout/sidebar.tsx:120
+msgid "Stash"
+msgstr "暂存"
+
+#: src/components/layout/sidebar.tsx:127
+msgid "Transfer"
+msgstr "传输"
+
 #: src/components/dropzone/dropzone.tsx:30
-#~ msgid "unable to paste directory"
+#~ msgid "Unable to paste directory"
 #~ msgstr "无法粘贴文件夹"
 
 #: src/components/item/item.tsx:160
-#~ msgid "unknown host"
+#~ msgid "Unknown host"
 #~ msgstr "未知主机"
 
 #: src/components/input/input.tsx:379
 #: src/components/input/input.tsx:447
-#~ msgid "upload"
+#~ msgid "Upload"
 #~ msgstr "上传"
 
 #: src/components/viewer-dialog/viewer-dialog.tsx:57
-msgid "View the contents of file \"{filename}\""
-msgstr "查看文件 \"{filename}\" 的内容"
+#~ msgid "View the contents of file \"{filename}\""
+#~ msgstr "查看文件 \"{filename}\" 的内容"

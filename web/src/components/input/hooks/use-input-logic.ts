@@ -9,7 +9,7 @@ import { executeAsyncTask } from '~/utils/execute-async-task.ts';
 import { upload } from '~/utils/upload.ts';
 import { openFilePicker } from '~/utils/open-file-picker.ts';
 import { featureCheck } from '~/utils/feature-check.ts';
-import { t } from '@lingui/macro';
+import { useLingui } from '@lingui/react/macro';
 import { IGNORE_FILE_TYPE } from '~/constants';
 import { FilesOrEntries } from '~/constants/types.ts';
 import { useSnackbar } from '~/components/ui/snackbar';
@@ -34,6 +34,7 @@ export const useInputLogic = (
     textareaRef: RefObject<HTMLTextAreaElement>,
     inputTransformer: InputTransformer,
 ) => {
+    const { t } = useLingui();
     const [text, setText] = useState('');
     const textRef = useLatestRef(text);
     const [transmitting, setTransmitting] = useState(false);
@@ -123,7 +124,7 @@ export const useInputLogic = (
                         const data = await navigator.clipboard.read();
                         if (data.length === 0) {
                             snackbar.enqueueSnackbar({
-                                message: t`paste file is empty`,
+                                message: t`Paste file is empty`,
                                 variant: 'warning',
                             });
                             return void 0;
@@ -168,7 +169,7 @@ export const useInputLogic = (
                             ) {
                                 logger.error('cannot to paste such files');
                                 snackbar.enqueueSnackbar({
-                                    message: t`cannot to paste such files`,
+                                    message: t`Cannot to paste such files`,
                                     variant: 'error',
                                 });
                             } else {
@@ -242,11 +243,9 @@ export const useInputLogic = (
                         }
                     }
                 };
-                openVoiceRecorder = async () => {
-
-                }
+                openVoiceRecorder = async () => {};
             })(),
-        [snackbar, textRef, textareaRef, transformer],
+        [snackbar, t, textRef, textareaRef, transformer],
     );
     const transmittable = useMemo(() => text.trim().length > 0, [text]);
     return {

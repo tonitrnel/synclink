@@ -46,15 +46,15 @@ const ItemImpl = forwardRef<
             return <span className="ml-2">shared from unknown</span>;
         return (
             <span className="ml-2">
-                <span className="text-gray-400">{i18n._('shared from')}</span>
+                <span className="text-gray-400">{i18n._('Shared from')}</span>
                 <span className="ml-1 text-gray-500">
-                    {data.device || data.ipaddr || i18n._('unknown')}
+                    {data.device || data.ipaddr || i18n._('Unknown')}
                 </span>
             </span>
         );
     }, [i18n, data.device, data.ipaddr]);
     const Render = ItemTypeComponentMap[data.__extras__.itemType];
-    console.count(data.id);
+    // console.count(data.id);
     return (
         <div
             ref={composedRefs}

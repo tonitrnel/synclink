@@ -6,9 +6,11 @@ type SseMessageMap = {
     USER_CONNECTED: string;
     USER_DISCONNECTED: string;
     CLIENT_ID: string;
-    P2P_REQUEST: string;
-    P2P_REJECT: string;
     HEART: number;
+    P2P_REQUEST: string;
+    P2P_REJECTED: string;
+    P2P_CANCELED: string;
+    P2P_DOWNGRADED: string;
     P2P_EXCHANGE: {
         request_id: string;
         protocol: 'webrtc' | 'websocket';
@@ -59,6 +61,7 @@ class NotifyManager extends EventBus<
             return await new Promise((resolve, reject) => {
                 const eventSource = new EventSource(
                     `${__ENDPOINT__}/api/notify`,
+                    { withCredentials: true },
                 );
                 eventSource.onmessage = this.handleMessage;
                 const timer = window.setTimeout(() => {

@@ -8,9 +8,9 @@
 export function debounce<T extends (...args: unknown[]) => void>(
     func: T,
     delay = 500,
-) {
+): DebounceReturn<T> {
     let timeout: number | null = null;
-    return (...args: Parameters<T>) => {
+    const fn = (...args: Parameters<T>) => {
         if (timeout !== null) {
             clearTimeout(timeout);
         }
@@ -18,4 +18,13 @@ export function debounce<T extends (...args: unknown[]) => void>(
             func(...args);
         }, delay);
     };
+    Reflect.set(fn, 'cancel', () => {
+        if (timeout !== null) {
+            clearTimeout(timeout);
+            timeout = null;
+        }
+    });
+    return fn as DebounceReturn<T>;
 }
+
+type DebounceReturn<T extends (...args: unknown[]) => unknown> = ((...args: Parameters<T>) => void) & { cancel: () => void };

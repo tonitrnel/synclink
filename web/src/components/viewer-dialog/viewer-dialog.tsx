@@ -3,11 +3,10 @@ import { withProduce } from '~/utils/with-produce';
 import { Loading } from '../loading';
 import { ViewerOptions } from './event';
 import { Dialog } from '../ui/dialog';
-import { useLingui } from '@lingui/react';
 import { MaximizeIcon, MinimizeIcon } from 'lucide-react';
 import { clsx } from '~/utils/clsx';
 import { useSrc, useViewerLoader } from './hooks.ts';
-import { t } from '@lingui/macro';
+import { useLingui } from '@lingui/react';
 
 export const ViewerDialog: FC<
     {
@@ -54,7 +53,9 @@ export const ViewerDialog: FC<
                     {filename}
                 </Dialog.Title>
                 <Dialog.Description className="sr-only">
-                    {t(i18n.i18n)`View the contents of file "${filename}"`}
+                    {i18n._('View the contents of file {filename}', {
+                        filename,
+                    })}
                 </Dialog.Description>
                 <button
                     className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-sm p-0.5 opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none [&>svg]:stroke-[3px]"

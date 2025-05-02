@@ -58,7 +58,7 @@ export const DesktopInput = forwardRef<
             {fileUploadDialog.visible && (
                 <FileUploadDialog {...fileUploadDialog.DialogProps} />
             )}
-            <div className="w-full rounded-2xl border border-gray-200 p-4">
+            <div className="w-full rounded-2xl border border-gray-200 p-3 bg-white">
                 <div className="p-3 pr-0">
                     <div
                         ref={scrollerRef}
@@ -116,8 +116,8 @@ export const DesktopInput = forwardRef<
                         </Button>
                         <Button
                             type="button"
-                            aria-label={i18n._('voice recording')}
-                            tooltip={i18n._('voice recording')}
+                            aria-label={i18n._('Voice recording')}
+                            tooltip={i18n._('Voice recording')}
                             className="rounded-lg p-2"
                             variant="ghost"
                             size="icon"

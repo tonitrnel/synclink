@@ -114,7 +114,7 @@ export const Menu: FC<{
                             await navigator.share(data);
                         else {
                             snackbar.enqueueSnackbar({
-                                message: t`can't share this file`,
+                                message: t`Can't share this file`,
                                 variant: 'warning',
                             });
                         }
