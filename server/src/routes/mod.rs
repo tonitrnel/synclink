@@ -112,6 +112,10 @@ pub fn build() -> Router<AppState> {
                 ])
                 .allow_credentials(true)
                 .expose_headers([axum::http::header::CONTENT_RANGE])
-                .allow_headers([axum::http::header::AUTHORIZATION]),
+                .allow_headers([
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::CONTENT_LENGTH,
+                    axum::http::header::AUTHORIZATION,
+                ]),
         )
 }
