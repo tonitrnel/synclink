@@ -130,7 +130,9 @@ export const FileTransferImpl: FC<{
     const participantsRef = useLatestRef([state.senderId, state.receiverId]);
     const { data: connections = [], refresh } = useSSEConnectionsQuery({
         keepDirtyOnPending: true,
-        onBefore: () => notifyManager.ensureWork(),
+        onBefore: async () => {
+            await notifyManager.ensureConnected();
+        },
     });
 
     const [currentConnection, otherConnections] = useMemo(
@@ -716,7 +718,7 @@ const ConnectionControl: FC<{
                     await conn.addIceCandidate(value[1]);
                 }
             }),
-            notifyManager.on('P2P_REJECT', (id) => {
+            notifyManager.on('P2P_REJECTED', (id) => {
                 const metadata = metadataRef.current;
                 console.log('id', id, 'requestId', metadata.requestId);
                 if (id !== metadata.requestId) return void 0;

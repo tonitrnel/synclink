@@ -90,7 +90,7 @@ const scanFiles = async (items: FileSystemEntry[]): Promise<DirEntry[]> => {
 };
 
 export const DropZone: FC<{
-    onReceivedTransferData?(
+    onReceivedTransferData(
         filesOrEntries: FilesOrEntries,
         source: 'drop',
     ): void;
@@ -120,7 +120,7 @@ export const DropZone: FC<{
                     const files = await Promise.all(
                         items.map((it) => it.getAsFile()!),
                     );
-                    onReceivedTransferData?.(
+                    onReceivedTransferData(
                         { type: 'multi-file', files },
                         'drop',
                     );
@@ -145,7 +145,7 @@ export const DropZone: FC<{
                             ),
                         ),
                     );
-                    onReceivedTransferData?.(
+                    onReceivedTransferData(
                         { type: 'multi-file', files },
                         'drop',
                     );

@@ -37,6 +37,7 @@ export const DesktopInput = forwardRef<
     });
     const { text, setText, handlers, transmitting, transmittable } =
         useInputLogic(textareaRef, async ({ mode, filesOrEntries }) => {
+            console.log('mode', filesOrEntries)
             fileUploadDialog.open({
                 mode,
                 filesOrEntries,
@@ -159,7 +160,7 @@ export const DesktopInput = forwardRef<
                     </div>
                 </div>
             </div>
-            <DropZone />
+            <DropZone onReceivedTransferData={handlers.receivedTransferData} />
         </section>
     );
 });

@@ -11,6 +11,7 @@ import { ReactComponent as LogoIcon } from '~/assets/logo.svg';
 import { clsx } from '~/utils/clsx.ts';
 import { useStatsQuery } from '~/endpoints';
 import { formatBytes } from '~/utils/format-bytes.ts';
+import { useNotifyOnline } from '~/utils/notify-manager.ts';
 
 const NavItem = ({
     icon,
@@ -55,6 +56,7 @@ export const Sidebar: FC<SidebarProps> = () => {
             key: 'stats',
         },
     });
+    const _online = useNotifyOnline();
     const setActiveTab = useCallback(
         (active: string) => {
             navigate(`/${active}`);
@@ -80,8 +82,8 @@ export const Sidebar: FC<SidebarProps> = () => {
         };
     }, [data]);
     const online = useMemo(() => {
-        return !error && navigator.onLine;
-    }, [error]);
+        return !error && navigator.onLine && _online;
+    }, [_online, error]);
     useEffect(() => {
         const onvisibilitychange = () => {
             if (document.visibilityState === 'visible') {
@@ -146,7 +148,7 @@ export const Sidebar: FC<SidebarProps> = () => {
                                 )}
                             />
                             <span className="block leading-none">
-                                {online ? t`Online` : `Offline`}
+                                {online ? t`Online` : t`Offline`}
                             </span>
                         </div>
                         <div className="flex items-center gap-2.5">
