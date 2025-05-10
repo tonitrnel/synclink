@@ -1,8 +1,10 @@
 use crate::common::{AppError, InternalError};
+use crate::models::Ulid;
 use crate::models::file::FileMetadata;
 use crate::services::file::{AppendArgs, FileService, QuotaReservationGuard};
 use crate::services::image::ImageService;
 use crate::utils::{TtiCache, guess_mimetype_from_file};
+use anyhow::Context;
 use axum::body::BodyDataStream;
 use futures::Stream;
 use sha2::{Digest, Sha256};
@@ -18,7 +20,6 @@ use tokio::io::{AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio_stream::StreamExt;
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
-use crate::models::Ulid;
 
 pub struct PreallocatedFile {
     pub id: Uuid,
@@ -65,25 +66,42 @@ impl PreallocatedFile {
         })
     }
     pub async fn new_temp(
+        dir: &Path,
         size: u64,
         reservation_guard: QuotaReservationGuard,
     ) -> anyhow::Result<Self, AppError> {
-        let path = std::env::temp_dir().join("ephemera");
-        if !path.exists() {
-            fs::create_dir(&path).await?;
-        };
         let id = Uuid::now_v7();
-        let path = path.join(format!("{}.tmp", id));
+        let path = dir.join(format!("{}.tmp", id));
 
         let file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .append(true)
             .open(&path)
-            .await?;
-        file.set_len(size).await.map_err(|e| match e.kind() {
-            io::ErrorKind::StorageFull => AppError::DiskQuotaExceeded,
-            _ => AppError::IoError(e),
+            .await
+            .map_err(|err| {
+                tracing::error!(
+                    "Failed to create/open temporary file at {}: {}",
+                    path.display(),
+                    err
+                );
+                err
+            })?;
+        file.set_len(size).await.map_err(|err| {
+            tracing::error!(
+                "Failed to allocate {} bytes for file {}: {}",
+                size,
+                path.display(),
+                err
+            );
+            std::fs::remove_file(&path).ok();
+            match err.kind() {
+                io::ErrorKind::StorageFull => {
+                    tracing::warn!("Disk quota exceeded while allocating file space");
+                    AppError::DiskQuotaExceeded
+                }
+                _ => AppError::IoError(err),
+            }
         })?;
 
         Ok(Self {
@@ -114,6 +132,7 @@ impl PreallocatedFile {
     fn get_device_id(_path: &Path) -> anyhow::Result<u64> {
         Ok(0)
     }
+    /// 将临时文件持久化
     pub async fn persist(
         mut self,
         dir: &Path,
@@ -215,7 +234,10 @@ impl AsyncWrite for PreallocatedFile {
         }
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), io::Error>> {
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), io::Error>> {
         let this = self.get_mut();
         if let Some(f) = &mut this.file {
             Pin::new(f).poll_flush(cx)
@@ -227,7 +249,10 @@ impl AsyncWrite for PreallocatedFile {
         }
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), io::Error>> {
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), io::Error>> {
         let this = self.get_mut();
         if let Some(f) = &mut this.file {
             Pin::new(f).poll_shutdown(cx)
@@ -492,7 +517,8 @@ impl UploadService {
                 (id, start)
             } else {
                 let reservation_guard = self.file_service.reserve_quota(user_id, size);
-                let file = PreallocatedFile::new_temp(size, reservation_guard).await?;
+                let file =
+                    PreallocatedFile::new_temp(self.dir.as_path(), size, reservation_guard).await?;
                 let id = file.id.clone();
 
                 self.sessions.insert(
@@ -594,8 +620,8 @@ impl UploadService {
         preallocated.commit();
         Ok(())
     }
-    
-    pub async fn abort(&self, id: Uuid) -> anyhow::Result<(), AppError>{
+
+    pub async fn abort(&self, id: Uuid) -> anyhow::Result<(), AppError> {
         self.sessions.remove(&id).ok_or(AppError::NotFound)?;
         Ok(())
     }
