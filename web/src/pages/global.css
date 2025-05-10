@@ -122,6 +122,18 @@
 
 @theme {
     --animate-spin-ease: spin 0.8s ease infinite;
+    --animate-progress-linear: progress-linear 1s infinite linear;
+    @keyframes progress-linear {
+        0%{
+            transform: translateX(0) scaleX(0);
+        }
+        40%{
+            transform: translateX(0) scaleX(0.4);
+        }
+        100%{
+            transform: translateX(100%) scaleX(0.5);
+        }
+    }
 }
 
 @layer base {
@@ -189,5 +201,8 @@
     }
     .anchor-none{
         overflow-anchor: none;
+    }
+    .origin-left-right{
+        transform-origin: 0 50%;
     }
 }

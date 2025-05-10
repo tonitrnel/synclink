@@ -2,7 +2,9 @@ import {
     FC,
     forwardRef,
     HTMLAttributes,
+    RefObject,
     useCallback,
+    useEffect,
     useLayoutEffect,
     useMemo,
     useRef,
@@ -14,7 +16,11 @@ import {
     DataEntryWithExtras,
     ItemType,
 } from '~/pages/desktop/stash/_types';
-import { fetchTextCollection, useListQuery } from '~/endpoints';
+import {
+    fetchTextCollection,
+    useFileRecordQuery,
+    useListQuery,
+} from '~/endpoints';
 import { withProduce } from '~/utils/with-produce.ts';
 import { clsx } from '~/utils/clsx.ts';
 import { Loading } from '~/components/loading';
@@ -24,6 +30,11 @@ import { debounce } from '~/utils/debounce.ts';
 import { useRem2px } from '../../_hooks/use-rem2px.ts';
 import { useComposedRefs } from '~/utils/hooks/use-compose-refs.ts';
 import { useVirtualizer, Virtualizer } from '@tanstack/react-virtual';
+import { notifyManager } from '~/utils/notify-manager.ts';
+import { useSnackbar } from '~/components/ui/snackbar';
+import { useUploadTasks } from '~/pages/desktop/stash/_hooks/use-upload-tasks.ts';
+import { AnimatePresence } from 'framer-motion';
+import { UploadItem } from '~/pages/desktop/stash/_components/upload/upload-item.tsx';
 
 interface State {
     cursor: string | undefined;
@@ -35,7 +46,8 @@ interface MetadataRef {
     isPrepending: boolean;
     // 标记反向行为完成
     isRevered: boolean;
-    initialCursor: string | undefined;
+    // 标记为已经追加
+    isAdded: boolean;
     hasMore: boolean;
     previousHeight: number;
     previousTop: number;
@@ -124,7 +136,7 @@ export const List: FC<{ className?: string }> = ({ className }) => {
     const metadataRef = useRef<MetadataRef>({
         isPrepending: false,
         isRevered: false,
-        initialCursor: undefined,
+        isAdded: true,
         hasMore: false,
         previousHeight: 0,
         previousTop: 0,
@@ -132,97 +144,107 @@ export const List: FC<{ className?: string }> = ({ className }) => {
     const recordsRef = useLatestRef(records);
 
     const rem2px = useRem2px();
-    const splitIdx = useCallback(
-        (index: number): [isSentinel: boolean, index: number] => {
-            if (metadataRef.current.hasMore) {
-                if (index == 0) return [true, 0];
-                else return [false, index - 1];
-            } else return [false, index];
+    const snackbar = useSnackbar();
+    const uploadTasks = useUploadTasks({
+        scrollIntoView(index: number) {
+            virtualizer.scrollToIndex(recordsRef.current.length + index + 1);
         },
-        [],
+    });
+    const getItemByIndex = useCallback(
+        (idx: number) => {
+            const hasMore = metadataRef.current.hasMore;
+            if (hasMore) {
+                if (idx === 0) return { type: 'bottom-sentinel' } as const;
+                else {
+                    idx -= 1;
+                }
+            }
+            if (uploadTasks.length > 0 && idx >= records.length) {
+                return {
+                    type: 'upload-task',
+                    content: uploadTasks[idx - records.length],
+                } as const;
+            }
+            return { type: 'record', content: records[idx] } as const;
+        },
+        [records, uploadTasks],
     );
 
     const virtualizer = useVirtualizer({
         // debug: true,
-        count: records.length + (metadataRef.current.hasMore ? 1 : 0),
+        count:
+            records.length +
+            (metadataRef.current.hasMore ? 1 : 0) +
+            uploadTasks.length,
         getScrollElement: () => scrollElementRef.current,
         useScrollendEvent: SUPPORTED_SCROLLEND_EVENT,
         observeElementOffset,
         getItemKey: useCallback(
             (idx: number) => {
-                const [a, b] = splitIdx(idx);
-                if (a) return 'bottom-sentinel';
-                else return recordsRef.current[b].id;
+                const item = getItemByIndex(idx);
+                switch (item.type) {
+                    case 'bottom-sentinel':
+                        return 'bottom-sentinel';
+                    case 'upload-task':
+                        return item.content;
+                    case 'record':
+                        return item.content.id;
+                }
             },
-            // records 发生变化只会在加载时变化，count 必定变化，这里可以安心使用 recordsRef
-            [splitIdx, recordsRef],
+            [getItemByIndex],
         ),
         estimateSize: useCallback(
             (idx: number) => {
-                const [a, b] = splitIdx(idx);
-                if (a) return rem2px(18);
-                else return records[b].__extras__.estimatedHeight;
+                const item = getItemByIndex(idx);
+                switch (item.type) {
+                    case 'bottom-sentinel':
+                        return rem2px(18);
+                    case 'upload-task':
+                        return rem2px(9);
+                    case 'record':
+                        return item.content.__extras__.estimatedHeight;
+                }
             },
-            [splitIdx, records, rem2px],
+            [getItemByIndex, rem2px],
         ),
         overscan: 10,
     });
-    const { pending, done } = useListQuery({
+    const {
+        pending,
+        done,
+        error,
+        execute: executeListQuery,
+    } = useListQuery({
         query: {
             last: 15,
             before: state.cursor,
         },
         onSuccess: async ({ data, has_prev }) => {
-            const texts = data.filter(
-                (it) => it.mimetype.startsWith('text/') && it.size < 4096,
-            ) as DataEntryWithExtras[];
-            if (texts.length > 0) {
-                try {
-                    const collections = await loadTextBatch(
-                        texts.map((it) => it.id),
-                    );
-                    for (let i = 0; i < texts.length; ++i) {
-                        if (texts[i]) texts[i].content = collections[i];
-                    }
-                } catch (error) {
-                    console.error('Failed to load text batch:', error);
-                    // Handle error appropriately
-                }
-            }
             const metadata = metadataRef.current;
-
-            metadata.hasMore = has_prev;
-            if (!metadata.initialCursor && data.length > 0) {
-                metadata.initialCursor = data[0].cursor;
-            }
-            withProduce(setState, (draft) => {
-                draft.loadingOlder = false;
-            });
-            const guesser = createHeightCalculator(
-                scrollElementRef.current!,
+            await patchTextBatch(data as DataEntryWithExtras[]);
+            patchExtras(
+                data as DataEntryWithExtras[],
+                scrollElementRef,
                 rem2px,
             );
 
-            const entries: DataEntryWithExtras[] = data
-                .map((it) => {
-                    const itemType = determineItemType(it.mimetype);
-                    const estimatedHeight = guesser(itemType, it);
-                    return {
-                        ...it,
-                        __extras__: {
-                            itemType,
-                            estimatedHeight: Math.round(estimatedHeight),
-                        },
-                    } satisfies DataEntryWithExtras;
-                })
-                .toReversed();
-            setRecords((prev) => [...entries, ...prev]);
+            metadata.hasMore = has_prev;
+            withProduce(setState, (draft) => {
+                draft.loadingOlder = false;
+            });
+            setRecords((prev) => [
+                ...(data.toReversed() as DataEntryWithExtras[]),
+                ...prev,
+            ]);
         },
         // Add onError handler
         onError: (error) => {
             console.error('useListQuery Error:', error);
             metadataRef.current.isPrepending = false;
         },
+    });
+    const fileRecordQuery = useFileRecordQuery({
+        enabled: false,
     });
     const loadOrder = useMemo(
         () =>
@@ -242,13 +264,9 @@ export const List: FC<{ className?: string }> = ({ className }) => {
                 metadata.previousTop = scrollElement.scrollTop;
                 withProduce(setState, (draft) => {
                     draft.loadingOlder = true;
+                    draft.cursor = records[0].cursor;
                     // draft.scrollLock = true;
                 });
-                setTimeout(() => {
-                    withProduce(setState, (draft) => {
-                        draft.cursor = records[0].cursor;
-                    });
-                }, 3000);
             }, 160),
         [recordsRef],
     );
@@ -263,13 +281,15 @@ export const List: FC<{ className?: string }> = ({ className }) => {
     );
     // 在首次加载完成后跳转到最后一项
     useLayoutEffect(() => {
-        const records = recordsRef.current;
+        const metadata = metadataRef.current;
         if (
             done &&
             scrollElementRef.current &&
-            !metadataRef.current.isRevered
+            (!metadata.isRevered || !metadata.isAdded)
         ) {
-            metadataRef.current.isRevered = true;
+            metadata.isRevered = true;
+            const isAdded = !metadata.isAdded;
+            metadata.isAdded = true;
             console.log('start calculateRange');
             virtualizer.calculateRange();
             // virtualizer.elementsCache
@@ -283,7 +303,9 @@ export const List: FC<{ className?: string }> = ({ className }) => {
             // });
             const offset = virtualizer.getOffsetForIndex(records.length, 'end');
             if (offset) {
-                virtualizer.scrollToOffset(offset[0] + 23.5);
+                virtualizer.scrollToOffset(offset[0] + 23.5, {
+                    behavior: isAdded ? 'smooth' : 'auto',
+                });
                 console.log(
                     'scrolled',
                     records.length,
@@ -298,7 +320,7 @@ export const List: FC<{ className?: string }> = ({ className }) => {
             //     console.log('actual: ', virtualizer.getTotalSize());
             // }, 500);
         }
-    }, [done, recordsRef, virtualizer]);
+    }, [done, records.length, recordsRef, virtualizer]);
     // 当 records 变化时调整滚动条位置
     useLayoutEffect(() => {
         const scrollElement = scrollElementRef.current;
@@ -326,11 +348,81 @@ export const List: FC<{ className?: string }> = ({ className }) => {
             metadata.isPrepending = false;
         }
     }, [records.length]);
+    // 处理来自 SSE 的记录新增、删除信息，如果 SSE 重连则还加载最新的记录
+    useEffect(() => {
+        if (!done || error) return void 0;
+        const metadata = metadataRef.current;
+        let cursor: string | undefined;
+        notifyManager.ensureConnected().catch((reason) => {
+            snackbar.enqueueSnackbar({
+                variant: 'error',
+                message: reason.message,
+            });
+        });
+        return notifyManager.batch(
+            notifyManager.on('CONNECTED', () => {
+                console.log('CONNECTED', cursor);
+                if (!cursor) return;
+            }),
+            notifyManager.on('DISCONNECTED', () => {
+                cursor =
+                    recordsRef.current[recordsRef.current.length - 1].cursor;
+                console.log('DISCONNECTED', cursor);
+            }),
+            notifyManager.on('RECORD_REMOVED', async (id) => {
+                const cursor = recordsRef.current[0].cursor;
+                metadata.isPrepending = true;
+                const res = await executeListQuery(
+                    {
+                        last: 1,
+                        before: cursor,
+                    },
+                    { silent: true },
+                );
+                await patchTextBatch(res.data as DataEntryWithExtras[]);
+                patchExtras(
+                    res.data as DataEntryWithExtras[],
+                    scrollElementRef,
+                    rem2px,
+                );
+                metadata.hasMore = res.has_prev;
+                metadata.isPrepending = false;
+                withProduce(setRecords, (draft) => {
+                    const index = draft.findIndex((it) => it.id === id);
+                    draft.splice(index, 1);
+                    draft.unshift(...(res.data as DataEntryWithExtras[]));
+                });
+            }),
+            notifyManager.on('RECORD_ADDED', async (id) => {
+                const res = await fileRecordQuery.execute(undefined, {
+                    path: {
+                        id,
+                    },
+                    silent: true,
+                });
+                const data = [res as DataEntryWithExtras];
+                await patchTextBatch(data);
+                patchExtras(data, scrollElementRef, rem2px);
+                metadata.isAdded = false;
+                withProduce(setRecords, (draft) => {
+                    draft.push(...data);
+                });
+            }),
+        );
+    }, [
+        done,
+        error,
+        executeListQuery,
+        fileRecordQuery,
+        recordsRef,
+        rem2px,
+        snackbar,
+    ]);
 
     const virtualItems = virtualizer.getVirtualItems();
     return (
         <div className={clsx('relative', className)}>
-            {pending && <InitialLoadingIndicator />}
+            {!done && pending && <InitialLoadingIndicator />}
             <div className="absolute top-0 left-0 h-full w-full">
                 <div
                     ref={scrollElementRef}
@@ -348,47 +440,63 @@ export const List: FC<{ className?: string }> = ({ className }) => {
                             height: `${virtualizer.getTotalSize()}px`,
                         }}
                     >
-                        {virtualItems.map((virtualItem) => {
-                            const [isSentinel, idx] = splitIdx(
-                                virtualItem.index,
-                            );
-                            if (isSentinel) {
-                                return (
-                                    <ScrollSentinel
-                                        ref={measureElement}
-                                        data-index={virtualItem.index}
-                                        data-size={virtualItem.size}
-                                        key="bottom-sentinel"
-                                        className="absolute top-0 left-0 w-full"
-                                        style={{
-                                            transform: `translateY(${virtualItem.start}px)`,
-                                        }}
-                                        // loading={state.loadingOlder}
-                                        onLoad={loadOrder}
-                                    />
-                                );
-                            } else {
-                                const item = records[idx];
+                        <AnimatePresence>
+                            {virtualItems.map((virtualItem) => {
+                                const item = getItemByIndex(virtualItem.index);
+                                if (item.type === 'bottom-sentinel') {
+                                    return (
+                                        <ScrollSentinel
+                                            ref={measureElement}
+                                            data-index={virtualItem.index}
+                                            data-size={virtualItem.size}
+                                            key="bottom-sentinel"
+                                            data-itemtype="sentinel"
+                                            className="absolute top-0 left-0 w-full"
+                                            style={{
+                                                transform: `translateY(${virtualItem.start}px)`,
+                                            }}
+                                            // loading={state.loadingOlder}
+                                            onLoad={loadOrder}
+                                        />
+                                    );
+                                }
+                                if (item.type === 'upload-task') {
+                                    return (
+                                        <UploadItem
+                                            key={item.content}
+                                            id={item.content}
+                                            data-index={virtualItem.index}
+                                            data-size={virtualItem.size}
+                                            data-itemtype="upload-task"
+                                            style={{
+                                                transform: `translateY(${virtualItem.start}px)`,
+                                            }}
+                                        />
+                                    );
+                                }
                                 return (
                                     <div
                                         ref={virtualizer.measureElement}
                                         data-index={virtualItem.index}
                                         data-size={virtualItem.size}
                                         data-guess={
-                                            item.__extras__.estimatedHeight
+                                            item.content.__extras__
+                                                .estimatedHeight
                                         }
-                                        data-itemtype={item.__extras__.itemType}
-                                        key={item.id}
+                                        data-itemtype={
+                                            item.content.__extras__.itemType
+                                        }
+                                        key={item.content.id}
                                         className="absolute top-0 left-0 w-full"
                                         style={{
                                             transform: `translateY(${virtualItem.start}px)`,
                                         }}
                                     >
-                                        <Item data={item} />
+                                        <Item data={item.content} />
                                     </div>
                                 );
-                            }
-                        })}
+                            })}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>
@@ -421,6 +529,37 @@ const loadTextBatch = async (uuids: string[]) => {
             },
         },
     });
+};
+const patchTextBatch = async (data: DataEntryWithExtras[]) => {
+    const texts = data.filter(
+        (it) => it.mimetype.startsWith('text/') && it.size < 4096,
+    ) as DataEntryWithExtras[];
+    if (texts.length > 0) {
+        try {
+            const collections = await loadTextBatch(texts.map((it) => it.id));
+            for (let i = 0; i < texts.length; ++i) {
+                if (texts[i]) texts[i].content = collections[i];
+            }
+        } catch (error) {
+            console.error('Failed to load text batch:', error);
+            // Handle error appropriately
+        }
+    }
+};
+const patchExtras = (
+    data: DataEntryWithExtras[],
+    scrollElementRef: RefObject<HTMLElement>,
+    rem2px: (rem: number) => number,
+) => {
+    const guesser = createHeightCalculator(scrollElementRef.current!, rem2px);
+    for (const item of data) {
+        const itemType = determineItemType(item.mimetype);
+        const estimatedHeight = guesser(itemType, item);
+        item['__extras__'] = {
+            itemType,
+            estimatedHeight: Math.round(estimatedHeight),
+        };
+    }
 };
 const createHeightCalculator = (
     scrollElement: HTMLElement,

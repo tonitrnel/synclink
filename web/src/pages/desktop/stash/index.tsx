@@ -6,7 +6,7 @@ import { notifyManager } from '~/utils/notify-manager.ts';
 
 export default function StashPage() {
     useEffect(() => {
-        notifyManager.connect()
+        notifyManager.connect().catch(console.error)
     }, [])
     return (
         <Layout titleBarProps={{ title: '暂存区' }}>

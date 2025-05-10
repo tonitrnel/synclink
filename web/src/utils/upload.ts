@@ -3,7 +3,6 @@ import {
     calculateHashFromDirectory,
     calculateHashFromStream,
 } from './calculate-hash.ts';
-import { UploadManager } from '~/components/upload-manager';
 import { Logger } from '~/utils/logger.ts';
 import { t } from '@lingui/core/macro';
 import { DirEntry, FilesOrEntries } from '~/constants/types.ts';
@@ -19,6 +18,10 @@ import {
     cancelMultipartUpload,
 } from '~/endpoints';
 import dayjs from 'dayjs';
+import {
+    createUploadTask,
+    UploadHandlers,
+} from '~/pages/desktop/stash/_hooks/use-upload-tasks.ts';
 
 const logger = new Logger('upload');
 
@@ -70,13 +73,12 @@ const slowPerform = async (
     tags: string[] | undefined,
 ) => {
     const abort = new AbortController();
-    const manager = await UploadManager.oneshot.fire({
+    const manager = createUploadTask({
         filename: file.name,
         mimetype: file.type,
         abort: (reason) => abort.abort(reason),
         timestamp: Date.now(),
         total: file.size,
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
         retry: () => {},
     });
     manager.scrollIntoView();
@@ -84,20 +86,17 @@ const slowPerform = async (
         const hash = await calculateHashFromStream(file.stream(), file.type, {
             signal: abort.signal,
             onReady: () => {
-                manager.entryHashCalculatingStage();
+                manager.enterHashingStage();
             },
-            onSpeedChange: (speed) =>
-                manager.onHashCalculatingSpeedChange(speed),
+            onSpeedChange: (speed) => manager.setHashSpeed(speed),
             onProgressChange(loaded: number) {
-                manager.onHashCalculatingProgressChange(
-                    Math.floor((loaded / file.size) * 100),
-                );
+                manager.setHashProgress(Math.floor((loaded / file.size) * 100));
             },
         });
         const setupTime = Date.now();
         const alreadyExists = await preflight(hash, file.size);
         if (alreadyExists) {
-            manager.entryCompleteStage();
+            manager.enterCompletionStage();
             throw new Error(t`Resource already exists`);
         }
         // 100 MB
@@ -111,10 +110,10 @@ const slowPerform = async (
             manager,
             caption,
             tags,
-            onReady: () => manager.ready(),
+            onReady: () => manager.markReady(),
             onProgress: (loaded, speed) => manager.setLoaded(loaded, speed),
             onAllSent: () => {
-                manager.entryServerProcessStage();
+                manager.enterServerProcessingStage();
             },
         });
         logger.debug(`upload success, ${uid}`);
@@ -122,10 +121,10 @@ const slowPerform = async (
             file.size,
             (file.size / (Date.now() - setupTime)) * 1000,
         );
-        manager.entryCompleteStage();
+        manager.enterCompletionStage();
     } catch (e) {
         logger.error(e);
-        manager.failed(String(e));
+        manager.markFailure(String(e));
     }
 };
 const dirPerform = async (
@@ -142,25 +141,22 @@ const dirPerform = async (
             : entries[0].name;
     const mimetype = 'application/x-tar';
     const setupTime = Date.now();
-    const manager = await UploadManager.oneshot.fire({
+    const manager = createUploadTask({
         filename,
         mimetype,
         abort: (reason) => abort.abort(reason),
         timestamp: Date.now(),
         total: size,
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
         retry: () => {},
     });
     const hash = await calculateHashFromDirectory(entries, {
         signal: abort.signal,
         onReady: () => {
-            manager.entryHashCalculatingStage();
+            manager.enterHashingStage();
         },
-        onSpeedChange: (speed) => manager.onHashCalculatingSpeedChange(speed),
+        onSpeedChange: (speed) => manager.setHashSpeed(speed),
         onProgressChange(loaded: number) {
-            manager.onHashCalculatingProgressChange(
-                Math.floor((loaded / size) * 100),
-            );
+            manager.setHashProgress(Math.floor((loaded / size) * 100));
         },
     });
     if (await preflight(hash, size)) {
@@ -199,10 +195,10 @@ const dirPerform = async (
             manager,
             caption,
             tags,
-            onReady: () => manager.ready(),
+            onReady: () => manager.markReady(),
             onProgress: (loaded, speed) => manager.setLoaded(loaded, speed),
             onAllSent: () => {
-                manager.entryServerProcessStage();
+                manager.enterServerProcessingStage();
             },
         });
         logger.debug(`upload success, ${uid}`);
@@ -210,10 +206,10 @@ const dirPerform = async (
             file.size,
             (file.size / (Date.now() - setupTime)) * 1000,
         );
-        manager.entryCompleteStage();
+        manager.enterCompletionStage();
     } catch (e) {
         logger.error(e);
-        manager.failed(String(e));
+        manager.markFailure(String(e));
     }
 };
 
@@ -225,7 +221,7 @@ const uploadByWhole = (
         hash: string;
         setupTime: number;
         signal: AbortSignal;
-        manager: UploadManager;
+        manager: UploadHandlers;
         onReady(): void;
         onProgress(loaded: number, speed: number): void;
     },
@@ -280,7 +276,7 @@ const uploadByParts = async (
         setupTime: number;
         signal: AbortSignal;
         chunkSize: number;
-        manager: UploadManager;
+        manager: UploadHandlers;
         onReady(): void;
         onProgress(loaded: number, speed: number): void;
         onAllSent(): void;
