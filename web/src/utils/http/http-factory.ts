@@ -277,7 +277,7 @@ type QueryExecuteOptions<S extends HttpSchemaProperties> = {
     path?: S['Path'];
     /**
      * 是否静默
-     * @description 如果为false将触发React重新渲染
+     * @description 如果为 false 将触发 React 重新渲染和 onSuccess 等事件
      * @default true
      */
     silent?: boolean;
@@ -943,12 +943,10 @@ export class HttpFactory<
                     const expose = exposeRef.current;
                     const metadata = metadataRef.current;
                     const mergedOptions = mergedOptionsRef.current;
+                    const isSilent = executeOptions.silent === true;
 
-                    const rerender = createRerender(
-                        executeOptions.silent === false,
-                        triggerUpdate,
-                    );
-                    await mergedOptions.onBefore?.();
+                    const rerender = createRerender(!isSilent, triggerUpdate);
+                    if (!isSilent) await mergedOptions.onBefore?.();
                     rerender(() => {
                         expose.pending = true;
                     });
@@ -959,11 +957,12 @@ export class HttpFactory<
                             ...executeOptions,
                         }).finally(() => rerender(cleanup, false));
                         request = ret[1];
-                        const serializedData =
-                            ((await mergedOptions.onSuccess?.(ret[0], {
-                                input: ret[1],
-                                output: ret[2],
-                            })) ?? ret[0]) as SerializedData;
+                        const serializedData = isSilent
+                            ? (ret[0] as SerializedData)
+                            : (((await mergedOptions.onSuccess?.(ret[0], {
+                                  input: ret[1],
+                                  output: ret[2],
+                              })) ?? ret[0]) as SerializedData);
                         rerender(() => {
                             expose.data = serializedData;
                             expose.request = ret[1];
@@ -976,7 +975,7 @@ export class HttpFactory<
                             expose.request = request;
                             expose.error = e as S['Error'];
                         }, false);
-                        mergedOptions.onError?.(e as S['Error']);
+                        if (!isSilent) mergedOptions.onError?.(e as S['Error']);
                         throw e;
                     } finally {
                         if (!metadata.unmounted) {
@@ -985,7 +984,7 @@ export class HttpFactory<
                                 metadata.done = true;
                             });
                         }
-                        mergedOptions.onFinally?.();
+                        if (!isSilent) mergedOptions.onFinally?.();
                     }
                 },
                 [
@@ -1271,11 +1270,10 @@ export class HttpFactory<
                     const expose = exposeRef.current;
                     const metadata = metadataRef.current;
                     const mergedOptions = mergedOptionsRef.current;
-                    const rerender = createRerender(
-                        executeOptions.silent === false,
-                        triggerUpdate,
-                    );
-                    await mergedOptions.onBefore?.();
+                    const isSilent = executeOptions.silent === true;
+
+                    const rerender = createRerender(isSilent, triggerUpdate);
+                    if (!isSilent) await mergedOptions.onBefore?.();
                     rerender(() => {
                         expose.pending = true;
                     });
@@ -1291,17 +1289,19 @@ export class HttpFactory<
                             expose.response = ret[2];
                             expose.request = ret[1];
                         }, false);
-                        mergedOptions.onSuccess?.(ret[0], {
-                            input: ret[1],
-                            output: ret[2],
-                        });
+                        if (!isSilent) {
+                            mergedOptions.onSuccess?.(ret[0], {
+                                input: ret[1],
+                                output: ret[2],
+                            });
+                        }
                         return ret[0];
                     } catch (e) {
                         rerender(() => {
                             expose.request = request;
                             expose.error = e as S['Error'];
                         }, false);
-                        mergedOptions.onError?.(e as S['Error']);
+                        if (!isSilent) mergedOptions.onError?.(e as S['Error']);
                         throw e;
                     } finally {
                         if (!metadata.unmounted) {
@@ -1310,7 +1310,7 @@ export class HttpFactory<
                                 metadata.done = true;
                             });
                         }
-                        mergedOptions.onFinally?.();
+                        if (!isSilent) mergedOptions.onFinally?.();
                     }
                 },
                 [
@@ -1414,7 +1414,29 @@ export class HttpFactory<
                 return (await options.serializers.response(
                     res,
                 )) as Promise<Serialized>;
-            else return (await res.json()) as Promise<Serialized>;
+            else {
+                const contentType =
+                    res.headers.get('content-type')?.split(';')[0] || '';
+                if (res.ok) {
+                    switch (contentType) {
+                        case 'application/json':
+                            return (await res.json()) as Promise<Serialized>;
+                        case 'text/plain':
+                            return (await res.text()) as unknown as Promise<Serialized>;
+                        default:
+                            return (await res.arrayBuffer()) as unknown as Promise<Serialized>;
+                    }
+                } else {
+                    switch (contentType) {
+                        case 'application/json':
+                            throw await res.json();
+                        case 'text/plain':
+                            throw await res.text();
+                        default:
+                            throw `${res.status} ${res.statusText}`;
+                    }
+                }
+            }
         }
 
         Reflect.set(request, ' __source', { method, pathname, baseUrl });
