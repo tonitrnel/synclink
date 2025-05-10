@@ -15,7 +15,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/pages/mobile/index.tsx:66
-#: src/pages/desktop/stash/_components/list/list.tsx:50
+#: src/pages/desktop/stash/_components/list/list.tsx:60
 msgid "Receiving"
 msgstr "接收中"
 
@@ -491,7 +491,7 @@ msgstr "拖拽文件放置于此"
 msgid "Can't share this file"
 msgstr "无法分享这个文件"
 
-#: src/components/input/hooks/use-input-logic.ts:171
+#: src/components/input/hooks/use-input-logic.ts:177
 msgid "Cannot to paste such files"
 msgstr "无法粘贴此类文件"
 
@@ -537,7 +537,11 @@ msgstr "文件夹已经存在"
 #~ msgid "No items found."
 #~ msgstr "未找到任何记录"
 
-#: src/components/layout/sidebar.tsx:149
+#: src/components/layout/sidebar.tsx:151
+msgid "Offline"
+msgstr "离线"
+
+#: src/components/layout/sidebar.tsx:151
 msgid "Online"
 msgstr "在线"
 
@@ -545,7 +549,7 @@ msgstr "在线"
 #~ msgid "Paste"
 #~ msgstr "粘贴"
 
-#: src/components/input/hooks/use-input-logic.ts:126
+#: src/components/input/hooks/use-input-logic.ts:132
 msgid "Paste file is empty"
 msgstr "粘贴文件为空"
 
@@ -567,7 +571,7 @@ msgstr "资源已存在"
 #~ msgid "Sending"
 #~ msgstr "发送中"
 
-#: src/components/layout/sidebar.tsx:134
+#: src/components/layout/sidebar.tsx:136
 msgid "Settings"
 msgstr "设置"
 
@@ -579,11 +583,11 @@ msgstr "设置"
 #~ msgid "Shared from"
 #~ msgstr "分享来自"
 
-#: src/components/layout/sidebar.tsx:120
+#: src/components/layout/sidebar.tsx:122
 msgid "Stash"
 msgstr "暂存"
 
-#: src/components/layout/sidebar.tsx:127
+#: src/components/layout/sidebar.tsx:129
 msgid "Transfer"
 msgstr "传输"
 

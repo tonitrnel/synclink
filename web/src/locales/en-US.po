@@ -15,7 +15,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/pages/mobile/index.tsx:66
-#: src/pages/desktop/stash/_components/list/list.tsx:50
+#: src/pages/desktop/stash/_components/list/list.tsx:60
 msgid "Receiving"
 msgstr "Receiving"
 
@@ -491,7 +491,7 @@ msgstr "Drag and Drop file here"
 msgid "Can't share this file"
 msgstr "Can't share this file"
 
-#: src/components/input/hooks/use-input-logic.ts:171
+#: src/components/input/hooks/use-input-logic.ts:177
 msgid "Cannot to paste such files"
 msgstr "Cannot to paste such files"
 
@@ -537,7 +537,11 @@ msgstr "directory already exists"
 #~ msgid "No items found."
 #~ msgstr "No items found."
 
-#: src/components/layout/sidebar.tsx:149
+#: src/components/layout/sidebar.tsx:151
+msgid "Offline"
+msgstr "Offline"
+
+#: src/components/layout/sidebar.tsx:151
 msgid "Online"
 msgstr "Online"
 
@@ -545,7 +549,7 @@ msgstr "Online"
 #~ msgid "Paste"
 #~ msgstr "Paste"
 
-#: src/components/input/hooks/use-input-logic.ts:126
+#: src/components/input/hooks/use-input-logic.ts:132
 msgid "Paste file is empty"
 msgstr "Paste file is empty"
 
@@ -567,7 +571,7 @@ msgstr "Resource already exists"
 #~ msgid "Sending"
 #~ msgstr "Sending"
 
-#: src/components/layout/sidebar.tsx:134
+#: src/components/layout/sidebar.tsx:136
 msgid "Settings"
 msgstr "Settings"
 
@@ -579,11 +583,11 @@ msgstr "Settings"
 #~ msgid "Shared from"
 #~ msgstr "shared from"
 
-#: src/components/layout/sidebar.tsx:120
+#: src/components/layout/sidebar.tsx:122
 msgid "Stash"
 msgstr "Stash"
 
-#: src/components/layout/sidebar.tsx:127
+#: src/components/layout/sidebar.tsx:129
 msgid "Transfer"
 msgstr "Transfer"
 
