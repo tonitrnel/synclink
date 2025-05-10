@@ -80,7 +80,42 @@ export const useDirectoryQuery = createHttpFactory('GET:/api/directory/{id}')
         }[]
     >()
     .makeQuery();
-
+export const useFileRecordQuery = createHttpFactory('GET:/api/file/{id}/metadata')
+    .apply<'Response', {
+        id: string;
+        name: string;
+        hash: string;
+        size: number;
+        extname: string;
+        mimetype: string;
+        ipaddr?: string;
+        device?: string;
+        metadata?:
+            | {
+            type: 'image';
+            width: number;
+            height: number;
+            thumbnail_width?: number;
+            thumbnail_height?: number;
+        }
+            | {
+            type: 'archive';
+            entries: {
+                path: string;
+                mtime: number;
+                size: number;
+                mimetype?: string;
+                is_file: boolean;
+                hash?: string;
+            }[];
+        };
+        is_encrypted: boolean;
+        is_pined: boolean;
+        created_at: number;
+        updated_at: number;
+        cursor: string;
+    }>()
+    .makeQuery()
 export const patchFileMetadata = createHttpFactory(
     'PATCH:/api/file/{id}/metadata',
 )
