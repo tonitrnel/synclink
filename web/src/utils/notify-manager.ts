@@ -1,8 +1,10 @@
 import { EventBus } from '~/utils/event-bus.ts';
+import { useLayoutEffect, useState } from 'react';
+import { wait } from '~/utils/wait.ts';
 
 type SseMessageMap = {
     RECORD_ADDED: string;
-    RECORD_DELETED: string;
+    RECORD_REMOVED: string;
     USER_CONNECTED: string;
     USER_DISCONNECTED: string;
     CLIENT_ID: string;
@@ -28,135 +30,211 @@ type ToEventUnion<T extends Record<string, unknown>> = {
 
 type SseMessage = ToEventUnion<SseMessageMap>;
 
+export interface NotifyOptions {
+    endpoint: string;
+    maxReconnectAttempts?: number;
+    reconnectIntervalMs?: number;
+    idleDisconnectMs?: number;
+}
+
 class NotifyManager extends EventBus<
     SseMessageMap & {
         CONNECTED: undefined;
         DISCONNECTED: undefined;
+        RECONNECT_ATTEMPT: number;
+        RECONNECT_FAILED: void;
     }
 > {
-    private eventSource: EventSource | undefined;
+    private sse: EventSource | undefined;
     public clientId: string | undefined;
     public clientPin: string | undefined;
-    private connecting = false;
-    private visibilityTimer: number | undefined;
-    public keepConnection = false;
-    private resolveQueue: Array<
+    public keepConnection: boolean = false;
+
+    private isConnecting = false;
+
+    private pendingResolvers: Array<
         [resolve: (value: string) => void, reject: (reason: unknown) => void]
     > = [];
 
-    constructor() {
+    private reconnectAttempts = 0;
+    private options: Required<NotifyOptions>;
+    private idleTimer: number | undefined;
+
+    constructor(options: NotifyOptions) {
         super();
-        document.addEventListener('visibilitychange', this.handleVisibility);
-        window.addEventListener('focus', this.handleFocus);
+        this.options = {
+            maxReconnectAttempts: 3,
+            reconnectIntervalMs: 2000,
+            idleDisconnectMs: 60000,
+            ...options,
+        };
+        document.addEventListener(
+            'visibilitychange',
+            this.handleVisibilityChange,
+        );
+        window.addEventListener('focus', this.handleWindowFocus);
     }
 
-    public async connect(): Promise<string | undefined> {
-        if (this.connecting)
-            return new Promise((resolve, reject) => {
-                this.resolveQueue.push([resolve, reject]);
-            });
-        this.connecting = true;
-        this.clear('CLIENT_ID');
-        try {
-            return await new Promise((resolve, reject) => {
-                const eventSource = new EventSource(
-                    `${__ENDPOINT__}/api/notify`,
-                    { withCredentials: true },
-                );
-                eventSource.onmessage = this.handleMessage;
-                const timer = window.setTimeout(() => {
-                    eventSource.close();
-                    reject(new Error('Connection timeout'));
-                }, 1600);
-                eventSource.onopen = () => {
-                    window.clearTimeout(timer);
-                    this.once('CLIENT_ID', (value) => {
-                        const [id, pin] = value.split(';');
-                        this.clientId = id;
-                        this.clientPin = pin;
-                        this.emit('CONNECTED');
-                        resolve(id);
-                        while (this.resolveQueue.length > 0) {
-                            const [resolve] = this.resolveQueue.pop()!;
-                            resolve(id);
-                        }
-                    });
-                    console.debug('sse connected');
-                };
-                eventSource.onerror = () => {
-                    window.clearTimeout(timer);
-                    eventSource.close();
-                    if (
-                        eventSource.readyState == eventSource.CONNECTING ||
-                        eventSource.readyState == eventSource.CLOSED
-                    ) {
-                        const reason = new Error('Failed to connect');
-                        reject(reason);
-                        while (this.resolveQueue.length > 0) {
-                            const [, reject] = this.resolveQueue.pop()!;
-                            reject(reason);
-                        }
-                        return void 0;
-                    }
-                    if (eventSource.readyState == eventSource.OPEN) {
-                        console.debug('sse disconnected, trying to reconnect');
-                    }
-                };
-                this.eventSource = eventSource;
-            });
-        } finally {
-            this.connecting = false;
+    /**
+     * 建立 SSE 连接
+     */
+    public async connect(): Promise<string> {
+        if (this.clientId) {
+            return this.clientId;
         }
+        if (this.isConnecting)
+            return new Promise((resolve, reject) => {
+                this.pendingResolvers.push([resolve, reject]);
+            });
+
+        this.isConnecting = true;
+        this.flushPending();
+
+        return new Promise<string>((resolve, reject) => {
+            const url = `${this.options.endpoint}/api/notify`;
+            this.sse = new EventSource(url, { withCredentials: true });
+            const timeout = window.setTimeout(() => {
+                this.teardown();
+                reject(new Error('SSE connection timed out'));
+            }, 3000);
+            this.sse.onopen = () => {
+                window.clearTimeout(timeout);
+                this.reconnectAttempts = 0;
+                console.debug('[NotifyService] SSE connected');
+            };
+            this.sse.onerror = () => {
+                window.clearTimeout(timeout);
+                this.handleError(new Error('SSE connection error'), reject);
+            };
+            this.sse.onmessage = (evt) => {
+                const msg: SseMessage = JSON.parse(evt.data);
+                if (msg.type === 'CLIENT_ID') {
+                    this.clientId = msg.payload.split(';')[0];
+                    this.clientPin = msg.payload.split(';')[1];
+                    this.emit('CONNECTED');
+
+                    resolve(this.clientId);
+                    this.flushPending(null, this.clientId);
+                    return;
+                }
+
+                if (msg.type === 'HEART') return;
+                this.emit(msg.type, msg.payload);
+            };
+        }).finally(() => {
+            this.isConnecting = false;
+        });
     }
 
+    /**
+     * 立即断开 SSE 连接
+     */
     public async disconnect(): Promise<void> {
-        this.eventSource?.close();
-        this.eventSource = undefined;
+        this.sse?.close();
+        this.sse = undefined;
         this.emit('DISCONNECTED');
     }
 
-    private handleMessage = async (evt: MessageEvent) => {
-        const message: SseMessage = JSON.parse(evt.data);
-        if (message.type === 'HEART') {
-            return void 0;
+    /**
+     * 确保连接是活跃的，或尝试重连中
+     */
+    public ensureConnected = async (): Promise<string | undefined> => {
+        if (this.sse && this.sse.readyState == EventSource.OPEN) {
+            return this.clientId;
         }
-        // console.log('sse message:', message);
-        this.emit(message.type, message.payload);
+        try {
+            return await this.attemptReconnect();
+        } catch {
+            return undefined;
+        }
     };
-    private handleVisibility = async () => {
-        const visibility = document.visibilityState;
-        if (this.visibilityTimer) {
-            window.clearTimeout(this.visibilityTimer);
-            this.visibilityTimer = undefined;
+
+    private async attemptReconnect(): Promise<string> {
+        while (this.reconnectAttempts < this.options.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            this.emit('RECONNECT_ATTEMPT', this.reconnectAttempts);
+            try {
+                return await this.connect();
+            } catch (err) {
+                console.warn(
+                    `[NotifyService] Reconnect #${this.reconnectAttempts} failed`,
+                    err,
+                );
+                await wait(this.options.reconnectIntervalMs);
+            }
         }
-        if (visibility === 'visible') {
+
+        this.emit('RECONNECT_FAILED');
+        throw new Error('Max reconnect attempts reached');
+    }
+
+    private handleError(err: Error, reject: (reason?: unknown) => void) {
+        this.teardown();
+        reject(err);
+        this.flushPending(err);
+        this.emit('DISCONNECTED');
+    }
+
+    private teardown() {
+        if (this.sse) {
+            this.sse.close();
+            this.sse = undefined;
+        }
+        this.clientId = undefined;
+        this.clientPin = undefined;
+    }
+
+    private flushPending(error: unknown = null, id?: string) {
+        this.pendingResolvers.forEach(([resolve, reject]) => {
+            if (error) {
+                reject(error);
+            } else {
+                resolve(id!);
+            }
+        });
+        this.pendingResolvers = [];
+    }
+
+    private handleVisibilityChange = () => {
+        if (this.idleTimer) {
+            window.clearTimeout(this.idleTimer);
+            this.idleTimer = undefined;
+        }
+        if (document.visibilityState === 'hidden') {
             if (this.keepConnection) return void 0;
-            this.visibilityTimer = window.setTimeout(() => {
-                if (this.keepConnection) return void 0;
-                console.debug('inactive for more than 60s');
-                this.visibilityTimer = undefined;
-                this.disconnect();
-            }, 6_000);
+            this.idleTimer = window.setTimeout(() => {
+                this.disconnect().catch(console.error);
+            }, this.options.idleDisconnectMs);
         } else {
-            await this.ensureWork();
+            this.ensureConnected().catch(console.error);
         }
     };
-    private handleFocus = async () => {
-        if (this.visibilityTimer) {
-            window.clearTimeout(this.visibilityTimer);
-            this.visibilityTimer = undefined;
+    private handleWindowFocus = () => {
+        if (this.idleTimer) {
+            window.clearTimeout(this.idleTimer);
+            this.idleTimer = undefined;
         }
-        await this.ensureWork();
+        this.ensureConnected().catch(console.error);
     };
-    public ensureWork = async () => {
-        if (
-            this.eventSource &&
-            this.eventSource.readyState == this.eventSource.OPEN
-        ) {
-            return void 0;
-        }
-        await this.connect();
-    };
+
+    // private destory() {
+    //     this.disconnect().catch(console.error);
+    //     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    //     document.removeEventListener('focus', this.handleWindowFocus);
+    //     this.flushPending(new Error('NotifyManager destroyed'));
+    // }
 }
 
-export const notifyManager = new NotifyManager();
+export const notifyManager = new NotifyManager({
+    endpoint: __ENDPOINT__,
+});
+export const useNotifyOnline = (): boolean => {
+    const [online, setOnline] = useState<boolean>(false);
+    useLayoutEffect(() => {
+        return notifyManager.batch(
+            notifyManager.on('CONNECTED', () => setOnline(true)),
+            notifyManager.on('DISCONNECTED', () => setOnline(false)),
+        );
+    }, []);
+    return online;
+};
