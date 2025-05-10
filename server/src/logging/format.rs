@@ -74,7 +74,9 @@ where
                 LogLevelFormat::format_level_colored(meta.level(), true),
                 ColoredText::bright_black(format!(
                     "{}{}{}:",
-                    meta.target().replace("ephemera", "eph"),
+                    meta.file()
+                        .and_then(|file| meta.line().map(|line| format!("{}:{}", file, line)))
+                        .unwrap_or_else(|| meta.target().replace("ephemera", "eph")),
                     trace_id,
                     fields_str
                 )),
@@ -85,7 +87,9 @@ where
                 writer,
                 "{} {}{}{} {} {}",
                 now.format("%F %X%.3f"),
-                meta.target().replace("ephemera", "eph"),
+                meta.file()
+                    .and_then(|file| meta.line().map(|line| format!("{}:{}", file, line)))
+                    .unwrap_or_else(|| meta.target().replace("ephemera", "eph")),
                 trace_id,
                 fields_str,
                 LogLevelFormat::format_level_char(meta.level()),

@@ -138,7 +138,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         match &self {
             AppError::Internal(err) => {
-                tracing::error!("Application error: {:?}", self);
+                tracing::error!("Internal error: {:?}", err);
                 err.chain()
                     .skip(1)
                     .for_each(|cause| tracing::error!("Because: {}", cause));
