@@ -31,7 +31,6 @@ fn print_banner() {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    #[cfg(target_os = "linux")]
     let _pid = utils::pidfile::Pidfile::new()?;
     let config = &config::CONFIG;
     let (mut log_writer, log_handle) = LogWriter::new()?;
@@ -51,12 +50,12 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(all(not(debug_assertions), target_os = "linux"))]
     tracing::info!(
         "Ephemera {version} ({commit_id} {build_date}) built with docker{docker_version}, {system_version}, rustc{rustc_version}",
-        build_date = env!("BUILD_DATE"),
+        build_date = option_env!("BUILD_DATE").unwrap_or("unknown"),
         version = env!("CARGO_PKG_VERSION"),
-        commit_id = env!("COMMIT_ID"),
-        docker_version = env!("DOCKER_VERSION"),
-        rustc_version = env!("RUSTC_VERSION"),
-        system_version = env!("SYSTEM_VERSION"),
+        commit_id = option_env!("COMMIT_ID").unwrap_or("unknown"),
+        docker_version = option_env!("DOCKER_VERSION").unwrap_or("unknown"),
+        rustc_version = option_env!("RUSTC_VERSION").unwrap_or("unknown"),
+        system_version = option_env!("SYSTEM_VERSION").unwrap_or("unknown"),
     );
     tracing::info!("listening on http://{}", listener.local_addr()?);
     match server::run_until_done(

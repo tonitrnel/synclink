@@ -2,6 +2,9 @@
 logs
 *.log
 
+# Env
+.env
+
 # Added by cargo
 
 /target
