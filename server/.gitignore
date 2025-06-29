@@ -8,3 +8,5 @@ logs
 # Added by cargo
 
 /target
+
+heaptrack.*
